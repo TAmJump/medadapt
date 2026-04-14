@@ -607,7 +607,18 @@ w.appendChild(nt);
 if(u.plan==='free'){const pl=h('div',{className:'card',style:{marginBottom:'20px',background:'linear-gradient(135deg,#ecfeff,#fff8e1)'}});
 pl.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},'Proプランへアップグレード'));
 pl.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.8'}},'月額 ¥900 で全機能無制限。受入れケース・担当者会議・モニタリングの月間制限なし。'));
-pl.appendChild(btn('アップグレード','btn-pri',()=>{toast('本番環境で決済画面へ遷移します')}));
+pl.appendChild(h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginTop:'8px',maxWidth:'420px'}},
+  h('a',{href:PAYMENT_URL,style:{display:'block',textAlign:'center',padding:'14px',borderRadius:'14px',background:'linear-gradient(135deg,#0891b2,#06b6d4)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'13px'}},
+    h('div',null,'月額プラン'),
+    h('div',{style:{fontSize:'20px',fontWeight:'800',margin:'2px 0'}},'¥900'),
+    h('div',{style:{fontSize:'10px',opacity:'.8'}},'/月（税込）')
+  ),
+  h('a',{href:PAYMENT_URL_ANNUAL,style:{display:'block',textAlign:'center',padding:'14px',borderRadius:'14px',background:'var(--ink)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'13px'}},
+    h('div',null,'年額プラン'),
+    h('div',{style:{fontSize:'20px',fontWeight:'800',margin:'2px 0'}},'¥9,900'),
+    h('div',{style:{fontSize:'10px',opacity:'.8'}},'年一括（1ヶ月お得）')
+  )
+));
 w.appendChild(pl)}
 // Data management
 const dm=h('div',{className:'card'});
