@@ -352,7 +352,62 @@ function caseCallTab(c){const w=h('div');const panel=h('div',{className:'call-pa
 function caseConsentTab(c){return consentSignBlock(c,'discharge')}
 function caseMembersTab(c){const w=h('div');(c.parts||[]).forEach((p,i)=>{w.appendChild(h('div',{className:'member-row'},h('div',{style:{flex:1}},h('div',{style:{fontSize:'13px',fontWeight:'600'}},p.name||''),h('div',{style:{fontSize:'10px',color:'var(--ink-m)'}},p.org||'')),btn('×','btn-xs btn-danger',()=>{c.parts.splice(i,1);sv();rr()})))});
 const ac=h('div',{className:'card',style:{marginTop:'12px'}});ac.appendChild(h('h4',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'10px'}},'参加者を追加'));const g=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}});g.appendChild(fld('氏名','np_n','',v=>{S.np.n=v}));g.appendChild(fld('所属','np_r','',v=>{S.np.r=v}));ac.appendChild(g);ac.appendChild(btn('追加','btn-sm btn-pri',()=>{const n=document.getElementById('np_n')?.value,r=document.getElementById('np_r')?.value;if(!n){toast('氏名必須');return}if(!c.parts)c.parts=[];c.parts.push({id:'p'+uid(),name:n,org:r});addAudit(c.audit,'参加者追加',n);sv();toast('追加');rr()}));w.appendChild(ac);return w}
-function caseRecordTab(c){const w=h('div');if(c.record?.generated){w.appendChild(h('div',{className:'card'},h('pre',{style:{fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'inherit'}},c.record.text)));w.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'12px'}},btn('PDF出力','btn-pri',()=>buildRecordPDF(c)),btn('CSV','btn-out',()=>{downloadCSV([['項目','内容'],['患者名',c.pn],['記録',c.record.text]],'退院記録_'+c.pn+'.csv')})))}else{w.appendChild(h('div',{className:'card',style:{textAlign:'center',padding:'40px',color:'var(--ink-m)'}},h('div',{style:{marginBottom:'12px'}},'通話終了後に記録が自動生成されます'),btn('手動生成','btn-out',()=>{c.record={generated:true,text:'共同指導記録\n\n患者名：'+c.pn+'\n（手動）'};addAudit(c.audit,'記録手動生成','');sv();rr()})))}return w}
+function caseRecordTab(c){
+if(!c.record)c.record={generated:false,text:''};
+if(!c.record.guidance)c.record.guidance={medical:'',diet:'',mobility:'',lifestyle:'',reaction:'',firstVisit:''};
+const g=c.record.guidance;
+const w=h('div');
+// 加算対応バナー
+w.appendChild(h('div',{style:{padding:'10px 16px',background:'#ecfeff',border:'1px solid #0891b2',borderRadius:'10px',fontSize:'12px',color:'#0e7490',fontWeight:'600',marginBottom:'16px'}},'退院時共同指導加算（600単位/回）対応帳票を自動生成できます'));
+// 指導内容入力フォーム
+const card=h('div',{className:'card',style:{marginBottom:'16px'}});
+card.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)',marginBottom:'16px'}},'指導内容の記録'));
+const g2=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+[
+  ['医療処置・服薬指導','medical','例：インスリン自己注射の手技確認、服薬カレンダー導入'],
+  ['食事形態・栄養','diet','例：嚥下機能低下あり、ミキサー食。水分はとろみ付き'],
+  ['移動・転倒リスク','mobility','例：歩行器使用。段差・濡れた床に注意。夜間転倒歴あり'],
+  ['生活上の留意点','lifestyle','例：入浴は週2回、介助必要。排泄はポータブルトイレ使用'],
+  ['本人・家族の反応','reaction','例：本人「頑張ります」。長男より「不安だが協力する」とのこと'],
+  ['初回訪問予定日','firstVisit','']
+].forEach(([label,key,ph])=>{
+  const isDate=key==='firstVisit';
+  const wrap=h('div',{className:'field'});
+  wrap.appendChild(h('label',null,label));
+  if(isDate){
+    wrap.appendChild(h('input',{type:'date',value:g[key]||'',onInput:e=>{g[key]=e.target.value;sv()}}));
+  }else{
+    const ta=h('textarea',{rows:'3',placeholder:ph,style:{fontSize:'12px'},onInput:e=>{g[key]=e.target.value;sv()}});
+    ta.textContent=g[key]||'';
+    wrap.appendChild(ta);
+  }
+  g2.appendChild(wrap);
+});
+card.appendChild(g2);
+w.appendChild(card);
+// ボタン
+w.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
+  btn('加算対応PDF帳票を出力','btn-pri',()=>{
+    c.record.generated=true;
+    addAudit(c.audit,'退院時共同指導記録PDF出力','加算対応帳票');
+    sv();buildRecordPDF(c);
+  }),
+  btn('CSV','btn-out',()=>{
+    const pt=D.patients.find(p=>p.id===c.patientId);
+    const rows=[['項目','内容'],
+      ['利用者名',c.pn],['退院予定日',c.dd||''],
+      ['実施日時',c.apt?c.apt.date+' '+c.apt.time:''],
+      ['実施場所・通信手段','オンライン（'+c.callUrl+'）'],
+      ['参加者',(c.parts||[]).map(p=>(p.org?p.org+' ':'')+p.name).join('/')],
+      ['医療処置・服薬',g.medical||''],['食事形態・栄養',g.diet||''],
+      ['移動・転倒リスク',g.mobility||''],['生活上の留意点',g.lifestyle||''],
+      ['本人・家族の反応',g.reaction||''],['初回訪問予定日',g.firstVisit||''],
+      ['同意者',c.consent?.name||''],['同意日時',c.consent?.signed_at||'']
+    ];
+    downloadCSV(rows,'退院時共同指導記録_'+c.pn+'.csv');
+  })
+));
+return w;}
 // --- HUB: CONFERENCES ---
 function hubConfs(pt){if(S.confId){const c=D.conferences.find(x=>x.id===S.confId);if(c)return confDetail(c)}
 const w=h('div');if(pt.status==='pre_admission')w.appendChild(h('div',{style:{padding:'10px 14px',background:'#1e293b12',border:'1px solid #1e293b30',borderRadius:'10px',fontSize:'12px',color:'#1e293b',marginBottom:'16px'}},'この患者は入居前です。入居決定後にサービス担当者会議が本格的に必要になります。'));
@@ -630,7 +685,58 @@ w.appendChild(dm);
 return w}
 // --- PDF GENERATORS ---
 function genAssessPDF(a,pt){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'アセスメント'));d.appendChild(h('div',{style:{margin:'12px 0'}},'患者：'+(pt?pt.name:'')+'　種別：'+({pre_admission:'入居前',periodic:'定期',adhoc:'臨時',post_incident:'事故後'}[a.type]||'')+'　日付：'+a.date+'　担当：'+a.author));const items=[];if(a.adl){const i=Object.entries(a.adl).filter(([,v])=>v);if(i.length)items.push('ADL: '+i.map(([k,v])=>k+'='+v).join(', '))}if(a.medical){const i=Object.entries(a.medical).filter(([,v])=>v);if(i.length)items.push('医療処置: '+i.map(([k])=>k).join(', '))}if(a.risk){const i=Object.entries(a.risk).filter(([,v])=>v);if(i.length)items.push('リスク: '+i.map(([k])=>k).join(', '))}if(a.medication)items.push('服薬: '+a.medication);if(a.family)items.push('家族意向: '+a.family);if(a.conditions)items.push('受入条件: '+a.conditions);if(a.notes)items.push('備考: '+a.notes);d.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'12px',fontFamily:'serif'}},items.join('\n\n')));d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'アセスメント_'+(pt?pt.name:'')+'.pdf')}
-function buildRecordPDF(c){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('h2',{style:{textAlign:'center',fontSize:'16px',borderBottom:'2px solid #000',paddingBottom:'8px'}},'共同指導記録'));d.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'12px',fontFamily:'serif',marginTop:'16px'}},c.record?.text||''));if(c.consent?.sigDataUrl){d.appendChild(h('div',{style:{marginTop:'16px',fontSize:'11px'}},'署名：'));d.appendChild(h('img',{src:c.consent.sigDataUrl,style:{maxWidth:'200px'}}))}d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'退院記録_'+c.pn+'.pdf')}
+function buildRecordPDF(c){
+const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';
+const g=c.record?.guidance||{};
+const parts=(c.parts||[]).filter(p=>p.name);
+const d=h('div',{style:{width:'700px',padding:'36px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.9',color:'#000',background:'#fff'}});
+// タイトル
+d.appendChild(h('div',{style:{textAlign:'center',fontSize:'17px',fontWeight:'700',borderBottom:'3px solid #000',paddingBottom:'8px',marginBottom:'4px'}},'退院時共同指導の記録'));
+d.appendChild(h('div',{style:{textAlign:'center',fontSize:'10px',color:'#555',marginBottom:'20px'}},'（退院時共同指導加算 算定対応）'));
+// 基本情報テーブル
+const t1=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px',marginBottom:'16px'}});
+const addR=(l,v,w2)=>{const tr=h('tr');tr.appendChild(h('td',{style:{padding:'6px 8px',fontWeight:'700',background:'#f0f9ff',border:'1px solid #ccc',width:w2||'120px',whiteSpace:'nowrap'}},l));tr.appendChild(h('td',{style:{padding:'6px 8px',border:'1px solid #ccc'}},v||''));t1.appendChild(tr);};
+addR('利用者氏名',c.pn);
+addR('退院予定日',c.dd||'');
+addR('実施日時',c.apt?c.apt.date+'　'+c.apt.time:'');
+addR('実施場所・方法',c.callUrl?'オンライン（情報通信機器使用）　'+c.callUrl:'対面');
+addR('算定事業所',S.user?.org_name||S.user?.org||'');
+d.appendChild(t1);
+// 参加者
+d.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',margin:'12px 0 6px'}},'■ 参加者'));
+const t2=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px',marginBottom:'16px'}});
+const hdr=h('tr');['氏名','所属・事業所','職種・役割'].forEach(l=>hdr.appendChild(h('th',{style:{padding:'5px 8px',background:'#1e293b',color:'#fff',border:'1px solid #ccc',textAlign:'left'}},l)));
+t2.appendChild(hdr);
+parts.forEach(p=>{const tr=h('tr');[p.name,p.org||'',''].forEach(v=>tr.appendChild(h('td',{style:{padding:'5px 8px',border:'1px solid #ccc'}},v)));t2.appendChild(tr);});
+// 空行2つ
+for(let i=0;i<2;i++){const tr=h('tr');['','',''].forEach(()=>tr.appendChild(h('td',{style:{padding:'12px 8px',border:'1px solid #ccc'}},' ')));t2.appendChild(tr);}
+d.appendChild(t2);
+// 指導内容
+d.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',margin:'12px 0 6px'}},'■ 指導内容'));
+const t3=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px',marginBottom:'16px'}});
+[
+  ['医療処置・服薬指導',g.medical],
+  ['食事形態・栄養管理',g.diet],
+  ['移動・転倒リスク管理',g.mobility],
+  ['生活上の留意点',g.lifestyle],
+  ['本人・家族の反応・意向',g.reaction],
+  ['初回訪問予定日',g.firstVisit],
+].forEach(([l,v])=>{
+  const tr=h('tr');
+  tr.appendChild(h('td',{style:{padding:'6px 8px',fontWeight:'700',background:'#f0f9ff',border:'1px solid #ccc',width:'160px',verticalAlign:'top'}},l));
+  tr.appendChild(h('td',{style:{padding:'6px 8px',border:'1px solid #ccc',minHeight:'40px',whiteSpace:'pre-wrap'}},v||''));
+  t3.appendChild(tr);
+});
+d.appendChild(t3);
+// 同意
+d.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',margin:'12px 0 6px'}},'■ 利用者・家族同意'));
+const t4=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px',marginBottom:'16px'}});
+[['同意者氏名',c.consent?.name||''],['続柄',c.consent?.relationship||''],['同意取得日時',c.consent?.signed_at?c.consent.signed_at.slice(0,16).replace('T','　'):'']].forEach(([l,v])=>{const tr=h('tr');tr.appendChild(h('td',{style:{padding:'6px 8px',fontWeight:'700',background:'#f0f9ff',border:'1px solid #ccc',width:'160px'}},l));tr.appendChild(h('td',{style:{padding:'6px 8px',border:'1px solid #ccc'}},v));t4.appendChild(tr);});
+d.appendChild(t4);
+if(c.consent?.sigDataUrl){d.appendChild(h('div',{style:{fontSize:'11px',marginBottom:'4px'}},'署名：'));d.appendChild(h('img',{src:c.consent.sigDataUrl,style:{maxWidth:'220px',maxHeight:'70px',border:'1px solid #ccc'}}));}
+// フッター
+d.appendChild(h('div',{style:{borderTop:'1px solid #ccc',marginTop:'20px',paddingTop:'8px',display:'flex',justifyContent:'space-between',fontSize:'10px',color:'#666'}},h('span',null,'作成：'+(S.user?.org_name||S.user?.org||'')),h('span',null,'MedAdapt　出力日：'+new Date().toLocaleDateString('ja-JP'))));
+cn.appendChild(d);genPdf(cn,'退院時共同指導記録_'+c.pn+'.pdf');}
 function genConfPDF(c){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf')}
 function genMonPDF(m2){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'モニタリング_'+m2.userName+'.pdf')}
 // --- ROUTER ---
