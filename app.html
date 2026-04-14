@@ -809,15 +809,20 @@ if(!findUser('free@test.com'))saveUser({email:'free@test.com',pw:'test1234',org:
 if(!findUser('pro@test.com'))saveUser({email:'pro@test.com',pw:'test1234',org:'テスト介護施設',type:'care',name:'テスト花子',plan:'pro',created:now(),usage:{}});
 // Token-based auto-login
 loadToken();
+const savedEmail=(()=>{try{return localStorage.getItem('medadapt-last-email')||null}catch(e){return null}})();
+function tryLocalLogin(){
+  if(savedEmail){const u=findUser(savedEmail);if(u){S.user=u;S.scr='app';S.page='patients';rr();return true;}}
+  return false;
+}
 if(S.token){
   (async()=>{
     const res=await api('/auth/me');
     if(res&&res.user){S.user=res.user;await loadPatients();await loadPendingShares();S.scr='app';S.page='patients';rr();}
+    else if(tryLocalLogin()){}
     else{if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else if(window.location.hash==='#signup'){S.scr='signup';S.signupStep=1;S.signupPlan='free';}else{S.scr='login';}rr();}
   })();
 } else {
-  if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else if(window.location.hash==='#signup'){S.scr='signup';S.signupStep=1;S.signupPlan='free';}else{S.scr=S.user?'app':'login';}
-  rr();
+  if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else if(window.location.hash==='#signup'){S.scr='signup';S.signupStep=1;S.signupPlan='free';}else if(tryLocalLogin()){}else{S.scr='login';rr();}
 }
 </script>
 </body>
