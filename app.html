@@ -646,7 +646,7 @@ w.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
     c.record.generated=true;
     addAudit(c.audit,'退院時共同指導記録PDF出力','加算対応帳票');
     const g2=c.record?.guidance||{};
-    saveDocument('discharge_guidance','退院時共同指導記録　'+c.pn+（g2.implementationDate?'　'+g2.implementationDate:''),c.patientId,c.id,{case:c,guidance:g2,parts:c.parts,consent:c.consent});
+    saveDocument('discharge_guidance','退院時共同指導記録　'+c.pn+(g2.implementationDate?'　'+g2.implementationDate:''),c.patientId,c.id,{case:c,guidance:g2,parts:c.parts,consent:c.consent});
     sv();buildRecordPDF(c);
   }),
   btn('CSV','btn-out',()=>{
