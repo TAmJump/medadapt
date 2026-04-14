@@ -117,25 +117,52 @@ function bdg(l,c){const isRed=c==='red'||c==='#dc2626'||c==='var(--red)';return 
 function toast(m){S.toast=m;if(S.tt)clearTimeout(S.tt);S.tt=setTimeout(()=>{S.toast=null;rr()},1200);rr()}
 function sv(){
   try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
-  if(S.user?.email){
-    const uid=S.user.email.replace(/[^a-zA-Z0-9]/g,'_');
-    fetch(API+'/state/'+uid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(D)}).catch(()=>{});
+  if(S.token){
+    fetch(API+'/sync',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},body:JSON.stringify(D)}).catch(()=>{});
   }
 }
 function ld(){try{const s=localStorage.getItem(K);if(s){const p=JSON.parse(s);Object.keys(D).forEach(k=>{if(p[k])D[k]=p[k]})}}catch(e){}}
 async function loadFromCloud(){
-  if(!S.user?.email)return;
+  if(!S.token)return;
   try{
-    const uid=S.user.email.replace(/[^a-zA-Z0-9]/g,'_');
-    const res=await fetch(API+'/state/'+uid);
+    const res=await fetch(API+'/sync',{headers:{'Authorization':'Bearer '+S.token}});
     if(res.ok){
       const data=await res.json();
-      if(data&&Object.keys(data).length>0){
-        Object.keys(D).forEach(k=>{if(data[k])D[k]=data[k]});
+      if(data){
+        if(data.patients&&data.patients.length)D.patients=data.patients;
+        if(data.cases&&data.cases.length)D.cases=data.cases;
+        if(data.conferences&&data.conferences.length)D.conferences=data.conferences;
+        if(data.monitors&&data.monitors.length)D.monitors=data.monitors;
+        if(data.assessments&&data.assessments.length)D.assessments=data.assessments;
+        if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
       }
     }
   }catch(e){}
+}
+async function saveDocument(docType,title,patientId,relatedId,content){
+  if(!S.token)return null;
+  try{
+    const res=await fetch(API+'/documents',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},body:JSON.stringify({docType,title,patientId,relatedId,content,createdBy:S.user?.name||''})});
+    if(res.ok)return await res.json();
+  }catch(e){}
+  return null;
+}
+async function loadDocuments(patientId){
+  if(!S.token)return[];
+  try{
+    const res=await fetch(API+'/documents?patient_id='+patientId,{headers:{'Authorization':'Bearer '+S.token}});
+    if(res.ok){const d=await res.json();return d.documents||[];}
+  }catch(e){}
+  return[];
+}
+async function getDocument(docId){
+  if(!S.token)return null;
+  try{
+    const res=await fetch(API+'/documents/'+docId,{headers:{'Authorization':'Bearer '+S.token}});
+    if(res.ok)return await res.json();
+  }catch(e){}
+  return null;
 }
 function now(){return new Date().toISOString()}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
@@ -273,7 +300,7 @@ function initSig(sel){setTimeout(()=>{const el=document.querySelector(sel||'.sig
 function getSig(){try{const cv=document.querySelector('.sig');return cv&&S.signed?cv.toDataURL('image/png'):null}catch(e){return null}}
 function genPdf(container,filename){setTimeout(()=>{html2canvas(container,{scale:2,backgroundColor:'#fff'}).then(canvas=>{const pdf=new window.jspdf.jsPDF('p','mm','a4');const w2=pdf.internal.pageSize.getWidth()-20;pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,w2,w2*(canvas.height/canvas.width));pdf.save(filename);document.getElementById('pdf-render').style.display='none';toast('PDF完了')})},200)}
 // --- LOGIN / SIGNUP ---
-function loginScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});const lastEmail=(()=>{try{return localStorage.getItem('medadapt-last-email')||''}catch(e){return''}})();cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--accent)'}},'MedAdapt'),h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'医療介護連携OS'),h('div',{style:{fontSize:'12px',color:S.loginErr?'var(--red)':'var(--ink-m)',marginTop:'12px'}},S.loginErr||'ログイン')));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_email'},'メール'),h('input',{id:'l_email',type:'email',name:'email',autocomplete:'username',placeholder:'mail@example.com',value:lastEmail||''})));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_pw'},'パスワード'),h('div',{style:{position:'relative'}},h('input',{id:'l_pw',type:'password',name:'password',autocomplete:'current-password',placeholder:'',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const inp=document.getElementById('l_pw');if(inp)inp.type=inp.type==='password'?'text':'password';}},'👁'))));if(lastEmail){setTimeout(()=>{const pw=document.getElementById('l_pw');if(pw)pw.focus()},100)}cd.appendChild(h('div',{style:{marginTop:'8px'}},h('button',{className:'btn btn-pri btn-full',type:'submit',onClick:async()=>{const email=document.getElementById('l_email')?.value?.trim(),pw=document.getElementById('l_pw')?.value?.trim();if(!email||!pw){S.loginErr='入力してください';rr();return}try{const res=await api('/auth/login',{method:'POST',body:JSON.stringify({email,password:pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;try{localStorage.setItem('medadapt-last-email',email);localStorage.setItem('medadapt-autologin',email)}catch(e){}if(res.user.must_change_pw){S.scr='changepw';rr();return}await loadPatients();await loadPendingShares();S.scr='app';S.page='patients';S.loginErr='';rr()}else{const u=findUser(email);if(u&&u.pw===pw){S.user=u;seedDemoData(email);try{localStorage.setItem('medadapt-autologin',email)}catch(e){};loadFromCloud().then(()=>rr());if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}};S.scr='app';S.page='patients';S.loginErr='';rr()}else{S.loginErr='認証エラー';rr()}}}catch(e){S.loginErr='通信エラー';rr()}}},'ログイン')));cd.appendChild(h('div',{style:{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px',fontSize:'13px'}},h('a',{href:'#',style:{color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='resetpw';rr()}},'パスワードを忘れた'),h('a',{href:'#',style:{color:'var(--accent)',fontWeight:'600',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='signup';S.signupStep=1;rr()}},'新規法人登録')));cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'12px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← MedAdaptトップへ'));w.appendChild(cd);return w}
+function loginScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});const lastEmail=(()=>{try{return localStorage.getItem('medadapt-last-email')||''}catch(e){return''}})();cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--accent)'}},'MedAdapt'),h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'医療介護連携OS'),h('div',{style:{fontSize:'12px',color:S.loginErr?'var(--red)':'var(--ink-m)',marginTop:'12px'}},S.loginErr||'ログイン')));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_email'},'メール'),h('input',{id:'l_email',type:'email',name:'email',autocomplete:'username',placeholder:'mail@example.com',value:lastEmail||''})));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_pw'},'パスワード'),h('div',{style:{position:'relative'}},h('input',{id:'l_pw',type:'password',name:'password',autocomplete:'current-password',placeholder:'',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const inp=document.getElementById('l_pw');if(inp)inp.type=inp.type==='password'?'text':'password';}},'👁'))));if(lastEmail){setTimeout(()=>{const pw=document.getElementById('l_pw');if(pw)pw.focus()},100)}cd.appendChild(h('div',{style:{marginTop:'8px'}},h('button',{className:'btn btn-pri btn-full',type:'submit',onClick:async()=>{const email=document.getElementById('l_email')?.value?.trim(),pw=document.getElementById('l_pw')?.value?.trim();if(!email||!pw){S.loginErr='入力してください';rr();return}try{const res=await api('/auth/login',{method:'POST',body:JSON.stringify({email,password:pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;try{localStorage.setItem('medadapt-last-email',email);localStorage.setItem('medadapt-autologin',email)}catch(e){}if(res.user.must_change_pw){S.scr='changepw';rr();return}await loadFromCloud();S.scr='app';S.page='patients';S.loginErr='';rr()}else{const u=findUser(email);if(u&&u.pw===pw){S.user=u;seedDemoData(email);try{localStorage.setItem('medadapt-autologin',email)}catch(e){};loadFromCloud().then(()=>rr());if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}};S.scr='app';S.page='patients';S.loginErr='';rr()}else{S.loginErr='認証エラー';rr()}}}catch(e){S.loginErr='通信エラー';rr()}}},'ログイン')));cd.appendChild(h('div',{style:{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px',fontSize:'13px'}},h('a',{href:'#',style:{color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='resetpw';rr()}},'パスワードを忘れた'),h('a',{href:'#',style:{color:'var(--accent)',fontWeight:'600',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='signup';S.signupStep=1;rr()}},'新規法人登録')));cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'12px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← MedAdaptトップへ'));w.appendChild(cd);return w}
 
 function signupScr(){const w=h('div',{className:'auth-bg'});const cd=h('div',{className:'card',style:{width:'100%',maxWidth:S.signupStep===1?'700px':'500px',padding:'32px'}});
 if(S.signupStep===1){cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'法人プラン選択')));const grid=h('div',{className:'plan-grid'});[['free','Free','¥0','','基本機能・月3ケース'],['pro','Pro','¥900','/月','全機能無制限']].forEach(([id,nm,pr,sub,ft])=>{grid.appendChild(h('div',{className:'plan-card'+(S.signupPlan===id?' selected':''),onClick:()=>{S.signupPlan=id;rr()}},h('div',{className:'plan-name'},nm),h('div',{className:'plan-price'},pr,sub?h('small',null,sub):null),h('div',{style:{fontSize:'13px',color:'var(--ink-l)'}},ft)))});cd.appendChild(grid);cd.appendChild(h('div',{style:{display:'flex',gap:'12px',justifyContent:'center',marginTop:'28px'}},btn('← 戻る','btn-out',()=>{S.scr='login';rr()}),btn('次へ →','btn-pri',()=>{S.signupStep=2;rr()})))}
@@ -285,8 +312,8 @@ if(d2.type==='other'){cd.appendChild(fld('種別（その他・具体的に）',
     h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const inp=document.getElementById('s_pw');if(inp){inp.type=inp.type==='password'?'text':'password';}}
     },'👁')
   )
-));cd.appendChild(h('div',{style:{display:'flex',gap:'12px',justifyContent:'center',marginTop:'20px'}},btn('← 戻る','btn-out',()=>{S.signupStep=1;rr()}),btn(S.signupPlan==='pro'?'決済へ →':'法人登録','btn-pri',async()=>{const d3=S.signupData;if(!d3.org||!d3.type||!d3.name||!d3.email||!d3.pw){toast('必須項目');return}if(d3.pw.length<8){toast('8文字以上');return}if(S.signupPlan==='pro'){S.signupStep=3;rr();return}const res=await api('/auth/register',{method:'POST',body:JSON.stringify({orgName:d3.org,orgType:d3.type,adminName:d3.name,email:d3.email,password:d3.pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;S.scr='app';S.page='patients';toast('法人登録完了！法人ID: '+res.user.org_id);rr()}else{saveUser({email:d3.email,pw:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free',created:now(),usage:{}});S.user=findUser(d3.email);S.scr='app';S.page='patients';toast('登録完了（オフライン）');rr()}})))}
-if(S.signupStep===3){cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'20px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'Proプラン決済'),bdg('Pro','#0891b2'),h('div',{style:{fontSize:'28px',fontWeight:'800',color:'var(--accent)',margin:'12px 0'}},'¥900',h('small',{style:{fontSize:'14px',fontWeight:'500',color:'var(--ink-m)'}},'/月')),h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'年額 ¥9,900（1ヶ月分お得）')));cd.appendChild(h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',margin:'20px auto 0',maxWidth:'460px'}},h('a',{href:PAYMENT_URL,style:{display:'block',textAlign:'center',padding:'16px',borderRadius:'14px',background:'linear-gradient(135deg,#0891b2,#06b6d4)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'14px',boxShadow:'0 4px 16px rgba(8,145,178,.3)'}},h('div',null,'月額プラン'),h('div',{style:{fontSize:'22px',fontWeight:'800',margin:'4px 0'}},'¥900'),h('div',{style:{fontSize:'11px',opacity:'.8'}},'/月（税込）')),h('a',{href:PAYMENT_URL_ANNUAL,style:{display:'block',textAlign:'center',padding:'16px',borderRadius:'14px',background:'var(--ink)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'14px'}},h('div',null,'年額プラン'),h('div',{style:{fontSize:'22px',fontWeight:'800',margin:'4px 0'}},'¥9,900'),h('div',{style:{fontSize:'11px',opacity:'.8'}},'年一括（1ヶ月お得）'))));cd.appendChild(h('div',{style:{display:'flex',gap:'12px',justifyContent:'center',marginTop:'20px'}},btn('← 戻る','btn-out',()=>{S.signupStep=2;rr()}),btn('Freeで始める','btn-out',async()=>{const d3=S.signupData;const res=await api('/auth/register',{method:'POST',body:JSON.stringify({orgName:d3.org,orgType:d3.type,adminName:d3.name,email:d3.email,password:d3.pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;S.scr='app';S.page='patients';toast('法人登録完了（Freeプラン）');rr()}else{saveUser({email:d3.email,pw:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free',created:now(),usage:{}});S.user=findUser(d3.email);S.scr='app';S.page='patients';toast('登録完了');rr()}})))}
+));cd.appendChild(h('div',{style:{display:'flex',gap:'12px',justifyContent:'center',marginTop:'20px'}},btn('← 戻る','btn-out',()=>{S.signupStep=1;rr()}),btn(S.signupPlan==='pro'?'決済へ →':'法人登録','btn-pri',async()=>{const d3=S.signupData;if(!d3.org||!d3.type||!d3.name||!d3.email||!d3.pw){toast('必須項目');return}if(d3.pw.length<8){toast('8文字以上');return}if(S.signupPlan==='pro'){S.signupStep=3;rr();return}const res=await api('/auth/register',{method:'POST',body:JSON.stringify({email:d3.email,password:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free'})});if(res&&res.success){const loginRes=await api('/auth/login',{method:'POST',body:JSON.stringify({email:d3.email,password:d3.pw})});if(loginRes&&loginRes.token){saveToken(loginRes.token);S.user=loginRes.user;S.scr='app';S.page='patients';toast('法人登録完了！');rr();return}}saveUser({email:d3.email,pw:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free',created:now(),usage:{}});S.user=findUser(d3.email);S.scr='app';S.page='patients';toast('登録完了');rr()})))}}
+if(S.signupStep===3){cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'20px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'Proプラン決済'),bdg('Pro','#0891b2'),h('div',{style:{fontSize:'28px',fontWeight:'800',color:'var(--accent)',margin:'12px 0'}},'¥900',h('small',{style:{fontSize:'14px',fontWeight:'500',color:'var(--ink-m)'}},'/月')),h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'年額 ¥9,900（1ヶ月分お得）')));cd.appendChild(h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',margin:'20px auto 0',maxWidth:'460px'}},h('a',{href:PAYMENT_URL,style:{display:'block',textAlign:'center',padding:'16px',borderRadius:'14px',background:'linear-gradient(135deg,#0891b2,#06b6d4)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'14px',boxShadow:'0 4px 16px rgba(8,145,178,.3)'}},h('div',null,'月額プラン'),h('div',{style:{fontSize:'22px',fontWeight:'800',margin:'4px 0'}},'¥900'),h('div',{style:{fontSize:'11px',opacity:'.8'}},'/月（税込）')),h('a',{href:PAYMENT_URL_ANNUAL,style:{display:'block',textAlign:'center',padding:'16px',borderRadius:'14px',background:'var(--ink)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'14px'}},h('div',null,'年額プラン'),h('div',{style:{fontSize:'22px',fontWeight:'800',margin:'4px 0'}},'¥9,900'),h('div',{style:{fontSize:'11px',opacity:'.8'}},'年一括（1ヶ月お得）'))));cd.appendChild(h('div',{style:{display:'flex',gap:'12px',justifyContent:'center',marginTop:'20px'}},btn('← 戻る','btn-out',()=>{S.signupStep=2;rr()}),btn('Freeで始める','btn-out',async()=>{const d3=S.signupData;const res=await api('/auth/register',{method:'POST',body:JSON.stringify({email:d3.email,password:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free'})});if(res&&res.success){const loginRes=await api('/auth/login',{method:'POST',body:JSON.stringify({email:d3.email,password:d3.pw})});if(loginRes&&loginRes.token){saveToken(loginRes.token);S.user=loginRes.user;S.scr='app';S.page='patients';toast('法人登録完了（Freeプラン）');rr();return}}saveUser({email:d3.email,pw:d3.pw,org:d3.org,type:d3.type,name:d3.name,plan:'free',created:now(),usage:{}});S.user=findUser(d3.email);S.scr='app';S.page='patients';toast('登録完了');rr()}))}
 cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'16px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← MedAdaptトップへ'));
 w.appendChild(cd);return w}
 // ── Password Reset Screen ──
@@ -340,7 +367,45 @@ w.appendChild(hdr);
 // Hub Tabs
 const tabs=h('div',{className:'tabs'});const tabList=[{id:'overview',l:'① 概要'},{id:'transition',l:'② 受入れ・移行'},{id:'conferences',l:'③ サービス担当者会議'},{id:'monitors',l:'④ モニタリング'},{id:'records',l:'⑤ 記録・監査'}];
 tabList.forEach(t=>{const cls='tab'+(S.hubTab===t.id?' active':'');tabs.appendChild(h('div',{className:cls,onClick:()=>{S.hubTab=t.id;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},t.l))});w.appendChild(tabs);
-const fn={overview:()=>{const sec=h('div');sec.appendChild(hubTimeline(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),records:()=>{const sec=h('div');sec.appendChild(hubSharing(pt));sec.appendChild(h('div',{className:'section-label',style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}},'同意書'));sec.appendChild(hubConsentDocs(pt));sec.appendChild(h('div',{className:'section-label',style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}},'監査ログ'));sec.appendChild(hubAudit(pt));return sec}};w.appendChild((fn[S.hubTab]||fn.overview)());return w}
+const fn={overview:()=>{const sec=h('div');sec.appendChild(hubTimeline(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),records:()=>{const sec=h('div');
+// 帳票一覧（D1保存）
+const docSection=h('div',{style:{marginBottom:'24px'}});
+docSection.appendChild(h('div',{className:'section-label',style:{marginBottom:'12px'}},'📄 保存済み帳票'));
+const docList=h('div',{id:'doc-list-container'});
+docList.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'12px'}},'読み込み中...'));
+docSection.appendChild(docList);
+sec.appendChild(docSection);
+// 非同期でD1から帳票一覧取得
+loadDocuments(pt.id).then(docs=>{
+  docList.innerHTML='';
+  if(!docs.length){docList.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'12px'}},'保存済み帳票はありません'));return;}
+  const typeLabel={discharge_guidance:'退院時共同指導記録',conference:'サービス担当者会議記録',monitoring:'モニタリング記録',assessment:'アセスメント'};
+  docs.forEach(doc=>{
+    const row=h('div',{style:{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'10px',marginBottom:'8px',fontSize:'12px'}});
+    row.appendChild(h('div',{style:{flex:1}},
+      h('div',{style:{fontWeight:'700'}},doc.title||typeLabel[doc.doc_type]||doc.doc_type),
+      h('div',{style:{fontSize:'10px',color:'var(--ink-m)',marginTop:'2px'}},doc.created.slice(0,16).replace('T',' ')+'　作成者：'+(doc.created_by||'—'))
+    ));
+    row.appendChild(btn('内容を見る','btn-xs btn-out',async()=>{
+      const full=await getDocument(doc.id);
+      if(!full){toast('取得できませんでした');return;}
+      const m=h('div',{className:'modal',style:{maxWidth:'700px',maxHeight:'90vh',overflow:'auto'}});
+      m.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
+        h('div',{style:{fontWeight:'800',fontSize:'15px'}},doc.title||typeLabel[doc.doc_type]||doc.doc_type),
+        btn('閉じる','btn-sec',()=>{S.modal=null;rr();})
+      ));
+      m.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'11px',lineHeight:'1.8',background:'#f8fafc',padding:'16px',borderRadius:'8px',overflow:'auto'}},JSON.stringify(full.content,null,2)));
+      S.modal=m;rr();
+    }));
+    docList.appendChild(row);
+  });
+});
+sec.appendChild(hubSharing(pt));
+sec.appendChild(h('div',{className:'section-label',style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}},'同意書'));
+sec.appendChild(hubConsentDocs(pt));
+sec.appendChild(h('div',{className:'section-label',style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}},'監査ログ'));
+sec.appendChild(hubAudit(pt));
+return sec}};w.appendChild((fn[S.hubTab]||fn.overview)());return w}
 function roleColor(r){return r==='family'?'#dc2626':'#1e293b'}
 function roleLabel(r){return{hospital:'病院',care_manager:'ケアマネ',visiting_nurse:'訪看',facility:'施設',home_helper:'サ責',equipment:'福祉用具',family:'家族',other:'その他'}[r]||'その他'}
 function buildTodos(pt){const todos=[];const cases=ptCases(pt.id),confs=ptConfs(pt.id),mons=ptMons(pt.id),assess=ptAssess(pt.id);
@@ -577,7 +642,13 @@ w.appendChild(card);
 
 w.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
   btn('プレビュー','btn-out',()=>{showRecordPreview(c);}),
-  btn('PDF出力','btn-pri',()=>{c.record.generated=true;addAudit(c.audit,'退院時共同指導記録PDF出力','加算対応帳票');sv();buildRecordPDF(c);}),
+  btn('PDF出力','btn-pri',()=>{
+    c.record.generated=true;
+    addAudit(c.audit,'退院時共同指導記録PDF出力','加算対応帳票');
+    const g2=c.record?.guidance||{};
+    saveDocument('discharge_guidance','退院時共同指導記録　'+c.pn+（g2.implementationDate?'　'+g2.implementationDate:''),c.patientId,c.id,{case:c,guidance:g2,parts:c.parts,consent:c.consent});
+    sv();buildRecordPDF(c);
+  }),
   btn('CSV','btn-out',()=>{
     const rows=[['項目','内容'],
       ['利用者名',c.pn],['介護認定',g.careLevel||''],['生年月日',g.birthdate||''],
@@ -1078,8 +1149,8 @@ d.appendChild(h('div',{style:{borderTop:'1px solid #ccc',paddingTop:'5px',displa
 cn.appendChild(d);
 genPdf(cn,'退院時共同指導記録_'+c.pn+'.pdf');
 }
-function genConfPDF(c){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf')}
-function genMonPDF(m2){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'モニタリング_'+m2.userName+'.pdf')}
+function genConfPDF(c){saveDocument('conference','サービス担当者会議記録　'+c.userName+'　'+c.date,c.patientId||'',c.id,c);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf')}
+function genMonPDF(m2){saveDocument('monitoring','モニタリング記録　'+m2.userName+'　'+m2.date,m2.patientId||'',m2.id,m2);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'モニタリング_'+m2.userName+'.pdf')}
 // --- ROUTER ---
 function rr(){const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='app')app.appendChild(appShell());if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}}
 // --- INIT ---
