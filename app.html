@@ -91,7 +91,7 @@ async function api(path,opts={}){
       toast(data.error||'エラーが発生しました');return null;
     }
     return data;
-  }catch(e){console.error('API error:',e);toast('通信エラー');return null;}
+  }catch(e){console.error('API error:',e);return null;}
 }
 
 // ── Token persistence ──
