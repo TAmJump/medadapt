@@ -626,11 +626,10 @@ if(S.token){
   (async()=>{
     const res=await api('/auth/me');
     if(res&&res.user){S.user=res.user;await loadPatients();await loadPendingShares();S.scr='app';S.page='patients';rr();}
-    else{if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else{S.scr='login';}rr();}
+    else{if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else if(window.location.hash==='#signup'){S.scr='signup';S.signupStep=1;S.signupPlan='free';}else{S.scr='login';}rr();}
   })();
 } else {
-  if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}
-  else{S.scr=S.user?'app':'login';}
+  if(window.location.hash==='#pro'){S.scr='signup';S.signupStep=1;S.signupPlan='pro';}else if(window.location.hash==='#signup'){S.scr='signup';S.signupStep=1;S.signupPlan='free';}else{S.scr=S.user?'app':'login';}
   rr();
 }
 </script>
