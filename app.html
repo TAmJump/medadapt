@@ -121,17 +121,14 @@ function now(){return new Date().toISOString()}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 async function genCallURL(){
   try{
-    const endDate=new Date();
-    endDate.setFullYear(endDate.getFullYear()+1);
-    const res=await fetch('https://api.whereby.dev/v1/meetings',{
+    const res=await fetch('https://medadapt-whereby.animalb001.workers.dev',{
       method:'POST',
-      headers:{'Authorization':'Bearer '+WHEREBY_API_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({endDate:endDate.toISOString(),fields:['hostRoomUrl']})
+      headers:{'Content-Type':'application/json'}
     });
     const data=await res.json();
     return data.roomUrl||data.hostRoomUrl||'https://meet.medadapt.jp/'+uid();
   }catch(e){
-    console.error('Whereby API error:',e);
+    console.error('Whereby Worker error:',e);
     return'https://meet.medadapt.jp/'+uid();
   }
 }
