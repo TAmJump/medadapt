@@ -337,7 +337,68 @@ if(S.signupStep===4){cd.appendChild(h('div',{style:{textAlign:'center',padding:'
 cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'16px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← MedAdaptトップへ'));
 w.appendChild(cd);return w}
 // ── Password Reset Screen ──
-function resetpwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault()}});cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワードリセット')));if(!S.resetSent){cd.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'登録したメールアドレスを入力してください。リセット用のリンクをお送りします。'));cd.appendChild(fld('登録メールアドレス','r_email','',()=>{},{type:'email',ph:'mail@example.com'}));cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('リセットメールを送信','btn-pri btn-full',async()=>{const email=document.getElementById('r_email')?.value?.trim();if(!email){toast('メールアドレスを入力してください');return}await api('/auth/reset-request',{method:'POST',body:JSON.stringify({email})});S.resetSent=true;S.resetEmail=email;rr()})))}else{cd.appendChild(h('div',{style:{textAlign:'center',padding:'16px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',marginBottom:'16px'}},h('div',{style:{fontSize:'32px',marginBottom:'8px'}},'📧'),h('div',{style:{fontWeight:'700',color:'#16a34a',marginBottom:'4px'}},'メールを送信しました'),h('div',{style:{fontSize:'12px',color:'#15803d'}},S.resetEmail||'',' 宛にリセット用リンクを送信しました。'),h('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'8px'}},'メールが届かない場合は迷惑メールフォルダをご確認ください。')))}cd.appendChild(h('div',{style:{textAlign:'center',marginTop:'16px'}},h('a',{href:'#',style:{fontSize:'13px',color:'var(--accent)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.resetSent=false;S.resetEmail='';S.scr='login';rr()}},'← ログインに戻る')));w.appendChild(cd);return w}
+function resetpwScr(){
+const w=h('div',{className:'auth-bg'});
+const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault()}});
+cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワードリセット')));
+
+// ★ 新PW設定モード（リセットメールのリンクからアクセス）
+if(S.resetMode==='set'){
+  if(!S.resetSetDone){
+    cd.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'新しいパスワードを設定してください。'));
+    if(S.resetLoginId||S.resetEmail){
+      cd.appendChild(h('div',{style:{padding:'10px 14px',background:'#f0fdfa',border:'1px solid #bae6fd',borderRadius:'8px',marginBottom:'16px',fontSize:'12px'}},
+        h('span',{style:{color:'var(--ink-m)'}},'対象のID: '),
+        h('span',{style:{fontWeight:'700',fontFamily:'monospace',color:'#0891b2'}},S.resetLoginId||S.resetEmail)
+      ));
+    }
+    cd.appendChild(fld('新しいパスワード','rset_pw1','',()=>{},{type:'password',ph:'6文字以上'}));
+    cd.appendChild(fld('確認（もう一度）','rset_pw2','',()=>{},{type:'password',ph:'もう一度入力'}));
+    cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('パスワードを設定する','btn-pri btn-full',async()=>{
+      const pw=document.getElementById('rset_pw1')?.value?.trim();
+      const pw2=document.getElementById('rset_pw2')?.value?.trim();
+      if(!pw||pw.length<6){toast('6文字以上で入力してください');return;}
+      if(pw!==pw2){toast('パスワードが一致しません');return;}
+      const body={token:S.resetToken,newPassword:pw};
+      if(S.resetLoginId)body.login_id=S.resetLoginId;
+      if(S.resetEmail)body.email=S.resetEmail;
+      const res=await api('/auth/reset',{method:'POST',body:JSON.stringify(body)});
+      if(res&&res.success){S.resetSetDone=true;rr();}
+      else{toast((res&&res.error)||'リンクが無効または期限切れです');}
+    })));
+  }else{
+    cd.appendChild(h('div',{style:{textAlign:'center',padding:'20px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',marginBottom:'16px'}},
+      h('div',{style:{fontSize:'40px',marginBottom:'10px'}},'✅'),
+      h('div',{style:{fontWeight:'800',color:'#16a34a',marginBottom:'6px',fontSize:'16px'}},'パスワードを変更しました'),
+      h('div',{style:{fontSize:'12px',color:'#15803d'}},'新しいパスワードでログインしてください。')
+    ));
+    cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('ログイン画面へ','btn-pri btn-full',()=>{
+      S.resetMode=null;S.resetToken=null;S.resetLoginId=null;S.resetEmail='';S.resetSetDone=false;S.scr='login';rr();
+    })));
+  }
+  w.appendChild(cd);return w;
+}
+
+// 通常：メールアドレスを入力してリセットメール送信
+if(!S.resetSent){
+  cd.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'登録したメールアドレスを入力してください。リセット用のリンクをお送りします。'));
+  cd.appendChild(fld('登録メールアドレス','r_email','',()=>{},{type:'email',ph:'mail@example.com'}));
+  cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('リセットメールを送信','btn-pri btn-full',async()=>{
+    const email=document.getElementById('r_email')?.value?.trim();
+    if(!email){toast('メールアドレスを入力してください');return;}
+    await api('/auth/reset-request',{method:'POST',body:JSON.stringify({email})});
+    S.resetSent=true;S.resetEmail=email;rr();
+  })));
+}else{
+  cd.appendChild(h('div',{style:{textAlign:'center',padding:'16px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',marginBottom:'16px'}},
+    h('div',{style:{fontSize:'32px',marginBottom:'8px'}},'📧'),
+    h('div',{style:{fontWeight:'700',color:'#16a34a',marginBottom:'4px'}},'メールを送信しました'),
+    h('div',{style:{fontSize:'12px',color:'#15803d'}},S.resetEmail||'',' 宛にリセット用リンクを送信しました。'),
+    h('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'8px'}},'メールが届かない場合は迷惑メールフォルダをご確認ください。')
+  ));
+}
+cd.appendChild(h('div',{style:{textAlign:'center',marginTop:'16px'}},h('a',{href:'#',style:{fontSize:'13px',color:'var(--accent)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.resetSent=false;S.resetEmail='';S.scr='login';rr()}},'← ログインに戻る')));
+w.appendChild(cd);return w;}
 
 function changepwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワード変更'),h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'8px'}},'初回ログインのため、パスワードを変更してください')));cd.appendChild(fld('新しいパスワード','c_newpw','',()=>{},{type:'password',ph:'8文字以上'}));cd.appendChild(fld('確認','c_newpw2','',()=>{},{type:'password',ph:'もう一度入力'}));cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('変更して利用開始','btn-pri btn-full',async()=>{const pw=document.getElementById('c_newpw')?.value?.trim(),pw2=document.getElementById('c_newpw2')?.value?.trim();if(!pw||pw.length<8){toast('8文字以上');return}if(pw!==pw2){toast('パスワードが一致しません');return}const res=await api('/auth/change-password',{method:'POST',body:JSON.stringify({newPassword:pw})});if(res&&res.success){S.user.must_change_pw=0;await loadPatients();S.scr='app';S.page='patients';toast('パスワード変更完了');rr()}})));w.appendChild(cd);return w}
 // --- APP SHELL ---
@@ -1478,11 +1539,19 @@ function tryLocalLogin(){
     }
   }
 
-  if(resetToken&&paramEmail){
-    // パスワードリセット画面
-    S.scr='resetpw';S.resetToken=resetToken;S.resetEmail=paramEmail;S.resetMode='set';
-    window.history.replaceState({},'',window.location.pathname);
-    rr();return;
+  if(resetToken){
+    const paramLoginId=params.get('login_id');
+    if(paramLoginId||paramEmail){
+      // パスワードリセット画面（新PW設定モード）
+      S.scr='resetpw';
+      S.resetToken=resetToken;
+      S.resetMode='set';
+      S.resetLoginId=paramLoginId||null;
+      S.resetEmail=paramEmail||'';
+      S.resetSetDone=false;
+      window.history.replaceState({},'',window.location.pathname);
+      rr();return;
+    }
   }
 
   // 通常の起動フロー
