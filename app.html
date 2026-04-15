@@ -366,7 +366,7 @@ const main=h('div',{className:'main'});
 if(S.page==='hub'&&S.ptId){main.appendChild(patientHub())}
 else if(S.page==='patients'){main.appendChild(patientsPage())}
 else if(S.page==='admin'){main.appendChild(adminPage())}
-
+else if(S.page==='staff'){main.appendChild(staffPage())}
 else if(S.page==='integrations'){main.appendChild(integPage())}
 else if(S.page==='settings'){main.appendChild(settingsPage())}
 else{main.appendChild(patientsPage())}
@@ -946,6 +946,74 @@ w.appendChild(h('div',{className:'section-label'},'モニタリング（'+allM.l
 if(!allM.length)w.appendChild(h('div',{style:{color:'var(--ink-m)'},fontSize:'13px'},'なし'));
 else{const t3=h('table',{className:'tbl'});t3.appendChild(h('thead',null,h('tr',null,h('th',null,'利用者'),h('th',null,'日付'),h('th',null,'介護度'))));const tb3=h('tbody');allM.forEach(m2=>{tb3.appendChild(h('tr',{style:{cursor:'pointer'},onClick:()=>{S.ptId=m2.patientId;S.page='hub';S.hubTab='monitors';S.monId=m2.id;rr()}},h('td',{className:'name'},m2.userName),h('td',null,m2.date||'—'),h('td',null,m2.cl||'—')))});t3.appendChild(tb3);w.appendChild(h('div',{className:'card',style:{padding:0,overflow:'hidden'}},t3))}
 return w}
+// === STAFF PAGE ===
+function staffPage(){
+  const w=h('div');
+  w.appendChild(h('div',{className:'page-title'},'スタッフ管理'));
+  const invBox=h('div',{className:'card',style:{marginBottom:'20px',padding:'20px'}});
+  invBox.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'12px'}},'スタッフを招待'));
+  invBox.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'招待リンクを発行してスタッフに送付してください。リンクは7日間有効です。'));
+  const invRow=h('div',{style:{display:'flex',gap:'8px',alignItems:'flex-end'}});
+  invRow.appendChild(h('div',{style:{flex:1}},h('label',{style:{fontSize:'12px',fontWeight:'600',display:'block',marginBottom:'4px'}},'招待するメールアドレス（任意）'),h('input',{id:'inv_email',type:'email',placeholder:'staff@example.com（空欄でも可）',style:{width:'100%',padding:'8px 12px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})));
+  invRow.appendChild(btn('招待リンクを発行','btn-pri',async()=>{const email=document.getElementById('inv_email')?.value?.trim()||'';const res=await api('/staff/invite',{method:'POST',body:JSON.stringify({email})});if(res&&res.invite_url){S.inviteResult=res.invite_url;rr();}else{toast(res?.error||'招待リンクの発行に失敗しました');}}));
+  invBox.appendChild(invRow);
+  if(S.inviteResult){const resultBox=h('div',{style:{marginTop:'12px',padding:'12px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'8px'}});resultBox.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',color:'#16a34a',marginBottom:'6px'}},'招待リンクが発行されました'));const linkRow=h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}});const linkInput=h('input',{type:'text',value:S.inviteResult,readOnly:true,style:{flex:1,padding:'6px 10px',border:'1px solid #86efac',borderRadius:'6px',fontSize:'11px',background:'#fff',color:'#15803d'}});linkRow.appendChild(linkInput);linkRow.appendChild(btn('コピー','btn-sm btn-out',()=>{navigator.clipboard?.writeText(S.inviteResult).then(()=>toast('コピーしました'));}));resultBox.appendChild(linkRow);resultBox.appendChild(h('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'6px'}},'このリンクをスタッフに送付してください。7日間有効です。'));invBox.appendChild(resultBox);}
+  w.appendChild(invBox);
+  const listBox=h('div',{className:'card',style:{padding:'20px'}});
+  listBox.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'16px'}},'スタッフ一覧'));
+  const listContent=h('div',{style:{color:'var(--ink-m)',fontSize:'13px'}},'読み込み中...');
+  listBox.appendChild(listContent);
+  w.appendChild(listBox);
+  api('/staff',{}).then(res=>{
+    listContent.innerHTML='';
+    if(!res||!res.staff||res.staff.length===0){listContent.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'13px',padding:'12px 0'}},'まだスタッフが登録されていません。招待リンクを発行してスタッフを追加してください。'));return;}
+    const table=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}});
+    table.appendChild(h('tr',{style:{borderBottom:'2px solid var(--border)'}},h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'名前'),h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'メール'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'状態'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'操作')));
+    res.staff.forEach(st=>{
+      const isSuspended=st.suspended===1||st.suspended===true;
+      const tr=h('tr',{style:{borderBottom:'1px solid var(--border)',opacity:isSuspended?'0.5':'1'}},h('td',{style:{padding:'10px 8px',fontWeight:'600'}},st.name),h('td',{style:{padding:'10px 8px',color:'var(--ink-m)'}},st.email),h('td',{style:{padding:'10px 8px',textAlign:'center'}},h('span',{style:{display:'inline-block',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:isSuspended?'#fee2e2':st.email_verified?'#dcfce7':'#fef9c3',color:isSuspended?'#dc2626':st.email_verified?'#16a34a':'#ca8a04'}},isSuspended?'停止中':st.email_verified?'有効':'未認証')),h('td',{style:{padding:'10px 8px',textAlign:'center'}},h('div',{style:{display:'flex',gap:'6px',justifyContent:'center'}},btn(isSuspended?'復帰':'停止',isSuspended?'btn-sm btn-out':'btn-sm',async()=>{const r2=await api('/staff/suspend',{method:'POST',body:JSON.stringify({staff_id:st.id,suspend:!isSuspended})});if(r2&&r2.success){S.inviteResult=null;toast(isSuspended?'復帰しました':'停止しました');rr();}else toast(r2?.error||'エラー');}),btn('削除','btn-sm',async()=>{if(!confirm(st.name+'を削除しますか？この操作は取り消せません。'))return;const r2=await fetch(API+'/staff/'+st.id,{method:'DELETE',headers:{Authorization:'Bearer '+S.token}});const data=await r2.json();if(data.success){S.inviteResult=null;toast('削除しました');rr();}else toast(data?.error||'エラー');}))));
+      table.appendChild(tr);
+    });
+    listContent.appendChild(table);
+    listContent.appendChild(h('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--ink-m)'}},res.staff.length+'名のスタッフ ／ 月額 ¥'+(res.staff.filter(s=>!s.suspended).length*200).toLocaleString()+'（アクティブ '+res.staff.filter(s=>!s.suspended).length+'名×¥200）'));
+  });
+  return w;
+}
+
+// === STAFF REGISTER SCREEN ===
+function staffRegisterScr(){
+  const w=h('div',{className:'auth-bg'});
+  const cd=h('div',{className:'card',style:{width:'100%',maxWidth:'440px',padding:'32px'}});
+  cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--accent)'}},'MedAdapt'),h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginTop:'8px'}},'スタッフアカウント登録')));
+  const orgInfo=h('div',{style:{padding:'10px 14px',background:'var(--accent-l)',borderRadius:'8px',marginBottom:'16px',fontSize:'13px',color:'var(--ink-m)'}},'招待情報を確認中...');
+  cd.appendChild(orgInfo);
+  api('/invite/'+S.inviteToken,{}).then(res=>{
+    if(!res||res.error){orgInfo.textContent='招待リンクが無効または期限切れです。';orgInfo.style.background='#fee2e2';orgInfo.style.color='#dc2626';return;}
+    orgInfo.innerHTML='';
+    orgInfo.appendChild(h('span',{style:{fontWeight:'700',color:'var(--accent)'}},res.org_name||'施設'));
+    orgInfo.appendChild(document.createTextNode(' からの招待です'));
+    if(res.email){const ei=document.getElementById('sr_email');if(ei){ei.value=res.email;ei.readOnly=true;}}
+  });
+  cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_name'},'お名前 *'),h('input',{id:'sr_name',type:'text',placeholder:'山田 花子'})));
+  cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_email'},'メールアドレス *'),h('input',{id:'sr_email',type:'email',placeholder:'mail@example.com'})));
+  cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_pw'},'パスワード *'),h('input',{id:'sr_pw',type:'password',placeholder:'8文字以上'})));
+  cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_pw2'},'パスワード（確認） *'),h('input',{id:'sr_pw2',type:'password',placeholder:'もう一度入力'})));
+  cd.appendChild(h('div',{style:{marginTop:'16px'}},btn('アカウントを作成','btn-pri btn-full',async()=>{
+    const name=document.getElementById('sr_name')?.value?.trim();
+    const email=document.getElementById('sr_email')?.value?.trim();
+    const pw=document.getElementById('sr_pw')?.value?.trim();
+    const pw2=document.getElementById('sr_pw2')?.value?.trim();
+    if(!name||!email||!pw){toast('必須項目を入力してください');return;}
+    if(pw.length<8){toast('パスワードは8文字以上');return;}
+    if(pw!==pw2){toast('パスワードが一致しません');return;}
+    const res=await api('/auth/staff-register',{method:'POST',body:JSON.stringify({invite_token:S.inviteToken,email,password:pw,name})});
+    if(res&&res.success){S.scr='login';S.inviteToken=null;toast('登録完了！ログインしてください');rr();}
+    else{toast(res?.error||'登録に失敗しました');}
+  })));
+  cd.appendChild(h('div',{style:{textAlign:'center',marginTop:'12px'}},h('a',{href:'#',style:{fontSize:'12px',color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='login';S.inviteToken=null;rr();}},'← ログインへ戻る')));
+  w.appendChild(cd);return w;
+}
+
 // === SETTINGS PAGE ===
 function settingsPage(){const w=h('div');const u=S.user;
 w.appendChild(h('div',{className:'page-title'},'設定'));
@@ -1188,7 +1256,7 @@ genPdf(cn,'退院時共同指導記録_'+c.pn+'.pdf');
 function genConfPDF(c){saveDocument('conference','サービス担当者会議記録　'+c.userName+'　'+c.date,c.patientId||'',c.id,c);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf')}
 function genMonPDF(m2){saveDocument('monitoring','モニタリング記録　'+m2.userName+'　'+m2.date,m2.patientId||'',m2.id,m2);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜MedAdapt'));cn.appendChild(d);genPdf(cn,'モニタリング_'+m2.userName+'.pdf')}
 // --- ROUTER ---
-function rr(){const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='app')app.appendChild(appShell());if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}}
+function rr(){const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='app')app.appendChild(appShell());if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}}
 // --- INIT ---
 ld();
 // Token-based auto-login
@@ -1222,6 +1290,15 @@ function tryLocalLogin(){
     }else{
       S.scr='login';S.loginErr='認証リンクが無効または期限切れです';
     }
+    rr();return;
+  }
+
+  // スタッフ招待リンク処理
+  const inviteToken=params.get('invite');
+  if(inviteToken){
+    S.scr='staffRegister';
+    S.inviteToken=inviteToken;
+    window.history.replaceState({},'',window.location.pathname);
     rr();return;
   }
 
