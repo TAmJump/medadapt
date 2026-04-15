@@ -1179,8 +1179,9 @@ function tryLocalLogin(){
       // 認証完了モーダル表示
       setTimeout(()=>{
         const m=document.createElement('div');
+        m.id='verify-modal-overlay';
         m.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
-        m.innerHTML='<div style="background:#fff;padding:32px;border-radius:16px;text-align:center;max-width:380px"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:18px;font-weight:800;color:#0891b2;margin-bottom:8px">メール認証完了！</div><div style="font-size:13px;color:#64748b;margin-bottom:20px">アカウントが有効になりました。<br>ログインしてMedAdaptをお使いください。</div><button onclick="this.closest(\'div[style]\').remove()" style="padding:10px 24px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">ログインする</button></div>';
+        m.innerHTML='<div style="background:#fff;padding:32px;border-radius:16px;text-align:center;max-width:380px"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:18px;font-weight:800;color:#0891b2;margin-bottom:8px">メール認証完了！</div><div style="font-size:13px;color:#64748b;margin-bottom:20px">アカウントが有効になりました。<br>ログインしてMedAdaptをお使いください。</div><button onclick="document.getElementById(\'verify-modal-overlay\').remove()" style="padding:10px 24px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">ログインする</button></div>';
         document.body.appendChild(m);
       },300);
     }else{
