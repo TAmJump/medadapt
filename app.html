@@ -129,11 +129,12 @@ async function loadFromCloud(){
     if(res.ok){
       const data=await res.json();
       if(data){
-        D.patients=data.patients||[];
-        D.cases=data.cases||[];
-        D.conferences=data.conferences||[];
-        D.monitors=data.monitors||[];
-        D.assessments=data.assessments||[];
+        // クラウドにデータがある場合のみ上書き（空の場合はlocalStorageを保持）
+        if(data.patients&&data.patients.length)D.patients=data.patients;
+        if(data.cases&&data.cases.length)D.cases=data.cases;
+        if(data.conferences&&data.conferences.length)D.conferences=data.conferences;
+        if(data.monitors&&data.monitors.length)D.monitors=data.monitors;
+        if(data.assessments&&data.assessments.length)D.assessments=data.assessments;
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
       }
