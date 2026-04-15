@@ -1033,7 +1033,7 @@ function staffRegisterScr(){
       const copyBtn=document.createElement('button');copyBtn.textContent='IDをコピー';copyBtn.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;margin-right:8px';
       copyBtn.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(res.login_id||'');};box.appendChild(copyBtn);
       const loginBtn=document.createElement('button');loginBtn.textContent='ログイン画面へ';loginBtn.style.cssText='padding:8px 16px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
-      loginBtn.onclick=function(){ov.remove();S.scr='login';S.inviteToken=null;try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}rr();};box.appendChild(loginBtn);
+      loginBtn.onclick=function(){ov.remove();S.scr='login';S.inviteToken=null;try{sessionStorage.removeItem('medadapt-invite-token');localStorage.removeItem('medadapt-last-email');localStorage.removeItem('medadapt-autologin');}catch(e){}rr();};box.appendChild(loginBtn);
       ov.appendChild(box);document.body.appendChild(ov);
     }
     else if(res?.error&&res.error.includes('法人管理者')){
