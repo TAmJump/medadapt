@@ -324,8 +324,43 @@ function changepwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',
 // --- APP SHELL ---
 function appShell(){const u=S.user,shell=h('div',{className:'app-shell'});const sb=h('div',{className:'sidebar'});const logoLink=h('a',{href:'index.html',style:{textDecoration:'none',color:'var(--yellow)'},className:'sidebar-logo'},'MedAdapt');sb.appendChild(logoLink);const nav=h('div',{className:'sidebar-nav'});
 [{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
-sb.appendChild(nav);const foot=h('div',{className:'sidebar-foot'});foot.appendChild(h('span',{style:{display:'inline-block',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:u.plan==='pro'?'var(--accent)':'rgba(255,255,255,.2)',color:'#fff',marginBottom:'8px'}},u.plan==='pro'?'Pro':'Free'));foot.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'#fff',marginBottom:'4px'}},u.org_name||u.org));foot.appendChild(h('div',{style:{fontSize:'13px',color:'rgba(255,255,255,.6)',marginBottom:'4px'}},u.name));foot.appendChild(h('a',{href:'#',style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none',marginBottom:'2px'},onClick:e=>{e.preventDefault();S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');S.scr='login';rr()}},'ログアウト'));foot.appendChild(h('a',{href:SAKAE_URL,style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none'}},'タムジ.Corp'));
-if(u.plan==='free'){const mo=now().slice(0,7);if(!u.usage)u.usage={};if(!u.usage[mo])u.usage[mo]={cases:0,confs:0,mons:0};const ug=u.usage[mo];const lim={cases:3,confs:2,mons:3};foot.appendChild(h('div',{style:{marginTop:'8px',padding:'8px',background:'rgba(255,255,255,.08)',borderRadius:'8px',fontSize:'10px',lineHeight:'1.8',color:'rgba(255,255,255,.6)'}},h('div',{style:{fontWeight:'700',color:'rgba(255,255,255,.8)',marginBottom:'2px'}},'今月の残数'),h('div',null,'退院ケース：'+(lim.cases-ug.cases)+'/'+lim.cases),h('div',null,'サービス担当者会議：'+(lim.confs-ug.confs)+'/'+lim.confs),h('div',null,'モニタリング：'+(lim.mons-ug.mons)+'/'+lim.mons)))}
+sb.appendChild(nav);
+// 今月の使用状況ウィジェット（中央の空白部分）
+if(u.plan==='free'){
+  const mo=now().slice(0,7);
+  if(!u.usage)u.usage={};
+  if(!u.usage[mo])u.usage[mo]={cases:0,confs:0,mons:0};
+  const ug=u.usage[mo];
+  const items=[
+    {label:'退院ケース',used:ug.cases||0,max:3,icon:'🏥'},
+    {label:'担当者会議',used:ug.confs||0,max:2,icon:'👥'},
+    {label:'モニタリング',used:ug.mons||0,max:3,icon:'📋'}
+  ];
+  const usageBox=h('div',{style:{margin:'0 12px 16px',padding:'14px 16px',background:'rgba(255,255,255,.06)',borderRadius:'12px',border:'1px solid rgba(255,255,255,.1)'}});
+  usageBox.appendChild(h('div',{style:{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,.4)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'12px'}},'今月の使用状況'));
+  items.forEach(it=>{
+    const pct=Math.round((it.used/it.max)*100);
+    const color=pct>=100?'#f87171':pct>=66?'#fb923c':'#34d399';
+    const row=h('div',{style:{marginBottom:'10px'}});
+    row.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},
+      h('span',{style:{fontSize:'11px',color:'rgba(255,255,255,.7)'}},it.icon+' '+it.label),
+      h('span',{style:{fontSize:'11px',fontWeight:'700',color:color}},it.used+'/'+it.max)
+    ));
+    const track=h('div',{style:{height:'4px',background:'rgba(255,255,255,.1)',borderRadius:'2px',overflow:'hidden'}});
+    const fill=h('div',{style:{height:'100%',width:Math.min(pct,100)+'%',background:color,borderRadius:'2px',transition:'width .3s'}});
+    track.appendChild(fill);
+    row.appendChild(track);
+    usageBox.appendChild(row);
+  });
+  if(true){
+    usageBox.appendChild(h('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid rgba(255,255,255,.08)',textAlign:'center'}},
+      h('a',{href:'#',style:{fontSize:'10px',color:'#34d399',textDecoration:'none',fontWeight:'600'},onClick:e=>{e.preventDefault();S.page='settings';rr()}},'▲ Proにアップグレード')
+    ));
+  }
+  sb.appendChild(usageBox);
+}
+const foot=h('div',{className:'sidebar-foot'});foot.appendChild(h('span',{style:{display:'inline-block',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:u.plan==='pro'?'var(--accent)':'rgba(255,255,255,.2)',color:'#fff',marginBottom:'8px'}},u.plan==='pro'?'Pro':'Free'));foot.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'#fff',marginBottom:'4px'}},u.org_name||u.org));foot.appendChild(h('div',{style:{fontSize:'13px',color:'rgba(255,255,255,.6)',marginBottom:'4px'}},u.name));foot.appendChild(h('a',{href:'#',style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none',marginBottom:'2px'},onClick:e=>{e.preventDefault();S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');S.scr='login';rr()}},'ログアウト'));foot.appendChild(h('a',{href:SAKAE_URL,style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none'}},'タムジ.Corp'));
+
 sb.appendChild(foot);shell.appendChild(sb);
 const main=h('div',{className:'main'});
 if(S.page==='hub'&&S.ptId){main.appendChild(patientHub())}
