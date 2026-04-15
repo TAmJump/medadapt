@@ -406,20 +406,20 @@ body {
               <div class="phone-header-sub">共同指導ダッシュボード</div>
             </div>
             <div class="phone-card">
-              <div class="phone-card-label"><span class="dot green"></span> 次回予定</div>
-              <div class="phone-card-value">2/12（水） 14:00〜 田中 太郎 様</div>
+              <div class="phone-card-label"><span class="dot green"></span> 患者・利用者</div>
+              <div class="phone-card-value">田中 タムジ 様　入居前</div>
             </div>
             <div class="phone-card">
-              <div class="phone-card-label"><span class="dot blue"></span> アセスメント</div>
+              <div class="phone-card-label"><span class="dot blue"></span> 退院調整ケース</div>
               <ul class="phone-check-list">
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>基本情報・ADL</li>
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>疾患・既往・禁忌</li>
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>服薬情報（定期/頓用）</li>
-                <li class="phone-check-item"><div class="phone-check-box"></div>リスク（転倒/褥瘡/誤嚥）</li>
+                <li class="phone-check-item"><div class="phone-check-box checked"></div>アセスメント完了</li>
+                <li class="phone-check-item"><div class="phone-check-box checked"></div>電子同意取得済み</li>
+                <li class="phone-check-item"><div class="phone-check-box checked"></div>オンライン通話済み</li>
+                <li class="phone-check-item"><div class="phone-check-box"></div>退院時共同指導書</li>
               </ul>
             </div>
             <div class="phone-status-bar">
-              <span class="phone-status-text">記録生成：準備完了</span>
+              <span class="phone-status-text">監査ログ：自動保存中</span>
               <span class="phone-status-badge">PDF出力</span>
             </div>
           </div>
@@ -609,12 +609,15 @@ body {
           <a href="app.html#signup" style="display:block;text-align:center;padding:13px;border-radius:var(--r-pill);font-size:.85rem;font-weight:700;text-decoration:none;background:var(--blue-xl);color:var(--blue);transition:all .2s;margin-bottom:20px;">会員登録して始める →</a>
           <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">スタッフ追加</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">患者・利用者登録</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">3件まで</td></tr>
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">受入れ・移行ケース</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1件まで</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">日程調整</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">オンライン通話URL</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">アセスメント</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">PDF/CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">サービス担当者会議・モニタリング</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">監査ログ</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">閲覧のみ</td></tr>
-            <tr><td style="padding:10px 0;color:var(--ink-l);">退院時共同指導書・自動作成</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">退院時共同指導書・自動作成</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
+            <tr><td style="padding:10px 0;color:var(--ink-l);">監査ログ</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">閲覧のみ</td></tr>
           </table>
         </div>
       </div>
@@ -630,12 +633,16 @@ body {
         <div style="padding:0 24px 28px;flex:1;display:flex;flex-direction:column;">
           <a href="app.html#pro" style="display:block;text-align:center;padding:13px;border-radius:var(--r-pill);font-size:.85rem;font-weight:700;text-decoration:none;background:var(--grad);color:#fff;box-shadow:0 4px 16px rgba(8,145,178,.3);transition:all .2s;margin-bottom:20px;">Proを始める →</a>
           <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">スタッフ追加</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限（¥200/人）</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">患者・利用者登録</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
             <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">受入れ・移行ケース</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">オンライン通話URL</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">同意・署名・PDF/CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">サービス担当者会議・モニタリング</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">監査ログ・CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr><td style="padding:10px 0;color:var(--ink-l);">外部連携（カナミック等）</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">日程調整</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">オンライン通話URL</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">アセスメント</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">PDF/CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">サービス担当者会議・モニタリング</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">退院時共同指導書・自動作成</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
+            <tr><td style="padding:10px 0;color:var(--ink-l);">監査ログ・CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
           </table>
         </div>
       </div>
