@@ -87,7 +87,7 @@ async function api(path,opts={}){
     const res=await fetch(API+path,{...opts,headers:{...headers,...(opts.headers||{})}});
     const data=await res.json();
     if(!res.ok){
-      if(res.status===401){S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');S.scr='login';rr();return null;}
+      if(res.status===401){S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');S.scr='login';rr();return null;}
       toast(data.error||'エラーが発生しました');return null;
     }
     return data;
@@ -129,11 +129,11 @@ async function loadFromCloud(){
     if(res.ok){
       const data=await res.json();
       if(data){
-        if(data.patients&&data.patients.length)D.patients=data.patients;
-        if(data.cases&&data.cases.length)D.cases=data.cases;
-        if(data.conferences&&data.conferences.length)D.conferences=data.conferences;
-        if(data.monitors&&data.monitors.length)D.monitors=data.monitors;
-        if(data.assessments&&data.assessments.length)D.assessments=data.assessments;
+        D.patients=data.patients||[];
+        D.cases=data.cases||[];
+        D.conferences=data.conferences||[];
+        D.monitors=data.monitors||[];
+        D.assessments=data.assessments||[];
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
       }
@@ -359,7 +359,7 @@ if(u.plan==='free'){
   }
   sb.appendChild(usageBox);
 }
-const foot=h('div',{className:'sidebar-foot'});foot.appendChild(h('span',{style:{display:'inline-block',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:u.plan==='pro'?'var(--accent)':'rgba(255,255,255,.2)',color:'#fff',marginBottom:'8px'}},u.plan==='pro'?'Pro':'Free'));foot.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'#fff',marginBottom:'4px'}},u.org_name||u.org));foot.appendChild(h('div',{style:{fontSize:'13px',color:'rgba(255,255,255,.6)',marginBottom:'4px'}},u.name));foot.appendChild(h('a',{href:'#',style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none',marginBottom:'2px'},onClick:e=>{e.preventDefault();S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');S.scr='login';rr()}},'ログアウト'));foot.appendChild(h('a',{href:SAKAE_URL,style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none'}},'タムジ.Corp'));
+const foot=h('div',{className:'sidebar-foot'});foot.appendChild(h('span',{style:{display:'inline-block',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:u.plan==='pro'?'var(--accent)':'rgba(255,255,255,.2)',color:'#fff',marginBottom:'8px'}},u.plan==='pro'?'Pro':'Free'));foot.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'#fff',marginBottom:'4px'}},u.org_name||u.org));foot.appendChild(h('div',{style:{fontSize:'13px',color:'rgba(255,255,255,.6)',marginBottom:'4px'}},u.name));foot.appendChild(h('a',{href:'#',style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none',marginBottom:'2px'},onClick:e=>{e.preventDefault();S.token=null;S.user=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');S.scr='login';rr()}},'ログアウト'));foot.appendChild(h('a',{href:SAKAE_URL,style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none'}},'タムジ.Corp'));
 
 sb.appendChild(foot);shell.appendChild(sb);
 const main=h('div',{className:'main'});
