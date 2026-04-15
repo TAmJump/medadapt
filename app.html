@@ -1008,6 +1008,12 @@ function staffRegisterScr(){
     if(pw!==pw2){toast('パスワードが一致しません');return;}
     const res=await api('/auth/staff-register',{method:'POST',body:JSON.stringify({invite_token:S.inviteToken,email,password:pw,name})});
     if(res&&res.success){S.scr='login';S.inviteToken=null;try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}toast('登録完了！ログインしてください');rr();}
+    else if(res?.error&&res.error.includes('法人管理者')){
+      // 管理者アドレスの場合はログイン画面へ誘導
+      S.scr='login';S.inviteToken=null;try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}
+      S.loginErr='このアドレスは管理者として登録済みです。そのままログインしてください。';
+      rr();
+    }
     else{toast(res?.error||'登録に失敗しました');}
   })));
   cd.appendChild(h('div',{style:{textAlign:'center',marginTop:'12px'}},h('a',{href:'#',style:{fontSize:'12px',color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='login';S.inviteToken=null;rr();}},'← ログインへ戻る')));
