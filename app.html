@@ -1015,21 +1015,65 @@ function staffRegisterScr(){
 }
 
 // === QR CODE MODAL ===
-function showQRModal({name,url,token}){
+function showQRModal(opts){
+  const name=opts.name,url=opts.url;
   const ov=document.createElement('div');
   ov.id='qr-modal-overlay';
   ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999';
   const box=document.createElement('div');
   box.style.cssText='background:#fff;padding:32px;border-radius:16px;text-align:center;max-width:360px;width:90%';
-  box.innerHTML='<div style="font-size:16px;font-weight:800;margin-bottom:4px">'+name+'</div><div style="font-size:12px;color:#64748b;margin-bottom:16px">QRコードでログイン</div><div id="qr-canvas-wrap" style="margin:0 auto 16px;width:200px;height:200px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center"><div style="font-size:12px;color:#94a3b8">生成中...</div></div><div style="font-size:10px;color:#94a3b8;word-break:break-all;margin-bottom:16px;padding:8px;background:#f8fafc;border-radius:6px">'+url+'</div><div style="display:flex;gap:8px;justify-content:center"><button onclick="navigator.clipboard?.writeText(''+url+'').then(()=>alert('URLをコピーしました'))" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">URLコピー</button><button onclick="window.print()" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">印刷</button><button onclick="document.getElementById('qr-modal-overlay').remove()" style="padding:8px 16px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px">閉じる</button></div>';
+
+  const title=document.createElement('div');
+  title.style.cssText='font-size:16px;font-weight:800;margin-bottom:4px';
+  title.textContent=name;
+  box.appendChild(title);
+
+  const sub=document.createElement('div');
+  sub.style.cssText='font-size:12px;color:#64748b;margin-bottom:16px';
+  sub.textContent='QRコードでログイン';
+  box.appendChild(sub);
+
+  const qrWrap=document.createElement('div');
+  qrWrap.id='qr-canvas-wrap';
+  qrWrap.style.cssText='margin:0 auto 16px;width:200px;height:200px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center';
+  qrWrap.textContent='生成中...';
+  box.appendChild(qrWrap);
+
+  const urlTxt=document.createElement('div');
+  urlTxt.style.cssText='font-size:10px;color:#94a3b8;word-break:break-all;margin-bottom:16px;padding:8px;background:#f8fafc;border-radius:6px';
+  urlTxt.textContent=url;
+  box.appendChild(urlTxt);
+
+  const btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:8px;justify-content:center';
+
+  const btnCopy=document.createElement('button');
+  btnCopy.textContent='URLコピー';
+  btnCopy.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px';
+  btnCopy.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(url).then(function(){alert('URLをコピーしました');});};
+  btnRow.appendChild(btnCopy);
+
+  const btnPrint=document.createElement('button');
+  btnPrint.textContent='印刷';
+  btnPrint.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px';
+  btnPrint.onclick=function(){window.print();};
+  btnRow.appendChild(btnPrint);
+
+  const btnClose=document.createElement('button');
+  btnClose.textContent='閉じる';
+  btnClose.style.cssText='padding:8px 16px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
+  btnClose.onclick=function(){var el=document.getElementById('qr-modal-overlay');if(el)el.remove();};
+  btnRow.appendChild(btnClose);
+
+  box.appendChild(btnRow);
   ov.appendChild(box);
   document.body.appendChild(ov);
-  // QRコード生成（qrcode.jsをCDNから読込）
-  const script=document.createElement('script');
+
+  var script=document.createElement('script');
   script.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  script.onload=()=>{
-    const wrap=document.getElementById('qr-canvas-wrap');
-    if(wrap){wrap.innerHTML='';new QRCode(wrap,{text:url,width:200,height:200,colorDark:'#0c4a6e',colorLight:'#ffffff'});}
+  script.onload=function(){
+    var wrap=document.getElementById('qr-canvas-wrap');
+    if(wrap){wrap.textContent='';new QRCode(wrap,{text:url,width:200,height:200,colorDark:'#0c4a6e',colorLight:'#ffffff'});}
   };
   document.head.appendChild(script);
 }
