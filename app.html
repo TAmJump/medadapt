@@ -996,7 +996,16 @@ function staffRegisterScr(){
     if(res.email){const ei=document.getElementById('sr_email');if(ei){ei.value=res.email;ei.readOnly=true;}}
   });
   cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_name'},'お名前 *'),h('input',{id:'sr_name',type:'text',placeholder:'山田 花子'})));
-  cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_email'},'メールアドレス（任意）'),h('input',{id:'sr_email',type:'text',autocomplete:'off',placeholder:'mail@example.com（なくても登録できます）'})));
+  cd.appendChild(h('div',{className:'field'},
+  h('label',{for:'sr_email'},'メールアドレス（任意）'),
+  h('input',{id:'sr_email',type:'text',
+    autocomplete:'new-password',
+    placeholder:'mail@example.com（なくても登録できます）',
+    onFocus:e=>{e.target.removeAttribute('readonly');},
+    readOnly:true,
+    onClick:e=>{e.target.removeAttribute('readonly');e.target.focus();}
+  })
+));
   cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_pw'},'パスワード *'),h('div',{style:{position:'relative'}},h('input',{id:'sr_pw',type:'text',placeholder:'8文字以上',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const i=document.getElementById('sr_pw');if(i)i.type=i.type==='password'?'text':'password';}},'👁'))));
   cd.appendChild(h('div',{className:'field'},h('label',{for:'sr_pw2'},'パスワード（確認） *'),h('div',{style:{position:'relative'}},h('input',{id:'sr_pw2',type:'text',placeholder:'もう一度入力',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const i=document.getElementById('sr_pw2');if(i)i.type=i.type==='password'?'text':'password';}},'👁'))));
   cd.appendChild(h('div',{style:{marginTop:'16px'}},btn('アカウントを作成','btn-pri btn-full',async()=>{
