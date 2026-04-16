@@ -1705,9 +1705,12 @@ function ndaPage(){
   if(!S.ndaFilter)S.ndaFilter={q:'',type:'all',sort:'newest'};
   const f=S.ndaFilter;
   const filterBar=h('div',{style:{display:'flex',gap:'8px',marginBottom:'12px',flexWrap:'wrap',alignItems:'center',background:'var(--surface)',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)'}});
+  let _ndaIme=false;
   filterBar.appendChild(h('input',{type:'text',placeholder:'法人名・IDで検索',value:f.q,
     style:{flex:'1',minWidth:'140px',padding:'6px 10px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px'},
-    onInput:e=>{f.q=e.target.value;rr()}}));
+    onCompositionStart:()=>{_ndaIme=true;},
+    onCompositionEnd:e=>{_ndaIme=false;f.q=e.target.value;rr();},
+    onInput:e=>{if(!_ndaIme){f.q=e.target.value;rr();}}}));
   const typeSelect=h('select',{style:{padding:'6px 8px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px'},
     onChange:e=>{f.type=e.target.value;rr()}});
   [['all','すべて'],['active','締結済み'],['pending','署名待ち'],['standard','標準書式'],['custom','自社書式'],['paper','紙締結']].forEach(([v,l])=>{
