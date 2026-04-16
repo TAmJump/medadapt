@@ -481,15 +481,18 @@ if(u.plan==='free'){
   sb.appendChild(usageBox);
 }
 const notifBtn=h('button',{
-  style:{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'10px 16px',
-         background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,.7)',
-         fontSize:'13px',textAlign:'left'},
+  style:{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',
+         padding:'10px 16px',background:S.unreadCount>0?'rgba(239,68,68,0.18)':'none',
+         border:'none',borderLeft:S.unreadCount>0?'3px solid #ef4444':'3px solid transparent',
+         cursor:'pointer',color:S.unreadCount>0?'#fff':'rgba(255,255,255,.7)',
+         fontSize:'13px',textAlign:'left',fontWeight:S.unreadCount>0?'700':'400',
+         transition:'all .2s'},
   onClick:()=>{S.page='notifications';rr()}
 },
   h('span',null,'通知'),
   S.unreadCount>0?h('span',{style:{
     background:'#ef4444',color:'#fff',borderRadius:'100px',
-    fontSize:'10px',fontWeight:'700',padding:'1px 6px',minWidth:'18px',textAlign:'center'
+    fontSize:'11px',fontWeight:'700',padding:'2px 8px',minWidth:'20px',textAlign:'center'
   }},S.unreadCount>99?'99+':String(S.unreadCount)):null
 );
 sb.appendChild(notifBtn);
