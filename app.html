@@ -1317,9 +1317,22 @@ function notificationsPage(){
         if(isUnread){
           await api('/notifications/'+n.id+'/read',{method:'POST'});
           if(S.unreadCount>0)S.unreadCount--;
-          await loadNotifList();rr();
+          n.is_read=1;
         }
-        if(n.action_url)window.location.href=n.action_url;
+        if(n.action_url){
+          // #patient:ID 形式 → 患者ハブへSPA遷移
+          const patientMatch=n.action_url.match(/^#patient:(.+)$/);
+          if(patientMatch){
+            S.ptId=patientMatch[1];S.page='hub';S.hubTab='overview';rr();return;
+          }
+          // #page:NAME 形式 → ページ遷移
+          const pageMatch=n.action_url.match(/^#page:(.+)$/);
+          if(pageMatch){S.page=pageMatch[1];rr();return;}
+          // それ以外は外部URLとして開く
+          window.open(n.action_url,'_blank');
+        } else {
+          rr();
+        }
       }
     },
       h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'12px'}},
