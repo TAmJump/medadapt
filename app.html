@@ -1887,25 +1887,62 @@ function genNdaPdf(nda){
 // ═══════════════════════════════════════════
 function dischargePage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'720px'}});
-  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}},
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'退院通知'),
     btn('+ 退院通知を発行する','btn-pri btn-sm',()=>{S.page='discharge_new';rr()})
   ));
 
   if(!S.dischargeList){
     api('/discharge/list').then(res=>{S.dischargeList=res;rr()});
-    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}},'読み込み中...'));
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}}),'読み込み中...');
     return w;
   }
 
   const sent=S.dischargeList?.sent||[];
   const received=S.dischargeList?.received||[];
 
-  // 発行した通知
-  if(sent.length){
-    w.appendChild(h('h3',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'8px'}},'発行した退院通知（'+sent.length+'件）'));
+  if(!sent.length && !received.length){
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}}),'退院通知はありません');
+    return w;
+  }
+
+  // フィルターバー
+  if(!S.dischargeFilter)S.dischargeFilter='all';
+  const filterDefs=[
+    {key:'all',l:'すべて'},{key:'pending',l:'未回答'},{key:'joined',l:'面談参加'},
+    {key:'active',l:'進行中'},{key:'declined',l:'辞退済み'},{key:'ended',l:'終了'},
+  ];
+  const filterBar=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}});
+  filterDefs.forEach(f=>{
+    const isActive=S.dischargeFilter===f.key;
+    filterBar.appendChild(h('button',{
+      style:{padding:'4px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:isActive?'700':'400',
+        background:isActive?'var(--accent)':'var(--surface)',color:isActive?'#fff':'var(--ink-m)',
+        border:'1px solid '+(isActive?'var(--accent)':'var(--border)'),cursor:'pointer',fontFamily:'inherit'},
+      onClick:()=>{S.dischargeFilter=f.key;rr()}
+    },f.l));
+  });
+  w.appendChild(filterBar);
+
+  const fk=S.dischargeFilter;
+  const filteredSent=sent.filter(n=>{
+    if(fk==='all'||fk==='pending'||fk==='joined'||fk==='declined')return true;
+    if(fk==='active')return n.status==='active';
+    if(fk==='ended')return n.status!=='active';
+    return true;
+  });
+  const filteredReceived=received.filter(n=>{
+    if(fk==='all'||fk==='active'||fk==='ended')return true;
+    if(fk==='pending')return !n.joined_at&&!n.declined_at;
+    if(fk==='joined')return !!n.joined_at&&!n.declined_at;
+    if(fk==='declined')return !!n.declined_at;
+    return true;
+  });
+
+  if(filteredSent.length){
+    w.appendChild(h('h3',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'8px',color:'var(--ink-m)'}}),'発行した退院通知（'+filteredSent.length+'件）');
     const slist=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'24px'}});
-    for(const n of sent){
+    for(const n of filteredSent){
       slist.appendChild(h('div',{
         style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',cursor:'pointer'},
         onClick:()=>{S.noticeId=n.id;S.noticeData=null;S.page='shared_chart';rr()}
@@ -1913,7 +1950,7 @@ function dischargePage(){
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
           h('div',null,
             h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
-            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'　送信先: '+n.recipient_count+'件　参加表明: '+n.joined_count+'件')
+            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'\u3000送信先: '+n.recipient_count+'件\u3000参加表明: '+n.joined_count+'件')
           ),
           h('span',{style:{fontSize:'11px',background:n.status==='active'?'#dcfce7':'#f1f5f9',color:n.status==='active'?'#15803d':'#64748b',padding:'2px 8px',borderRadius:'100px'}},n.status==='active'?'進行中':'終了')
         )
@@ -1922,36 +1959,36 @@ function dischargePage(){
     w.appendChild(slist);
   }
 
-  // 受信した通知
-  w.appendChild(h('h3',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'8px'}},'受信した退院通知（'+received.length+'件）'));
-  if(!received.length){
-    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}},'受信した退院通知はありません'));
-    return w;
+  if(filteredReceived.length){
+    w.appendChild(h('h3',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'8px',color:'var(--ink-m)'}}),'受信した退院通知（'+filteredReceived.length+'件）');
+    const rlist=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+    for(const n of filteredReceived){
+      const isDeclined=!!n.declined_at;
+      const isJoined=!!n.joined_at;
+      rlist.appendChild(h('div',{
+        style:{background:isDeclined?'#f8fafc':'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',cursor:isDeclined?'default':'pointer',opacity:isDeclined?'0.6':'1'},
+        onClick:()=>{if(!isDeclined){S.noticeId=n.id;S.noticeData=null;S.page='shared_chart';rr();}}
+      },
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
+          h('div',null,
+            h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
+            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'受信日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))
+          ),
+          h('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'100px',
+            background:isDeclined?'#f1f5f9':isJoined?'#dbeafe':'#fef9c3',
+            color:isDeclined?'#64748b':isJoined?'#1d4ed8':'#854d0e'}},
+            isDeclined?'辞退済み':isJoined?'面談参加':'未回答')
+        )
+      ));
+    }
+    w.appendChild(rlist);
   }
-  const rlist=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
-  for(const n of received){
-    const isDeclined=!!n.declined_at;
-    const isJoined=!!n.joined_at;
-    rlist.appendChild(h('div',{
-      style:{background:isDeclined?'#f8fafc':'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',cursor:isDeclined?'default':'pointer',opacity:isDeclined?'0.6':'1'},
-      onClick:()=>{if(!isDeclined){S.noticeId=n.id;S.noticeData=null;S.page='shared_chart';rr();}}
-    },
-      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
-        h('div',null,
-          h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
-          h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'受信日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))
-        ),
-        h('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'100px',
-          background:isDeclined?'#f1f5f9':isJoined?'#dbeafe':'#fef9c3',
-          color:isDeclined?'#64748b':isJoined?'#1d4ed8':'#854d0e'}},
-          isDeclined?'辞退済み':isJoined?'面談参加':'未回答')
-      )
-    ));
+
+  if(!filteredSent.length&&!filteredReceived.length){
+    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}}),'該当する通知はありません');
   }
-  w.appendChild(rlist);
   return w;
 }
-
 // ═══════════════════════════════════════════
 // v9: 退院通知発行ページ
 // ═══════════════════════════════════════════
@@ -2272,7 +2309,7 @@ function sharedChartPage(){
 
 function notificationsPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'680px'}});
-  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}},
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}},
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'通知'),
     S.unreadCount>0?h('button',{
       style:{fontSize:'12px',color:'var(--accent)',background:'none',border:'1px solid var(--accent)',borderRadius:'20px',cursor:'pointer',padding:'5px 14px',fontFamily:'inherit',fontWeight:'600'},
@@ -2282,29 +2319,63 @@ function notificationsPage(){
 
   if(!S.notifList){
     loadNotifList().then(()=>rr());
-    w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)'}},'読み込み中...'));
+    w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)'}}),'読み込み中...');
     return w;
   }
 
   if(!S.notifList.length){
     w.appendChild(h('div',{style:{textAlign:'center',padding:'64px 48px',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'16px',border:'1px solid var(--border)'}},
-      h('div',{style:{fontSize:'40px',marginBottom:'12px'}},'🔔'),
       h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'6px',color:'var(--ink)'}},'通知はありません'),
       h('div',{style:{fontSize:'13px'}},'新しい通知が届くとここに表示されます')
     ));
     return w;
   }
 
-  // 通知タイプ別のアイコン・カラーマップ
+  // フィルターバー
+  if(!S.notifFilter)S.notifFilter='all';
+  const nFilterDefs=[
+    {key:'all',l:'すべて'},{key:'unread',l:'未読'},{key:'read',l:'既読'},
+    {key:'discharge',l:'退院通知'},{key:'nda',l:'NDA'},
+  ];
+  const filterBar=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}});
+  nFilterDefs.forEach(f=>{
+    const isActive=S.notifFilter===f.key;
+    filterBar.appendChild(h('button',{
+      style:{padding:'4px 12px',borderRadius:'20px',fontSize:'12px',fontWeight:isActive?'700':'400',
+        background:isActive?'var(--accent)':'var(--surface)',color:isActive?'#fff':'var(--ink-m)',
+        border:'1px solid '+(isActive?'var(--accent)':'var(--border)'),cursor:'pointer',fontFamily:'inherit'},
+      onClick:()=>{S.notifFilter=f.key;rr()}
+    },f.l));
+  });
+  w.appendChild(filterBar);
+
+  const fk=S.notifFilter;
+  const filtered=S.notifList.filter(n=>{
+    if(fk==='all')return true;
+    if(fk==='unread')return !n.is_read;
+    if(fk==='read')return !!n.is_read;
+    if(fk==='discharge')return n.type==='discharge'||n.type==='discharge_notice'||n.type==='notice_joined';
+    if(fk==='nda')return n.type==='nda_request'||n.type==='nda_signed';
+    return true;
+  });
+
+  if(!filtered.length){
+    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}}),'該当する通知はありません');
+    return w;
+  }
+
+  // 通知タイプ別カラーマップ
   const typeStyle={
     nda_request:{color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
     nda_signed:  {color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
     discharge:   {color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
+    discharge_notice:{color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
+    notice_joined:{color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
     default:     {color:'#f97316',bg:'#fff7ed',border:'#fed7aa'},
   };
 
   const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
-  for(const n of S.notifList){
+  for(const n of filtered){
     const isUnread=!n.is_read;
     const ts=typeStyle[n.type]||typeStyle.default;
     const item=h('div',{
@@ -2335,16 +2406,12 @@ function notificationsPage(){
         } else { rr(); }
       }
     },
-      h('div',{style:{
-        width:'8px',borderRadius:'4px',flexShrink:'0',alignSelf:'stretch',
-        background:isUnread?ts.color:'#e2e8f0'
-      }}),
-      // テキスト
+      h('div',{style:{width:'8px',borderRadius:'4px',flexShrink:'0',alignSelf:'stretch',background:isUnread?ts.color:'#e2e8f0'}}),
       h('div',{style:{flex:'1',minWidth:'0'}},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px',marginBottom:'4px'}},
           h('div',{style:{fontWeight:isUnread?'700':'500',fontSize:'13px',color:isUnread?'var(--ink)':'var(--ink-m)',lineHeight:'1.5'}},n.title),
           h('div',{style:{fontSize:'11px',color:'var(--ink-l)',whiteSpace:'nowrap',flexShrink:'0',marginTop:'1px'}},
-            new Date(n.created_at).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+            new Date(n.created_at).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
           )
         ),
         h('div',{style:{fontSize:'12px',color:'var(--ink-l)',lineHeight:'1.6'}},n.body),
@@ -2356,7 +2423,6 @@ function notificationsPage(){
   w.appendChild(list);
   return w;
 }
-
 async function loadNotifList(){
   if(!S.token)return;
   try{
