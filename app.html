@@ -73,6 +73,46 @@ const SAKAE_URL='https://tamjump.com';
 const PAYMENT_URL='https://square.link/u/fcFMaV8q';
 const PAYMENT_URL_ANNUAL='https://square.link/u/NoVtGk6z';
 
+// ── NDA文面（当事者型電子署名） ──
+const NDA_TEXT = `患者情報秘密保持契約書
+
+甲（退院通知を発行する法人）と乙（退院通知を受信する法人）は、
+退院支援業務における患者情報の取り扱いについて、以下の通り合意します。
+
+第1条（目的）
+本契約は、退院支援業務において共有される患者の個人情報・医療情報を
+適切に管理し、患者のプライバシーを保護することを目的とします。
+
+第2条（秘密情報の定義）
+本契約において「秘密情報」とは、MedAdaptを通じて共有される
+患者の氏名・生年月日・住所・診断名・医療処置・介護情報・
+その他一切の個人情報を指します。
+
+第3条（秘密保持義務）
+乙は、甲から提供された秘密情報を以下の通り取り扱うものとします。
+1. 退院支援・介護サービス提供の目的以外に使用しないこと
+2. 第三者に開示・漏洩・提供しないこと
+3. 秘密情報の管理に必要な安全措置を講じること
+4. 自己の役員・従業員以外に開示しないこと
+
+第4条（利用目的の制限）
+乙は、取得した秘密情報を以下の場合を除き利用できません。
+・当該患者への介護・医療サービスの提供
+・関係法令に基づく開示が必要な場合
+
+第5条（情報の廃棄）
+退院支援案件が終了した場合、またはサービス提供が不成立となった場合、
+乙は速やかに秘密情報を消去・廃棄するものとします。
+
+第6条（損害賠償）
+乙が本契約に違反し甲または患者に損害を与えた場合、
+乙はその損害を賠償する責任を負います。
+
+第7条（有効期間）
+本契約は署名日から当該患者との契約終了後1年間有効とします。
+
+以上の内容に同意の上、電子署名します。`;
+
 // ── Adapt モジュール設定（ブランド切り替えはここだけ変える）──
 const APP_CONFIG = {
   name:       'MedAdapt',
@@ -1286,27 +1326,122 @@ function showQRModal(opts){
 // ═══════════════════════════════════════════
 // v9: NDA管理ページ
 // ═══════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// 当事者型電子署名 共通関数
+// ════════════════════════════════════════════════════════
+
+// NDA申請モーダル（全文表示あり）
+function showNdaRequestModal(){
+  const modal=h('div',{className:'modal',style:{maxWidth:'600px'}});
+  modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'NDA締結申請'));
+  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'申請前にNDA（秘密保持契約書）の内容をご確認ください。'));
+
+  // NDA全文表示
+  modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'16px',maxHeight:'280px',overflowY:'auto',fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'serif',marginBottom:'16px'}},NDA_TEXT));
+
+  modal.appendChild(h('div',{style:{borderTop:'1px solid var(--border)',paddingTop:'12px',marginBottom:'12px'}},
+    h('div',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'8px'}},'申請先のログインID'),
+    h('input',{id:'nda_partner_id',type:'text',placeholder:'ADM-XXXXXX',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
+  ));
+
+  modal.appendChild(h('div',{style:{background:'#fef9c3',border:'1px solid #fde047',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#854d0e',marginBottom:'12px'}},'上記の秘密保持契約書の内容に同意の上、申請してください。相手方が署名することで契約が成立します。'));
+
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+    btn('内容に同意して申請する','btn-pri',async()=>{
+      const pid=document.getElementById('nda_partner_id')?.value?.trim();
+      if(!pid){toast('ログインIDを入力してください');return;}
+      const res=await api('/nda/request',{method:'POST',body:JSON.stringify({partner_login_id:pid})});
+      if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
+      else toast(res?.error||'エラー');
+    })
+  ));
+  S.modal=modal;rr();
+}
+
+// NDA署名モーダル（全文表示＋本人確認PW入力）
+function showNdaSignModal(nda){
+  const modal=h('div',{className:'modal',style:{maxWidth:'600px'}});
+  modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'NDA署名'));
+  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},(nda.partner_org||nda.partner_login_id)+'との秘密保持契約書です。内容をよくお読みの上、署名してください。'));
+
+  // NDA全文表示
+  modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'16px',maxHeight:'280px',overflowY:'auto',fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'serif',marginBottom:'16px'}},NDA_TEXT));
+
+  // 署名者情報（読み取り専用で表示）
+  modal.appendChild(h('div',{style:{background:'#f0fdfa',border:'1px solid #bae6fd',borderRadius:'8px',padding:'12px',fontSize:'12px',marginBottom:'12px'}},
+    h('div',{style:{fontWeight:'700',marginBottom:'6px'}},'署名者情報（自動記録）'),
+    h('div',null,'法人名：'+(S.user?.org||'')),
+    h('div',null,'署名者：'+(S.user?.name||S.user?.login_id||'')),
+    h('div',null,'ログインID：'+(S.user?.login_id||'')),
+    h('div',null,'署名日時：'+new Date().toLocaleString('ja-JP')),
+    h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'※ IPアドレス・タイムスタンプはサーバー側で記録されます')
+  ));
+
+  // 本人確認：パスワード再入力
+  modal.appendChild(h('div',{style:{borderTop:'1px solid var(--border)',paddingTop:'12px',marginBottom:'8px'}},
+    h('div',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'6px'}},'本人確認'),
+    h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'8px'}},'電子署名として有効にするため、現在のパスワードを入力してください。'),
+    h('input',{id:'nda_sign_pw',type:'password',placeholder:'現在のパスワード',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
+  ));
+
+  modal.appendChild(h('div',{style:{background:'#fff2f0',border:'1px solid #fecaca',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#991b1b',marginBottom:'12px'}},'署名すると本契約の内容に法的に拘束されます。内容を十分にご確認の上、署名してください。'));
+
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+    btn('上記内容に同意して電子署名する','btn-pri',async()=>{
+      const pw=document.getElementById('nda_sign_pw')?.value?.trim();
+      if(!pw){toast('パスワードを入力してください');return;}
+      const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id,password:pw})});
+      if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
+      else toast(res?.error||'署名に失敗しました');
+    })
+  ));
+  S.modal=modal;rr();
+}
+
+// ════════════════════════════════════════════════════════
+// 当事者型電子署名 汎用関数（同意書などに横展開可能）
+// ════════════════════════════════════════════════════════
+function showElectronicSignModal({title, documentText, onSign, requirePassword=true}){
+  const modal=h('div',{className:'modal',style:{maxWidth:'600px'}});
+  modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},title));
+
+  // 文書全文
+  modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'16px',maxHeight:'260px',overflowY:'auto',fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'serif',marginBottom:'14px'}},documentText));
+
+  // 署名者情報
+  modal.appendChild(h('div',{style:{background:'#f0fdfa',border:'1px solid #bae6fd',borderRadius:'8px',padding:'12px',fontSize:'12px',marginBottom:'12px'}},
+    h('div',{style:{fontWeight:'700',marginBottom:'6px'}},'署名者情報（自動記録）'),
+    h('div',null,'法人名：'+(S.user?.org||'')),
+    h('div',null,'署名者：'+(S.user?.name||S.user?.login_id||'')),
+    h('div',null,'署名日時：'+new Date().toLocaleString('ja-JP')),
+    h('div',{style:{color:'var(--ink-l)',fontSize:'11px',marginTop:'4px'}},'IPアドレス・タイムスタンプはサーバー側で記録')
+  ));
+
+  if(requirePassword){
+    modal.appendChild(h('div',{style:{marginBottom:'12px'}},
+      h('div',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'6px'}},'本人確認（パスワード再入力）'),
+      h('input',{id:'esign_pw',type:'password',placeholder:'現在のパスワード',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
+    ));
+  }
+
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+    btn('電子署名する','btn-pri',async()=>{
+      const pw=requirePassword?document.getElementById('esign_pw')?.value?.trim():null;
+      if(requirePassword&&!pw){toast('パスワードを入力してください');return;}
+      await onSign(pw);
+    })
+  ));
+  S.modal=modal;rr();
+}
+
 function ndaPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'720px'}});
   w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'NDA管理'),
-    btn('+ NDA締結を申請する','btn-pri btn-sm',()=>{
-      const modal=h('div',{className:'modal',style:{maxWidth:'440px'}});
-      modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'16px'}},'NDA締結申請'));
-      modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'NDAを締結する相手のログインIDを入力してください。締結後、退院通知の送受信が可能になります。'));
-      modal.appendChild(fld('相手のログインID','nda_partner_id','',()=>{},{ph:'ADM-XXXXXX'}));
-      modal.appendChild(h('div',{style:{marginTop:'12px',display:'flex',gap:'8px'}},
-        btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
-        btn('申請する','btn-pri',async()=>{
-          const pid=document.getElementById('nda_partner_id')?.value?.trim();
-          if(!pid){toast('ログインIDを入力してください');return;}
-          const res=await api('/nda/request',{method:'POST',body:JSON.stringify({partner_login_id:pid})});
-          if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
-          else toast(res?.error||'エラー');
-        })
-      ));
-      S.modal=modal;rr();
-    })
+    btn('+ NDA締結を申請する','btn-pri btn-sm',()=>showNdaRequestModal())
   ));
 
   if(!S.ndaList){
@@ -1327,12 +1462,7 @@ function ndaPage(){
             h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)+'からNDA締結申請が届いています'),
             h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
           ),
-          btn('NDAに署名する','btn-pri btn-sm',async()=>{
-            if(!confirm('以下の内容でNDAに署名しますか？\n\n・取得した患者情報を退院支援の目的以外に使用しない\n・第三者に漏洩しない\n・案件終了後は適切に廃棄する')){return;}
-            const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id})});
-            if(res?.success){S.ndaList=null;toast(res.message);rr();}
-            else toast(res?.error||'エラー');
-          })
+          btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda))
         ));
       } else {
         w.appendChild(h('div',{style:{background:'#fafafa',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',marginBottom:'8px'}},

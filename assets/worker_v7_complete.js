@@ -742,8 +742,14 @@ async function handleRequest(request, env, json, err) {
 
   // POST /nda/sign
   if (path === '/nda/sign' && method === 'POST') {
-    const { nda_id } = await request.json().catch(() => ({}));
+    const { nda_id, password } = await request.json().catch(() => ({}));
     if (!nda_id) return err('nda_idが必要です');
+    // 本人確認：パスワード検証
+    if (!password) return err('本人確認のためパスワードを入力してください');
+    const pwOk = currentUser.pw_hash
+      ? await verifyPassword(password, currentUser.pw_hash)
+      : (currentUser.pw === password);
+    if (!pwOk) return err('パスワードが正しくありません。本人確認に失敗しました。');
     const orgId = currentUser.org_id || currentUser.id;
     let nda = null;
     try { nda = await env.DB.prepare('SELECT * FROM org_ndas WHERE id=?').bind(nda_id).first(); } catch(e) {}
