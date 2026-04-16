@@ -587,7 +587,20 @@ return shell}
 function patientsPage(){const w=h('div');w.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},h('div',{className:'page-title'},'患者・利用者'),h('div',{style:{display:'flex',gap:'8px'}},btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()}),btn('CSV取込','btn-out',()=>showImportModal()))));w.appendChild(h('div',{className:'page-sub'},'患者を選んで作業を開始'));
 // Status filter
 const fb=h('div',{style:{display:'flex',gap:'6px',marginBottom:'16px'}});[{v:'all',l:'全て'},{v:'pre_admission',l:'入居前'},{v:'active',l:'利用中'},{v:'closed',l:'クローズ'}].forEach(f=>{fb.appendChild(h('button',{className:'btn btn-xs '+(S.ptFilter===f.v?'btn-pri':'btn-out'),onClick:()=>{S.ptFilter=f.v;rr()}},f.l))});w.appendChild(fb);
-const pts=myPatients().filter(p=>S.ptFilter==='all'?p.status!=='closed':p.status===S.ptFilter);if(!pts.length){w.appendChild(h('div',{className:'card',style:{textAlign:'center',padding:'48px'}},h('div',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},'患者が登録されていません'),btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()})))}
+// 非表示トグル
+if(S.showArchivedPt===undefined)S.showArchivedPt=false;
+const archiveToggle=h('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px'}},
+  h('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:'var(--ink-m)'}},
+    h('input',{type:'checkbox',checked:S.showArchivedPt,onChange:e=>{S.showArchivedPt=e.target.checked;rr()},style:{width:'14px',height:'14px'}}),
+    '非表示を含む'
+  )
+);
+w.appendChild(archiveToggle);
+const pts=myPatients().filter(p=>{
+  if(!S.showArchivedPt && p.archived)return false;
+  if(S.ptFilter==='all')return p.status!=='closed';
+  return p.status===S.ptFilter;
+});if(!pts.length){w.appendChild(h('div',{className:'card',style:{textAlign:'center',padding:'48px'}},h('div',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},'患者が登録されていません'),btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()})))}
 else{pts.forEach(p=>{const sb2=stBdg(p.status);const members=(p.members||[]).filter(m=>m.active!==false);const shared=(p.sharedWith||[]).filter(s=>s.status==='active').length;const card=h('div',{className:'card',style:{marginBottom:'12px',cursor:'pointer',padding:'16px',display:'flex',alignItems:'center',gap:'16px'},onClick:()=>{S.ptId=p.id;S.page='hub';S.hubTab='overview';rr()}});const info=h('div',{style:{flex:1}});info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},p.room?h('span',{style:{fontSize:'12px',fontWeight:'700',color:'var(--accent)',minWidth:'36px'}},p.room):null,h('span',{style:{fontSize:'16px',fontWeight:'700'}},p.name),bdg(sb2.l,sb2.c),p.cl?bdg(p.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(p.age?p.age+'歳 ':'')+(p.managerOrg?'管理：'+p.managerOrg:'')));const counts=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px',flexWrap:'wrap'}});const nc=ptCases(p.id).length,nco=ptConfs(p.id).length,nm=ptMons(p.id).length,na=ptAssess(p.id).length;if(nc)counts.appendChild(bdg('移行'+nc));if(na)counts.appendChild(bdg('アセス'+na));if(nco)counts.appendChild(bdg('担当者会議'+nco));if(nm)counts.appendChild(bdg('モニタ'+nm));if(members.length)counts.appendChild(bdg(members.length+'名関係者'));if(shared)counts.appendChild(bdg(shared+'名共有'));info.appendChild(counts);card.appendChild(info);card.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'20px'}},'→'));w.appendChild(card)})}return w}
 // --- PATIENT MODAL (2-path: 入居前 vs 入居中) ---
 function showPatientModal(ex){const p=ex?{...ex,members:[...(ex.members||[]).map(m=>({...m}))]}:{id:'',name:'',age:'',sex:'',cl:'',diagnosis:'',dd:'',room:'',status:'pre_admission',startDate:'',managerOrg:S.user?S.user.org:'',members:[],ownerEmail:getOwnerEmail(),sharedWith:[],audit:[],flags:{}};const isE=!!(ex&&ex.id);const m=h('div',{className:'modal'});m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'16px'}},isE?'患者情報の編集':'新規患者登録'));
@@ -602,7 +615,16 @@ function showImportModal(){const m=h('div',{className:'modal'});m.appendChild(h(
 function patientHub(){const pt=D.patients.find(p=>p.id===S.ptId);if(!pt)return h('div',null,'患者が見つかりません');const w=h('div');
 w.appendChild(h('div',{style:{marginBottom:'12px'}},h('span',{style:{cursor:'pointer',fontSize:'13px',color:'var(--accent)',fontWeight:'600'},onClick:()=>{S.page='patients';S.ptId=null;rr()}},'← 患者一覧')));
 // --- Header: Name + Status + Manager + Primary Members + Next Tasks ---
-const hdr=h('div',{className:'pt-header'});const hdrTop=h('div',{style:{display:'flex',alignItems:'center',gap:'16px',marginBottom:'12px'}});const info=h('div',{style:{flex:1}});const sb2=stBdg(pt.status);info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},pt.room?h('span',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}},pt.room):null,h('span',{style:{fontSize:'20px',fontWeight:'800'}},pt.name),bdg(sb2.l,sb2.c),pt.cl?bdg(pt.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(pt.age?pt.age+'歳':'')+(pt.sex==='male'?' 男性':pt.sex==='female'?' 女性':'')+(pt.diagnosis?' '+pt.diagnosis:'')+(pt.dd?' 退院：'+pt.dd:'')));hdrTop.appendChild(info);hdrTop.appendChild(h('div',{style:{display:'flex',gap:'6px'}},btn('編集','btn-xs btn-out',()=>showPatientModal(pt)),pt.status!=='closed'?btn('ステータス変更','btn-xs btn-out',()=>showStatusModal(pt)):null));hdr.appendChild(hdrTop);
+const hdr=h('div',{className:'pt-header'});const hdrTop=h('div',{style:{display:'flex',alignItems:'center',gap:'16px',marginBottom:'12px'}});const info=h('div',{style:{flex:1}});const sb2=stBdg(pt.status);info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},pt.room?h('span',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}},pt.room):null,h('span',{style:{fontSize:'20px',fontWeight:'800'}},pt.name),bdg(sb2.l,sb2.c),pt.cl?bdg(pt.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(pt.age?pt.age+'歳':'')+(pt.sex==='male'?' 男性':pt.sex==='female'?' 女性':'')+(pt.diagnosis?' '+pt.diagnosis:'')+(pt.dd?' 退院：'+pt.dd:'')));hdrTop.appendChild(info);hdrTop.appendChild(h('div',{style:{display:'flex',gap:'6px'}},btn('編集','btn-xs btn-out',()=>showPatientModal(pt)),
+    pt.status!=='closed'?btn('ステータス変更','btn-xs btn-out',()=>showStatusModal(pt)):null,
+    !pt.archived?btn('非表示にする','btn-xs btn-out',()=>{
+      if(!confirm(pt.name+'を非表示にしますか？\n患者一覧から見えなくなりますが、「非表示を含む」から復元できます。'))return;
+      D.patients=D.patients.map(x=>x.id===pt.id?{...x,archived:true,archivedAt:now()}:x);
+      addAudit(pt.audit,'非表示','');sv();S.page='patients';S.ptId=null;toast('非表示にしました');rr();
+    }):btn('表示を戻す','btn-xs btn-out',()=>{
+      D.patients=D.patients.map(x=>x.id===pt.id?{...x,archived:false,archivedAt:null}:x);
+      addAudit(pt.audit,'非表示解除','');sv();toast('表示を戻しました');rr();
+    })));hdr.appendChild(hdrTop);
 // Manager + Members row
 const mRow=h('div',{style:{display:'flex',gap:'20px',alignItems:'center',flexWrap:'wrap',fontSize:'12px'}});mRow.appendChild(h('div',null,h('span',{style:{color:'var(--ink-m)',fontWeight:'600'}},'管理主体：'),h('span',{style:{fontWeight:'700'}},pt.managerOrg||'未設定'),h('span',{style:{cursor:'pointer',color:'var(--accent)',marginLeft:'6px',fontSize:'10px'},onClick:()=>{const v=prompt('管理主体（法人名）',pt.managerOrg||'');if(v!==null){pt.managerOrg=v;addAudit(pt.audit||[],'管理主体変更',v);D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();rr()}}},'変更')));
 const pms=(pt.members||[]).filter(m=>m.isPrimary&&m.active!==false);if(pms.length){const mw=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}});pms.forEach(m=>{mw.appendChild(h('span',{style:{fontSize:'11px',padding:'2px 8px',background:'var(--accent-l)',borderRadius:'6px',fontWeight:'600'}},roleLabel(m.role)+' '+m.name))});const others=(pt.members||[]).filter(m=>!m.isPrimary&&m.active!==false).length;if(others)mw.appendChild(h('span',{style:{color:'var(--ink-m)',fontSize:'10px'}},'+'+others+'名'));mRow.appendChild(mw)}
@@ -684,7 +706,7 @@ w.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--acce
 w.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--accent)',margin:'16px 0 8px'}},'医療処置'));const mg=h('div',{className:'assess-grid'});['経管栄養','吸引','酸素','褥瘡処置','インスリン','バルーン','ストーマ','点滴'].forEach(item=>{mg.appendChild(chk(item,a.medical[item]||false,v=>{a.medical[item]=v;sv()}))});w.appendChild(mg);
 w.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',color:'var(--accent)',margin:'16px 0 8px'}},'リスク'));const rg=h('div',{className:'assess-grid'});['転倒','徘徊','誤嚥','感染','褥瘡','脱水'].forEach(item=>{rg.appendChild(chk(item,a.risk[item]||false,v=>{a.risk[item]=v;sv()}))});w.appendChild(rg);
 w.appendChild(fld('服薬','as_med',a.medication,v=>{a.medication=v;sv()},{ta:true,rows:'2'}));w.appendChild(fld('家族意向','as_fam',a.family,v=>{a.family=v;sv()},{ta:true,rows:'2'}));w.appendChild(fld('受入条件','as_cond',a.conditions,v=>{a.conditions=v;sv()},{ta:true,rows:'2'}));w.appendChild(fld('備考','as_note',a.notes,v=>{a.notes=v;sv()},{ta:true,rows:'2'}));
-w.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},btn('保存','btn-pri',()=>{addAudit(a.audit,'アセスメント更新','');sv();toast('保存完了')}),btn('PDF','btn-out',()=>genAssessPDF(a,pt)),btn('削除','btn-danger',()=>{if(confirm('削除?')){D.assessments=D.assessments.filter(x=>x.id!==a.id);sv();S.assId=null;toast('削除');rr()}})));return w}
+w.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},btn('保存','btn-pri',()=>{addAudit(a.audit,'アセスメント更新','');sv();toast('保存完了')}),btn('PDF','btn-out',()=>genAssessPDF(a,pt)),btn('非表示','btn-out',()=>{if(confirm('このアセスメントを非表示にしますか？')){D.assessments=D.assessments.map(x=>x.id===a.id?{...x,archived:true}:x);sv();S.assId=null;toast('非表示にしました');rr()}})));return w}
 // --- HUB: CASES (退院調整) ---
 function hubCases(pt){if(S.caseId){const c=D.cases.find(x=>x.id===S.caseId);if(c)return caseDetail(c,pt)}
 const w=h('div');w.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},h('div',{className:'section-label'},'受入れ・移行ケース'),btn('+ 新規','btn-sm btn-pri',()=>{if(!freeCheck('cases'))return;const defParts=[];if(pt.members)pt.members.filter(m=>m.active).forEach(m=>{defParts.push({name:m.name||'',org:m.org||''})});if(S.user)defParts.push({name:S.user.name||'',org:S.user.org||''});const c={id:'c_'+uid(),pn:pt.name,patientId:pt.id,dd:pt.dd||'',st:'draft',ca:now().slice(0,10),slots:[],apt:null,callUrl:'',parts:defParts,consent:{},record:{generated:false,text:''},audit:[]};addAudit(c.audit,'ケース作成',pt.name);D.cases.push(c);freeIncrement('cases');sv();S.caseId=c.id;S.caseTab='schedule';toast('作成完了');rr()})));
@@ -1177,6 +1199,10 @@ function staffPage(){
   api('/staff',{}).then(res=>{
     listContent.innerHTML='';
     if(!res||!res.staff||res.staff.length===0){listContent.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'13px',padding:'12px 0'}},'まだスタッフが登録されていません。招待リンクを発行してスタッフを追加してください。'));return;}
+    if(S.showSuspendedStaff===undefined)S.showSuspendedStaff=false;
+    const suspToggle=h('div',{style:{marginBottom:'10px'}},h('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:'var(--ink-m)'}},h('input',{type:'checkbox',checked:S.showSuspendedStaff,onChange:e=>{S.showSuspendedStaff=e.target.checked;rr()},style:{width:'14px',height:'14px'}}),'停止中を含む'));
+    listContent.appendChild(suspToggle);
+    res.staff=S.showSuspendedStaff?res.staff:res.staff.filter(s=>!s.suspended);
     const table=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}});
     table.appendChild(h('tr',{style:{borderBottom:'2px solid var(--border)'}},h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'ログインID'),h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'名前'),h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'メール'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'状態'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'操作')));
     res.staff.forEach(st=>{
@@ -1202,7 +1228,7 @@ function staffPage(){
                 btnClose.onclick=function(){ov.remove();};box.appendChild(btnClose);
                 ov.appendChild(box);document.body.appendChild(ov);
               }else toast(r2?.error||'エラー');
-            }),btn('QR','btn-sm btn-out',async()=>{const r2=await api('/staff/qr',{method:'POST',body:JSON.stringify({staff_id:st.id})});if(r2&&r2.qr_url){S.qrModal={name:st.name,url:r2.qr_url,token:r2.qr_token};showQRModal(S.qrModal);}else toast(r2?.error||'エラー');}),btn('削除','btn-sm',async()=>{if(!confirm(st.name+'を削除しますか？この操作は取り消せません。'))return;const r2=await fetch(API+'/staff/'+st.id,{method:'DELETE',headers:{Authorization:'Bearer '+S.token}});const data=await r2.json();if(data.success){S.inviteResult=null;toast('削除しました');rr();}else toast(data?.error||'エラー');}))));
+            }),btn('QR','btn-sm btn-out',async()=>{const r2=await api('/staff/qr',{method:'POST',body:JSON.stringify({staff_id:st.id})});if(r2&&r2.qr_url){S.qrModal={name:st.name,url:r2.qr_url,token:r2.qr_token};showQRModal(S.qrModal);}else toast(r2?.error||'エラー');}),)));
       table.appendChild(tr);
     });
     listContent.appendChild(table);
