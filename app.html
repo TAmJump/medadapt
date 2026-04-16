@@ -1626,7 +1626,11 @@ function showNdaSignModal(nda){
   modal.appendChild(h('div',{style:{borderTop:'1px solid var(--border)',paddingTop:'12px',marginBottom:'8px'}},
     h('div',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'6px'}},'本人確認'),
     h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'8px'}},'電子署名として有効にするため、現在のパスワードを入力してください。'),
-    h('input',{id:'nda_sign_pw',type:'password',placeholder:'現在のパスワード',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
+    h('div',{style:{position:'relative'}},
+      h('input',{id:'nda_sign_pw',type:'password',placeholder:'現在のパスワード',style:{width:'100%',padding:'8px 10px',paddingRight:'44px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}}),
+      h('button',{type:'button',style:{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'13px',color:'var(--ink-m)',fontFamily:'inherit'},
+        onClick:()=>{const i=document.getElementById('nda_sign_pw');if(i)i.type=i.type==='password'?'text':'password';}},'表示')
+    )
   ));
 
   modal.appendChild(h('div',{style:{background:'#fff2f0',border:'1px solid #fecaca',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#991b1b',marginBottom:'12px'}},'署名すると本契約の内容に法的に拘束されます。内容を十分にご確認の上、署名してください。'));
@@ -1686,7 +1690,7 @@ function showElectronicSignModal({title, documentText, onSign, requirePassword=t
 
 function ndaPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'720px'}});
-  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}},
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'NDA管理'),
     btn('+ NDA締結を申請する','btn-pri btn-sm',()=>showNdaRequestModal())
   ));
@@ -1697,137 +1701,125 @@ function ndaPage(){
     return w;
   }
 
-  const active=S.ndaList.filter(n=>n.status==='active');
-  const pending=S.ndaList.filter(n=>n.status==='pending');
+  // 検索・絞り込みバー
+  if(!S.ndaFilter)S.ndaFilter={q:'',type:'all',sort:'newest'};
+  const f=S.ndaFilter;
+  const filterBar=h('div',{style:{display:'flex',gap:'8px',marginBottom:'12px',flexWrap:'wrap',alignItems:'center',background:'var(--surface)',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)'}});
+  filterBar.appendChild(h('input',{type:'text',placeholder:'法人名・IDで検索',value:f.q,
+    style:{flex:'1',minWidth:'140px',padding:'6px 10px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px'},
+    onInput:e=>{f.q=e.target.value;rr()}}));
+  const typeSelect=h('select',{style:{padding:'6px 8px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px'},
+    onChange:e=>{f.type=e.target.value;rr()}});
+  [['all','すべて'],['active','締結済み'],['pending','署名待ち'],['standard','標準書式'],['custom','自社書式'],['paper','紙締結']].forEach(([v,l])=>{
+    const o=h('option',{value:v},l);if(f.type===v)o.selected=true;typeSelect.appendChild(o);
+  });
+  filterBar.appendChild(typeSelect);
+  const sortSelect=h('select',{style:{padding:'6px 8px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px'},
+    onChange:e=>{f.sort=e.target.value;rr()}});
+  [['newest','新しい順'],['oldest','古い順'],['name','法人名順']].forEach(([v,l])=>{
+    const o=h('option',{value:v},l);if(f.sort===v)o.selected=true;sortSelect.appendChild(o);
+  });
+  filterBar.appendChild(sortSelect);
+  w.appendChild(filterBar);
 
-  if(pending.length){
-    w.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px',color:'#f97316'}},'署名待ち（'+pending.length+'件）'));
-    for(const nda of pending){
-      if(!nda.is_requester){
-        w.appendChild(h('div',{style:{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:'10px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
-          h('div',null,
-            h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)+'からNDA締結申請が届いています'),
-            h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
-          ),
-          btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda))
-        ));
-      } else {
-        w.appendChild(h('div',{style:{background:'#fafafa',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',marginBottom:'8px'}},
-          h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)+'に申請中'),
-          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},'相手の署名待ち')
-        ));
-      }
-    }
-  }
+  // フィルタ適用
+  let filtered=S.ndaList.filter(n=>{
+    const q=f.q.toLowerCase();
+    if(q&&!(n.partner_org||'').toLowerCase().includes(q)&&!(n.partner_login_id||'').toLowerCase().includes(q))return false;
+    if(f.type==='active')return n.status==='active';
+    if(f.type==='pending')return n.status==='pending';
+    if(f.type==='standard')return n.nda_type==='standard'&&n.status==='active';
+    if(f.type==='custom')return n.nda_type==='custom'&&n.status==='active';
+    if(f.type==='paper')return n.nda_type==='paper';
+    return true;
+  });
+  if(f.sort==='newest')filtered.sort((a,b)=>new Date(b.requested_at)-new Date(a.requested_at));
+  else if(f.sort==='oldest')filtered.sort((a,b)=>new Date(a.requested_at)-new Date(b.requested_at));
+  else filtered.sort((a,b)=>(a.partner_org||a.partner_login_id||'').localeCompare(b.partner_org||b.partner_login_id||''));
 
-  w.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px',marginTop:'20px'}},'締結済み（'+active.length+'件）'));
-  if(!active.length){
-    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}},'締結済みのNDAはありません。上の「NDA締結を申請する」から相手に申請してください。'));
+  w.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginBottom:'10px'}},
+    filtered.length<S.ndaList.length?S.ndaList.length+'件中 '+filtered.length+'件表示':'全'+S.ndaList.length+'件'
+  ));
+
+  if(!filtered.length){
+    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}},'条件に一致するNDAがありません'));
     return w;
   }
-  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
-  for(const nda of active){
-    const typeMap={standard:{label:'標準書式',color:'#0891b2',bg:'#e0f2fe'},custom:{label:'自社書式',color:'#7c3aed',bg:'#f5f3ff'},paper:{label:'紙締結',color:'#16a34a',bg:'#f0fdf4'}};
+
+  const typeMap={standard:{label:'標準書式',color:'#0891b2',bg:'#e0f2fe'},custom:{label:'自社書式',color:'#7c3aed',bg:'#f5f3ff'},paper:{label:'紙締結',color:'#16a34a',bg:'#f0fdf4'}};
+  const ndaList=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  for(const nda of filtered){
     const tm=typeMap[nda.nda_type||'standard']||typeMap.standard;
-    list.appendChild(h('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
-      h('div',{style:{flex:'1'}},
-        h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'2px'}},
-          h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)),
-          h('span',{style:{fontSize:'10px',fontWeight:'700',color:tm.color,background:tm.bg,padding:'1px 7px',borderRadius:'20px'}},tm.label)
+    if(nda.status==='pending'){
+      ndaList.appendChild(h('div',{style:{background:nda.is_requester?'#fafafa':'#fff7ed',border:'1px solid '+(nda.is_requester?'var(--border)':'#fed7aa'),borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
+        h('div',null,
+          h('div',{style:{fontWeight:'700',fontSize:'13px'}},nda.is_requester?(nda.partner_org||nda.partner_login_id)+'に申請中':(nda.partner_org||nda.partner_login_id)+'からNDA締結申請が届いています'),
+          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
         ),
-        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.7'}},
-          '締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP')+
-          (nda.signer_name?'　署名者: '+nda.signer_name+(nda.signer_role?' ('+nda.signer_role+')':''):''),
-          nda.paper_note?h('div',null,'メモ: '+nda.paper_note):null
+        nda.is_requester?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'相手の署名待ち'):btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda))
+      ));
+    } else {
+      ndaList.appendChild(h('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
+        h('div',{style:{flex:'1'}},
+          h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'2px'}},
+            h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)),
+            h('span',{style:{fontSize:'10px',fontWeight:'700',color:tm.color,background:tm.bg,padding:'1px 7px',borderRadius:'20px'}},tm.label)
+          ),
+          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.7'}},
+            '締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP')+
+            (nda.signer_name?'　署名者: '+nda.signer_name+(nda.signer_role?' ('+nda.signer_role+')':''):'')
+          ),
+          nda.paper_note?h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'メモ: '+nda.paper_note):null
+        ),
+        h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexShrink:'0'}},
+          nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,
+          h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
         )
-      ),
-      h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexShrink:'0'}},
-        nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,
-        h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
-      )
-    ));
+      ));
+    }
   }
-  w.appendChild(list);
+  w.appendChild(ndaList);
   return w;
 }
-
-// NDA署名済みPDF生成（jsPDF使用）
+// NDA署名済みPDF生成（ブラウザ印刷）
 function genNdaPdf(nda){
-  const script=document.createElement('script');
-  script.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-  script.onload=()=>{
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    // フォント設定（日本語はbase64埋め込みが必要なためUnicode対応で対処）
-    const lh=7, margin=20, pageW=210, contentW=pageW-margin*2;
-    let y=margin;
-
-    const addText=(text,opts={})=>{
-      const size=opts.size||10;
-      const bold=opts.bold||false;
-      doc.setFontSize(size);
-      doc.setFont('helvetica',bold?'bold':'normal');
-      const lines=doc.splitTextToSize(text,contentW);
-      lines.forEach(line=>{
-        if(y>280){doc.addPage();y=margin;}
-        doc.text(line,margin,y);
-        y+=size*0.4+2;
-      });
-      if(opts.after)y+=opts.after;
-    };
-
-    // タイトル
-    doc.setFillColor(8,145,178);
-    doc.rect(0,0,210,18,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(14);doc.setFont('helvetica','bold');
-    doc.text('NDA / Confidentiality Agreement',margin,12);
-    doc.setTextColor(0,0,0);
-    y=28;
-
-    addText('患者情報秘密保持契約書',{size:14,bold:true,after:4});
-
-    // 当事者情報ボックス
-    doc.setFillColor(240,253,250);
-    doc.setDrawColor(186,230,253);
-    doc.rect(margin,y,contentW,28,'FD');
-    doc.setFontSize(9);doc.setFont('helvetica','normal');
-    doc.text('甲（申請者）: '+(nda.partner_org||nda.partner_login_id||''),margin+4,y+7);
-    doc.text('乙（署名者）: '+(S.user?.org||''),margin+4,y+14);
-    doc.text('署名者氏名: '+(nda.signer_name||'')+(nda.signer_role?' ('+nda.signer_role+')':''),margin+4,y+21);
-    doc.text('締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP'),margin+contentW/2,y+21);
-    y+=34;
-
-    // NDA本文（簡易ASCII変換で出力）
-    addText('--- 契約本文 ---',{size:9,bold:true,after:2});
-    const ndaLines=NDA_TEXT.split('\n');
-    ndaLines.forEach(line=>{
-      if(!line.trim())y+=3;
-      else addText(line,{size:8});
-    });
-
-    y+=6;
-    // 電子署名証明ボックス
-    doc.setFillColor(254,249,195);
-    doc.setDrawColor(253,224,71);
-    doc.rect(margin,y,contentW,24,'FD');
-    doc.setFontSize(9);doc.setFont('helvetica','bold');
-    doc.text('Electronic Signature Certificate',margin+4,y+7);
-    doc.setFont('helvetica','normal');
-    doc.text('Signed by: '+(nda.signer_name||'(not recorded)')+(nda.signer_role?' / '+nda.signer_role:''),margin+4,y+14);
-    doc.text('Date: '+new Date(nda.signed_at||'').toLocaleString('ja-JP')+'  IP: recorded on server',margin+4,y+21);
-    y+=30;
-
-    // フッター
-    doc.setFontSize(8);doc.setTextColor(150,150,150);
-    doc.text('Generated by MedAdapt  |  medadapt.scsgo.co.jp  |  '+new Date().toLocaleDateString('ja-JP'),margin,285);
-
-    const fname='NDA_'+(nda.partner_org||nda.partner_login_id).replace(/\s/g,'_')+'_'+new Date(nda.signed_at||Date.now()).toISOString().slice(0,10)+'.pdf';
-    doc.save(fname);
-    toast('PDFを出力しました');
-  };
-  if(!window.jspdf)document.head.appendChild(script);
-  else script.onload();
+  const ndaText = nda.custom_text || NDA_TEXT;
+  const typeLabel = {standard:'MedAdapt標準書式',custom:'自社書式',paper:'紙締結'}[nda.nda_type||'standard']||'標準書式';
+  const signedDate = nda.signed_at ? new Date(nda.signed_at).toLocaleDateString('ja-JP') : '';
+  const win = window.open('','_blank','width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>NDA_${(nda.partner_org||nda.partner_login_id||'').replace(/\s/g,'_')}_${signedDate}.pdf</title>
+<style>
+  body{font-family:'Noto Serif JP','Yu Mincho','MS Mincho',serif;font-size:10.5pt;line-height:1.9;color:#000;padding:20mm 18mm;max-width:170mm;margin:0 auto}
+  h1{font-size:14pt;text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:16px}
+  .meta{background:#f0f8ff;border:1px solid #bce;border-radius:4px;padding:10px 14px;margin-bottom:16px;font-size:9.5pt}
+  .meta div{margin:2px 0}
+  .body{white-space:pre-wrap;font-size:10pt;line-height:1.9}
+  .cert{background:#fffde7;border:1px solid #f0d060;border-radius:4px;padding:10px 14px;margin-top:16px;font-size:9pt}
+  @media print{body{padding:10mm 12mm}@page{size:A4;margin:10mm}}
+  .btn-wrap{text-align:center;margin:20px 0;print:none}
+  button{padding:8px 24px;background:#0891b2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:0 6px}
+  @media print{.btn-wrap{display:none}}
+</style></head><body>
+<div class="btn-wrap"><button onclick="window.print()">印刷 / PDF保存</button><button onclick="window.close()">閉じる</button></div>
+<h1>秘密保持契約書（${typeLabel}）</h1>
+<div class="meta">
+  <div>締結先：${nda.partner_org||nda.partner_login_id||''}</div>
+  <div>自法人：${S.user?.org||''}</div>
+  <div>締結日：${signedDate}</div>
+  ${nda.signer_name?`<div>署名者：${nda.signer_name}${nda.signer_role?' ('+nda.signer_role+')':''}</div>`:''}
+</div>
+<div class="body">${ndaText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+<div class="cert">
+  <div><strong>電子署名証明</strong></div>
+  <div>署名者：${nda.signer_name||'（未記録）'}${nda.signer_role?' / '+nda.signer_role:''}</div>
+  <div>署名日時：${nda.signed_at?new Date(nda.signed_at).toLocaleString('ja-JP'):''}</div>
+  <div>ログインID：${nda.signed_by||''}</div>
+  <div>IPアドレス・タイムスタンプはサーバー側に記録済み</div>
+</div>
+<div class="btn-wrap"><button onclick="window.print()">印刷 / PDF保存</button></div>
+</body></html>`);
+  win.document.close();
 }
 
 // ═══════════════════════════════════════════
