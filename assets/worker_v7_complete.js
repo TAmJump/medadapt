@@ -921,7 +921,7 @@ async function handleRequest(request, env, json, err) {
 
   // POST /discharge/new
   if (path === '/discharge/new' && method === 'POST') {
-    const { patient_id, title, memo, pdf_data, pdf_filename, pdf_file_type, recipient_org_ids, requirements_data } = await request.json().catch(() => ({}));
+    const { patient_id, title, memo, pdf_data, pdf_filename, pdf_file_type, recipient_org_ids, requirements_data, schedule_slots } = await request.json().catch(() => ({}));
     if (!patient_id || !title || !recipient_org_ids?.length) return err('患者・タイトル・通知先は必須です');
     if (pdf_data && pdf_data.length > 4 * 1024 * 1024) return err('PDFは3MB以下にしてください');
     const orgId = currentUser.org_id || currentUser.id;
@@ -929,8 +929,8 @@ async function handleRequest(request, env, json, err) {
     const now = new Date().toISOString();
     try {
       await env.DB.prepare(
-        'INSERT INTO discharge_notices (id,patient_id,issued_by,org_id,title,memo,pdf_url,pdf_filename,pdf_data,pdf_file_type,requirements_data,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
-      ).bind(id, patient_id, currentUser.id, orgId, title, memo||'', '', pdf_filename||'', pdf_data||'', pdf_file_type||'', requirements_data ? JSON.stringify(requirements_data) : '', 'active', now).run();
+        'INSERT INTO discharge_notices (id,patient_id,issued_by,org_id,title,memo,pdf_url,pdf_filename,pdf_data,pdf_file_type,requirements_data,schedule_slots,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, patient_id, currentUser.id, orgId, title, memo||'', '', pdf_filename||'', pdf_data||'', pdf_file_type||'', requirements_data ? JSON.stringify(requirements_data) : '', schedule_slots ? JSON.stringify(schedule_slots) : '', 'active', now).run();
     } catch(e) { return err('退院通知の作成に失敗しました: '+e.message); }
 
     for (const recipientOrgId of recipient_org_ids) {
@@ -1016,17 +1016,24 @@ async function handleRequest(request, env, json, err) {
       has_pdf: !!(notice.pdf_data),
       meeting_url: notice.meeting_url || '',
       requirements_data: notice.requirements_data ? JSON.parse(notice.requirements_data) : null,
+      schedule_slots: notice.schedule_slots ? JSON.parse(notice.schedule_slots) : [],
+      confirmed_slot: notice.confirmed_slot || '',
       joined_at: recipient?.joined_at || null,
       declined_at: recipient?.declined_at || null,
       decline_reason: recipient?.decline_reason || '',
       proposal_data: recipient?.proposal_data ? JSON.parse(recipient.proposal_data) : null,
+      schedule_votes: recipient?.schedule_votes ? JSON.parse(recipient.schedule_votes) : null,
     };
     if (isIssuer) {
       try {
         const recs = await env.DB.prepare(
-          'SELECT nr.recipient_org_id,nr.access_stage,nr.joined_at,nr.declined_at,nr.decline_reason,nr.proposal_data,u.org,u.login_id FROM notice_recipients nr LEFT JOIN users u ON (nr.recipient_org_id=u.org_id OR nr.recipient_org_id=u.id) WHERE nr.notice_id=? AND (u.role=? OR u.role IS NULL) GROUP BY nr.recipient_org_id'
+          'SELECT nr.recipient_org_id,nr.access_stage,nr.joined_at,nr.declined_at,nr.decline_reason,nr.proposal_data,nr.schedule_votes,u.org,u.login_id FROM notice_recipients nr LEFT JOIN users u ON (nr.recipient_org_id=u.org_id OR nr.recipient_org_id=u.id) WHERE nr.notice_id=? AND (u.role=? OR u.role IS NULL) GROUP BY nr.recipient_org_id'
         ).bind(noticeId, 'admin').all();
-        data.recipients = recs.results || [];
+        data.recipients = (recs.results || []).map(r => ({
+          ...r,
+          proposal_data: r.proposal_data ? JSON.parse(r.proposal_data) : null,
+          schedule_votes: r.schedule_votes ? JSON.parse(r.schedule_votes) : null,
+        }));
       } catch(e) { data.recipients = []; }
     }
     return json(data);
@@ -1038,10 +1045,10 @@ async function handleRequest(request, env, json, err) {
     const orgId = currentUser.org_id || currentUser.id;
     const now = new Date().toISOString();
     try {
-      const { proposal_data } = await request.json().catch(() => ({}));
+      const { proposal_data, schedule_votes } = await request.json().catch(() => ({}));
       await env.DB.prepare(
-        'UPDATE notice_recipients SET access_stage=2,joined_at=?,proposal_data=? WHERE notice_id=? AND recipient_org_id=? AND joined_at IS NULL'
-      ).bind(now, proposal_data ? JSON.stringify(proposal_data) : '', noticeId, orgId).run();
+        'UPDATE notice_recipients SET access_stage=2,joined_at=?,proposal_data=?,schedule_votes=? WHERE notice_id=? AND recipient_org_id=? AND joined_at IS NULL'
+      ).bind(now, proposal_data ? JSON.stringify(proposal_data) : '', schedule_votes ? JSON.stringify(schedule_votes) : '', noticeId, orgId).run();
     } catch(e) { return err('更新に失敗しました'); }
     try {
       const notice = await env.DB.prepare('SELECT * FROM discharge_notices WHERE id=?').bind(noticeId).first();
@@ -1114,8 +1121,9 @@ async function handleRequest(request, env, json, err) {
     if (notice.org_id !== orgId) return err('発行者のみ設定できます', 403);
     const now = new Date().toISOString();
     // meeting_urlを保存
+    const { confirmed_slot } = await request.json().catch(() => ({}));
     try {
-      await env.DB.prepare('UPDATE discharge_notices SET meeting_url=? WHERE id=?').bind(meeting_url, noticeId).run();
+      await env.DB.prepare('UPDATE discharge_notices SET meeting_url=?,confirmed_slot=? WHERE id=?').bind(meeting_url, confirmed_slot||'', noticeId).run();
     } catch(e) { return err('更新に失敗しました: ' + e.message); }
     // 参加済み（access_stage=2）の受信者をStage3へ
     try {

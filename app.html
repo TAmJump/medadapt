@@ -2118,8 +2118,35 @@ function dischargeNewPage(){
   ndaArea.appendChild(ndaBox);
   w.appendChild(ndaArea);
 
+  // 候補日程セクション
+  if(!S.dnSlots)S.dnSlots=[{id:'s1',date:'',time:''}];
+  const slotSection=h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',marginTop:'16px'}});
+  slotSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px',color:'#15803d'}},'面談の候補日程'));
+  slotSection.appendChild(h('div',{style:{fontSize:'11px',color:'#16a34a',marginBottom:'10px'}},'受信側が○△×で回答します。最大5枠まで追加できます。'));
+  const slotsWrap=h('div',{id:'slots_wrap',style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  S.dnSlots.forEach((sl,idx)=>{
+    const row=h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+      h('span',{style:{fontSize:'12px',color:'var(--ink-m)',minWidth:'20px'}},idx+1+'.'),
+      h('input',{type:'date',value:sl.date,style:{padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',flex:2},
+        onChange:e=>{S.dnSlots[idx].date=e.target.value}}),
+      h('input',{type:'time',value:sl.time,style:{padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',flex:1},
+        onChange:e=>{S.dnSlots[idx].time=e.target.value}}),
+      S.dnSlots.length>1?h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'16px',padding:'0 4px',fontFamily:'inherit'},
+        onClick:()=>{S.dnSlots=S.dnSlots.filter((_,i)=>i!==idx);rr()}},'×'):null
+    );
+    slotsWrap.appendChild(row);
+  });
+  slotSection.appendChild(slotsWrap);
+  if(S.dnSlots.length<5){
+    slotSection.appendChild(h('button',{
+      style:{marginTop:'8px',background:'none',border:'1px dashed #86efac',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',color:'#16a34a',cursor:'pointer',fontFamily:'inherit',width:'100%'},
+      onClick:()=>{S.dnSlots.push({id:'s'+Date.now(),date:'',time:''});rr()}
+    },'+ 候補日を追加'));
+  }
+  w.appendChild(slotSection);
+
   w.appendChild(h('div',{style:{marginTop:'16px',display:'flex',gap:'8px'}},
-    btn('キャンセル','btn-sec',()=>{S.page='discharge';rr()}),
+    btn('キャンセル','btn-sec',()=>{S.page='discharge';S.dnSlots=null;rr()}),
     btn('退院通知を送信する','btn-pri',async()=>{
       const ptId=document.getElementById('dn_patient')?.value;
       const title=document.getElementById('dn_title')?.value?.trim();
@@ -2148,11 +2175,14 @@ function dischargeNewPage(){
         caremanager:document.getElementById('dn_req_caremanager')?.value||'',
         other:document.getElementById('dn_req_other')?.value?.trim()||''
       };
+      const schedule_slots=(S.dnSlots||[]).filter(s=>s.date&&s.time).map(s=>({
+        id:s.id,datetime:s.date+'T'+s.time,label:new Date(s.date+'T'+s.time).toLocaleString('ja-JP',{month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit'})
+      }));
       const res=await api('/discharge/new',{method:'POST',body:JSON.stringify({
-        patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks,requirements_data
+        patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks,requirements_data,schedule_slots
       })});
       if(res?.success){
-        S.page='discharge';S.dischargeList=null;
+        S.page='discharge';S.dischargeList=null;S.dnSlots=null;
         toast('退院通知を送信しました（'+checks.length+'件）');rr();
       } else toast(res?.error||'送信に失敗しました');
     })
@@ -2370,7 +2400,39 @@ function sharedChartPage(){
           // 提案フォームモーダル
           const m=h('div',{className:'modal',style:{maxWidth:'520px'}});
           m.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'面談参加・施設情報の提案'));
-          m.appendChild(h('p',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'参加表明と合わせて、施設の情報を病院側に送ることができます（任意）'));
+          m.appendChild(h('p',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'参加表明と合わせて、候補日程への回答と施設情報を病院側に送ることができます'));
+
+          // 候補日程○△×投票
+          if(n.schedule_slots&&n.schedule_slots.length){
+            const voteState={};
+            n.schedule_slots.forEach(sl=>{voteState[sl.id]='';});
+            const voteSection=h('div',{style:{marginBottom:'16px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'8px',padding:'12px 14px'}});
+            voteSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'12px',color:'#15803d',marginBottom:'8px'}},'候補日程への回答'));
+            n.schedule_slots.forEach(sl=>{
+              const row=h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #d1fae5'}},
+                h('span',{style:{fontSize:'12px',flex:1}},sl.label||sl.datetime),
+                h('div',{style:{display:'flex',gap:'6px'}},
+                  ...[['ok','○','#16a34a','#f0fdf4'],['maybe','△','#d97706','#fffbeb'],['ng','×','#dc2626','#fff2f0']].map(([v,l,c,bg])=>
+                    h('button',{
+                      id:'vote_'+sl.id+'_'+v,
+                      style:{padding:'4px 10px',borderRadius:'6px',border:'2px solid #e2e8f0',cursor:'pointer',fontSize:'13px',fontWeight:'700',background:'var(--surface)',color:'var(--ink-m)',fontFamily:'inherit'},
+                      onClick:()=>{
+                        voteState[sl.id]=voteState[sl.id]===v?'':v;
+                        ['ok','maybe','ng'].forEach(vv=>{
+                          const b=document.getElementById('vote_'+sl.id+'_'+vv);
+                          if(b){b.style.background=voteState[sl.id]===vv?bg:'var(--surface)';b.style.borderColor=voteState[sl.id]===vv?c:'#e2e8f0';b.style.color=voteState[sl.id]===vv?c:'var(--ink-m)';}
+                        });
+                      }
+                    },l)
+                  )
+                )
+              );
+              voteSection.appendChild(row);
+            });
+            m.appendChild(voteSection);
+            m._voteState=voteState;
+          }
+
           m.appendChild(h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'12px'}},
             h('div',{className:'field',style:{margin:'0'}},
               h('label',{style:{fontSize:'12px'}},'看護師の在籍'),
@@ -2403,7 +2465,8 @@ function sharedChartPage(){
                 url:document.getElementById('prop_url')?.value?.trim()||'',
                 other:document.getElementById('prop_other')?.value?.trim()||''
               };
-              const res=await api('/discharge/'+n.id+'/join',{method:'POST',body:JSON.stringify({proposal_data})});
+              const schedule_votes=m._voteState||null;
+              const res=await api('/discharge/'+n.id+'/join',{method:'POST',body:JSON.stringify({proposal_data,schedule_votes})});
               if(res?.success){
                 S.modal=null;S.noticeData=null;S.dischargeList=null;
                 toast(res.message);
@@ -2426,7 +2489,19 @@ function sharedChartPage(){
         return items;
       })():[];
       w.appendChild(h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',fontSize:'13px',color:'#15803d'}},
-        h('div',{style:{fontWeight:'700',marginBottom:propDisp.length?'8px':'0'}},'面談への参加を表明しました。病院スタッフから日程調整の案内が届くまでお待ちください。'),
+        h('div',{style:{fontWeight:'700',marginBottom:'8px'}},'面談への参加を表明しました。日程確定をお待ちください。'),
+        n.schedule_votes&&n.schedule_slots&&n.schedule_slots.length?h('div',{style:{fontSize:'12px',borderBottom:'1px solid #86efac',paddingBottom:'8px',marginBottom:'8px'}},
+          h('div',{style:{fontWeight:'600',marginBottom:'4px'}},'回答した候補日程：'),
+          ...n.schedule_slots.map(sl=>{
+            const v=(n.schedule_votes||{})[sl.id]||'';
+            const vc={ok:'#16a34a',maybe:'#d97706',ng:'#dc2626'};
+            const vl={ok:'○',maybe:'△',ng:'×'};
+            return h('div',{style:{display:'flex',justifyContent:'space-between',padding:'3px 0'}},
+              h('span',null,sl.label||sl.datetime),
+              h('span',{style:{fontWeight:'700',color:vc[v]||'var(--ink-l)'}},vl[v]||'—')
+            );
+          })
+        ):null,
         propDisp.length?h('div',{style:{fontSize:'12px',color:'var(--ink-m)',borderTop:'1px solid #86efac',paddingTop:'8px',marginTop:'4px'}},
           h('div',{style:{fontWeight:'600',marginBottom:'4px'}},'送信した情報：'),
           ...propDisp.map(item=>typeof item==='string'?h('div',null,item):item)
@@ -2443,6 +2518,65 @@ function sharedChartPage(){
           : h('div',{style:{fontSize:'12px',color:'var(--ink-l)'}},'面談URLを確認中...')
       ));
     }
+  }
+
+  // 発行者側：日程集計マトリクス
+  if(isIssuer && n.schedule_slots && n.schedule_slots.length){
+    const recipients=n.recipients||[];
+    const voted=recipients.filter(r=>r.joined_at&&!r.declined_at&&r.schedule_votes);
+    const matSection=h('div',{style:{marginBottom:'16px',border:'1px solid var(--border)',borderRadius:'10px',overflow:'hidden'}});
+    matSection.appendChild(h('div',{style:{padding:'10px 14px',background:'#f8fafc',borderBottom:'1px solid var(--border)',fontWeight:'700',fontSize:'13px'}},'候補日程の回答状況'));
+    const table=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px'}});
+    // ヘッダー行
+    const thead=h('tr',{style:{borderBottom:'1px solid var(--border)'}},h('th',{style:{padding:'8px 10px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'候補日程'));
+    recipients.filter(r=>r.joined_at&&!r.declined_at).forEach(r=>{
+      thead.appendChild(h('th',{style:{padding:'8px 6px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)',fontSize:'11px',maxWidth:'80px',wordBreak:'break-all'}},r.org||r.login_id||'—'));
+    });
+    thead.appendChild(h('th',{style:{padding:'8px 6px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'集計'));
+    table.appendChild(thead);
+    // 各スロット行
+    n.schedule_slots.forEach(sl=>{
+      const voteMap={ok:'○',maybe:'△',ng:'×'};
+      const voteColor={ok:'#16a34a',maybe:'#d97706',ng:'#dc2626'};
+      let okCount=0;
+      const tr=h('tr',{style:{borderBottom:'1px solid #f1f5f9',background:n.confirmed_slot===sl.id?'#f0fdf4':''}},
+        h('td',{style:{padding:'8px 10px',fontSize:'12px'}},
+          n.confirmed_slot===sl.id?h('span',{style:{marginRight:'4px',color:'#15803d',fontWeight:'700'}},'確定済み '):null,
+          sl.label||sl.datetime
+        )
+      );
+      recipients.filter(r=>r.joined_at&&!r.declined_at).forEach(r=>{
+        const v=(r.schedule_votes||{})[sl.id]||'';
+        if(v==='ok')okCount++;
+        tr.appendChild(h('td',{style:{padding:'8px 6px',textAlign:'center',fontWeight:'700',color:voteColor[v]||'var(--ink-l)'}},voteMap[v]||'—'));
+      });
+      tr.appendChild(h('td',{style:{padding:'8px 6px',textAlign:'center'}},
+        !n.confirmed_slot&&okCount>0?h('button',{
+          style:{padding:'3px 10px',background:'#0891b2',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'11px',fontWeight:'700',fontFamily:'inherit'},
+          onClick:()=>{
+            const urlInput=document.getElementById('meeting_url_input_confirm');
+            const url=urlInput?urlInput.value.trim():'';
+            if(!url){toast('面談URLを先に入力してください');return;}
+            api('/discharge/'+n.id+'/meeting',{method:'POST',body:JSON.stringify({meeting_url:url,confirmed_slot:sl.id})}).then(res=>{
+              if(res?.success){S.noticeData=null;api('/discharge/'+S.noticeId).then(r=>{S.noticeData=r;rr();});toast('日程を確定しました');}
+              else toast(res?.error||'エラー');
+            });
+          }
+        },'この日程で確定'):h('span',{style:{fontSize:'11px',color:n.confirmed_slot===sl.id?'#15803d':'var(--ink-l)'}},n.confirmed_slot===sl.id?'確定済み':'—')
+      ));
+      table.appendChild(tr);
+    });
+    matSection.appendChild(table);
+    // 面談URL入力（確定前のみ）
+    if(!n.confirmed_slot){
+      const urlRow=h('div',{style:{padding:'10px 14px',borderTop:'1px solid var(--border)',display:'flex',gap:'8px',alignItems:'center'}},
+        h('input',{id:'meeting_url_input_confirm',type:'url',placeholder:'https://tamj-corp.whereby.com/...',
+          style:{flex:1,padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}}),
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'↑ 日程確定前にURLを入力してから「確定」を押してください')
+      );
+      matSection.appendChild(urlRow);
+    }
+    w.appendChild(matSection);
   }
 
   // 発行者側：面談URL設定パネル
