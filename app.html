@@ -480,6 +480,19 @@ if(u.plan==='free'){
   }
   sb.appendChild(usageBox);
 }
+const notifBtn=h('button',{
+  style:{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'10px 16px',
+         background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,.7)',
+         fontSize:'13px',textAlign:'left'},
+  onClick:()=>{S.page='notifications';rr()}
+},
+  h('span',null,'通知'),
+  S.unreadCount>0?h('span',{style:{
+    background:'#ef4444',color:'#fff',borderRadius:'100px',
+    fontSize:'10px',fontWeight:'700',padding:'1px 6px',minWidth:'18px',textAlign:'center'
+  }},S.unreadCount>99?'99+':String(S.unreadCount)):null
+);
+sb.appendChild(notifBtn);
 const foot=h('div',{className:'sidebar-foot'});foot.appendChild(h('span',{style:{display:'inline-block',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:u.plan==='pro'?'var(--accent)':'rgba(255,255,255,.2)',color:'#fff',marginBottom:'8px'}},u.plan==='pro'?'Pro':'Free'));foot.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'#fff',marginBottom:'4px'}},u.org_name||u.org));foot.appendChild(h('div',{style:{fontSize:'13px',color:'rgba(255,255,255,.6)',marginBottom:'4px'}},u.name));foot.appendChild(h('a',{href:'#',style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none',marginBottom:'2px'},onClick:e=>{e.preventDefault();stopNotifPolling();S.token=null;S.user=null;S.moduleAccess=null;S.unreadCount=0;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}S.scr='login';rr()}},'ログアウト'));foot.appendChild(h('a',{href:SAKAE_URL,style:{display:'block',fontSize:'13px',color:'rgba(255,255,255,.5)',textDecoration:'none'}},'タムジ.Corp'));
 
 sb.appendChild(foot);shell.appendChild(sb);
