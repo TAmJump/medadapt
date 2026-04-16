@@ -1004,7 +1004,6 @@ async function handleRequest(request, env, json, err) {
       status: notice.status, created_at: notice.created_at,
       access_stage: accessStage, is_issuer: isIssuer,
       pdf_url: notice.pdf_url, pdf_filename: notice.pdf_filename,
-      meeting_url: notice.meeting_url || '',
       joined_at: recipient?.joined_at || null,
       declined_at: recipient?.declined_at || null,
     };
@@ -1054,51 +1053,6 @@ async function handleRequest(request, env, json, err) {
       ).bind(now, noticeId, orgId).run();
     } catch(e) { return err('更新に失敗しました'); }
     return json({ success: true, message: '辞退しました' });
-  }
-
-  // POST /discharge/:id/meeting  — 発行者が面談URLを設定し、参加済み受信者をStage3へ
-  if (path.match(/^\\/discharge\\/[^/]+\\/meeting$/) && method === 'POST') {
-    const noticeId = path.split('/')[2];
-    const orgId = currentUser.org_id || currentUser.id;
-    const { meeting_url } = await request.json().catch(() => ({}));
-    if (!meeting_url) return err('面談URLを入力してください');
-    // 発行者確認
-    let notice = null;
-    try { notice = await env.DB.prepare('SELECT * FROM discharge_notices WHERE id=?').bind(noticeId).first(); } catch(e) {}
-    if (!notice) return err('退院通知が見つかりません', 404);
-    if (notice.org_id !== orgId) return err('発行者のみ設定できます', 403);
-    const now = new Date().toISOString();
-    // meeting_urlを保存
-    try {
-      await env.DB.prepare('UPDATE discharge_notices SET meeting_url=? WHERE id=?').bind(meeting_url, noticeId).run();
-    } catch(e) { return err('更新に失敗しました: ' + e.message); }
-    // 参加済み（access_stage=2）の受信者をStage3へ
-    try {
-      await env.DB.prepare(
-        'UPDATE notice_recipients SET access_stage=3 WHERE notice_id=? AND access_stage=2'
-      ).bind(noticeId).run();
-    } catch(e) {}
-    // 参加済み受信者に通知
-    try {
-      const joinedRecs = await env.DB.prepare(
-        'SELECT nr.recipient_org_id FROM notice_recipients nr WHERE nr.notice_id=? AND nr.joined_at IS NOT NULL AND nr.declined_at IS NULL'
-      ).bind(noticeId).all();
-      for (const rec of (joinedRecs.results || [])) {
-        const adminUser = await env.DB.prepare(
-          'SELECT id FROM users WHERE (org_id=? OR id=?) AND role=? LIMIT 1'
-        ).bind(rec.recipient_org_id, rec.recipient_org_id, 'admin').first().catch(() => null);
-        if (adminUser) {
-          await env.DB.prepare(
-            'INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)'
-          ).bind('notif_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
-            adminUser.id, 'medical-adapt', 'discharge',
-            '【面談URL確定】' + notice.title,
-            '面談のURLが設定されました。確認してください。',
-            '#notice:' + noticeId, 0, now).run();
-        }
-      }
-    } catch(e) {}
-    return json({ success: true, message: '面談URLを設定しました' });
   }
 
   return err('Not found', 404);

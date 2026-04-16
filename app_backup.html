@@ -2086,7 +2086,7 @@ function sharedChartPage(){
     w.appendChild(h('div',{style:{marginBottom:'16px'}},
       h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px'}},'介護・看護サマリー（PDF）'),
       h('div',{style:{position:'relative',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',background:'#fafafa'}},
-        h('iframe',{src:n.pdf_url,style:{width:'100%',height:'560px',border:'none',display:'block'},sandbox:'allow-same-origin allow-scripts allow-popups allow-forms allow-presentation'}),
+        h('iframe',{src:n.pdf_url,style:{width:'100%',height:'560px',border:'none',display:'block'},sandbox:'allow-same-origin allow-scripts'}),
         // ウォーターマーク（DL防止）
         stage<4?h('div',{style:{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center',transform:'rotate(-25deg)',fontSize:'18px',fontWeight:'900',color:'rgba(8,145,178,0.08)',whiteSpace:'nowrap',userSelect:'none',letterSpacing:'4px'}},'閲覧専用 · '+(S.user?.org||'')+'· 閲覧専用 · '+(S.user?.org||'')):null,
         // DLブロック用の透明オーバーレイ（右クリック無効化）
@@ -2114,7 +2114,7 @@ function sharedChartPage(){
     ));
   }
 
-  // 受信者側：アクションボタン
+  // 受信者側：アクションボタン（段階①のみ）
   if(!isIssuer && !n.declined_at){
     if(stage===1){
       w.appendChild(h('div',{style:{display:'flex',gap:'12px',marginTop:'8px'}},
@@ -2133,52 +2133,9 @@ function sharedChartPage(){
           } else toast(res?.error||'エラー');
         })
       ));
-    } else if(stage===2){
+    } else if(stage>=2){
       w.appendChild(h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',fontSize:'13px',color:'#15803d',fontWeight:'600'}},'面談への参加を表明しました。病院スタッフから日程調整の案内が届くまでお待ちください。'));
-    } else if(stage>=3){
-      // Stage3：Whereby面談リンク表示
-      w.appendChild(h('div',{style:{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'10px',padding:'14px 16px',marginTop:'8px'}},
-        h('div',{style:{fontWeight:'700',fontSize:'13px',color:'#1d4ed8',marginBottom:'8px'}},'面談URLが確定しました'),
-        n.meeting_url
-          ? h('a',{href:n.meeting_url,target:'_blank',rel:'noopener noreferrer',
-              style:{display:'inline-block',background:'#1d4ed8',color:'#fff',padding:'8px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:'700',textDecoration:'none'}},
-              '面談に参加する（Whereby）')
-          : h('div',{style:{fontSize:'12px',color:'var(--ink-l)'}},'面談URLを確認中...')
-      ));
     }
-  }
-
-  // 発行者側：面談URL設定パネル
-  if(isIssuer){
-    const joinedCount=(n.recipients||[]).filter(r=>r.joined_at&&!r.declined_at).length;
-    const hasMeetingUrl=!!(n.meeting_url);
-    w.appendChild(h('div',{style:{marginTop:'16px',background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px'}},
-      h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'10px'}},'面談URL設定'),
-      hasMeetingUrl
-        ? h('div',null,
-            h('div',{style:{fontSize:'12px',color:'var(--ink-l)',marginBottom:'6px'}},'設定済みURL:'),
-            h('div',{style:{fontSize:'12px',wordBreak:'break-all',color:'var(--accent)',marginBottom:'8px'}},n.meeting_url),
-            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},joinedCount+'名が面談参加中（Stage 3に移行済み）')
-          )
-        : h('div',null,
-            joinedCount===0
-              ? h('div',{style:{fontSize:'12px',color:'var(--ink-l)'}},'まだ参加表明がありません。参加者が現れたら面談URLを設定できます。')
-              : h('div',null,
-                  h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'8px'}},joinedCount+'名が参加表明しています。面談URLを設定すると参加者に通知が届きます。'),
-                  h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
-                    h('input',{id:'meeting_url_input',type:'url',placeholder:'https://tamj-corp.whereby.com/...',
-                      style:{flex:1,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}}),
-                    btn('設定する','btn-pri btn-sm',async()=>{
-                      const url=document.getElementById('meeting_url_input')?.value?.trim();
-                      if(!url){toast('URLを入力してください');return;}
-                      const res=await api('/discharge/'+n.id+'/meeting',{method:'POST',body:JSON.stringify({meeting_url:url})});
-                      if(res?.success){S.noticeData=null;await api('/discharge/'+S.noticeId).then(r=>{S.noticeData=r;rr();});toast(res.message);}
-                      else toast(res?.error||'エラー');
-                    })
-                  )
-                )
-          )
-    ));
   }
 
   return w;
