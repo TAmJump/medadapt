@@ -1796,7 +1796,7 @@ function ndaPage(){
       ndaList.appendChild(h('div',{style:{background:nda.is_requester?'#fafafa':'#fff7ed',border:'1px solid '+(nda.is_requester?'var(--border)':'#fed7aa'),borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
         h('div',null,
           h('div',{style:{fontWeight:'700',fontSize:'13px'}},nda.is_requester?(nda.partner_org||nda.partner_login_id)+'に申請中':(nda.partner_org||nda.partner_login_id)+'からNDA締結申請が届いています'),
-          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
+          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))
         ),
         h('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},
           nda.is_requester?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'相手の署名待ち'):btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda)),
@@ -1811,7 +1811,7 @@ function ndaPage(){
             h('span',{style:{fontSize:'10px',fontWeight:'700',color:tm.color,background:tm.bg,padding:'1px 7px',borderRadius:'20px'}},tm.label)
           ),
           h('div',{style:{fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.7'}},
-            '締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP')+
+            '締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+
             (nda.signer_name?'　署名者: '+nda.signer_name+(nda.signer_role?' ('+nda.signer_role+')':''):'')
           ),
           nda.paper_note?h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'メモ: '+nda.paper_note):null
@@ -1845,7 +1845,7 @@ function ndaPage(){
 function genNdaPdf(nda){
   const ndaText = nda.custom_text || NDA_TEXT;
   const typeLabel = {standard:'MedAdapt標準書式',custom:'自社書式',paper:'紙締結'}[nda.nda_type||'standard']||'標準書式';
-  const signedDate = nda.signed_at ? new Date(nda.signed_at).toLocaleDateString('ja-JP') : '';
+  const signedDate = nda.signed_at ? new Date(nda.signed_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
   const win = window.open('','_blank','width=800,height=900');
   win.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>NDA_${(nda.partner_org||nda.partner_login_id||'').replace(/\s/g,'_')}_${signedDate}.pdf</title>
@@ -1913,7 +1913,7 @@ function dischargePage(){
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
           h('div',null,
             h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
-            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'発行日: '+new Date(n.created_at).toLocaleDateString('ja-JP')+'　送信先: '+n.recipient_count+'件　参加表明: '+n.joined_count+'件')
+            h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'　送信先: '+n.recipient_count+'件　参加表明: '+n.joined_count+'件')
           ),
           h('span',{style:{fontSize:'11px',background:n.status==='active'?'#dcfce7':'#f1f5f9',color:n.status==='active'?'#15803d':'#64748b',padding:'2px 8px',borderRadius:'100px'}},n.status==='active'?'進行中':'終了')
         )
@@ -1939,7 +1939,7 @@ function dischargePage(){
       h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
         h('div',null,
           h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
-          h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'受信日: '+new Date(n.created_at).toLocaleDateString('ja-JP'))
+          h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'受信日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))
         ),
         h('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'100px',
           background:isDeclined?'#f1f5f9':isJoined?'#dbeafe':'#fef9c3',
@@ -2092,7 +2092,7 @@ function sharedChartPage(){
   w.appendChild(h('div',{style:{marginBottom:'20px'}},
     h('h2',{style:{fontSize:'18px',fontWeight:'800',margin:'0 0 8px 0'}},n.title),
     h('div',{style:{fontSize:'12px',color:'var(--ink-l)'}},
-      '発行日: '+new Date(n.created_at).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'}),
+      '発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}),
       !isIssuer?h('span',{style:{marginLeft:'12px',background:stage>=2?'#dbeafe':'#fef9c3',color:stage>=2?'#1d4ed8':'#854d0e',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},stage>=2?'面談参加済み':'未回答'):null
     )
   ));
