@@ -863,6 +863,60 @@ async function handleRequest(request, env, json, err) {
     return json({ success: true, message: '削除しました' });
   }
 
+  // DELETE /nda/:id （紙締結のみ・PW確認済み）
+  if (path.match(/^\/nda\/[^/]+$/) && method === 'DELETE') {
+    const ndaId = path.split('/')[2];
+    const { password } = await request.json().catch(() => ({}));
+    if (!password) return err('パスワードが必要です');
+    const pwOk = currentUser.pw_hash
+      ? await verifyPassword(password, currentUser.pw_hash)
+      : (currentUser.pw === password);
+    if (!pwOk) return err('パスワードが正しくありません');
+    const orgId = currentUser.org_id || currentUser.id;
+    let nda = null;
+    try { nda = await env.DB.prepare('SELECT * FROM org_ndas WHERE id=?').bind(ndaId).first(); } catch(e) {}
+    if (!nda) return err('NDAが見つかりません');
+    if (nda.nda_type !== 'paper') return err('署名済みNDAは削除できません。終了処理を行ってください。');
+    if (nda.org_id_a !== orgId && nda.org_id_b !== orgId) return err('削除権限がありません');
+    try {
+      await env.DB.prepare('DELETE FROM org_ndas WHERE id=?').bind(ndaId).run();
+    } catch(e) { return err('削除に失敗しました'); }
+    return json({ success: true, message: '紙締結NDAを削除しました' });
+  }
+
+  // POST /nda/:id/terminate （署名済みNDAの終了処理）
+  if (path.match(/^\/nda\/[^/]+\/terminate$/) && method === 'POST') {
+    const ndaId = path.split('/')[2];
+    const { password } = await request.json().catch(() => ({}));
+    if (!password) return err('パスワードが必要です');
+    const pwOk = currentUser.pw_hash
+      ? await verifyPassword(password, currentUser.pw_hash)
+      : (currentUser.pw === password);
+    if (!pwOk) return err('パスワードが正しくありません');
+    const orgId = currentUser.org_id || currentUser.id;
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare('UPDATE org_ndas SET status=?,terminated_at=? WHERE id=? AND (org_id_a=? OR org_id_b=?)')
+        .bind('terminated', now, ndaId, orgId, orgId).run();
+    } catch(e) { return err('処理に失敗しました'); }
+    return json({ success: true, message: 'NDAを終了処理しました' });
+  }
+
+  // POST /nda/:id/withdraw （申請取り下げ）
+  if (path.match(/^\/nda\/[^/]+\/withdraw$/) && method === 'POST') {
+    const ndaId = path.split('/')[2];
+    const orgId = currentUser.org_id || currentUser.id;
+    let nda = null;
+    try { nda = await env.DB.prepare('SELECT * FROM org_ndas WHERE id=?').bind(ndaId).first(); } catch(e) {}
+    if (!nda) return err('NDAが見つかりません');
+    if (nda.org_id_a !== orgId) return err('申請者のみ取り下げできます');
+    if (nda.status !== 'pending') return err('申請中のNDAのみ取り下げできます');
+    try {
+      await env.DB.prepare('DELETE FROM org_ndas WHERE id=?').bind(ndaId).run();
+    } catch(e) { return err('取り下げに失敗しました'); }
+    return json({ success: true, message: '申請を取り下げました' });
+  }
+
   // ═══════════════════════════════════════════════
   // v9: 退院通知 API
   // ═══════════════════════════════════════════════

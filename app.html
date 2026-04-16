@@ -1688,6 +1688,45 @@ function showElectronicSignModal({title, documentText, onSign, requirePassword=t
   S.modal=modal;rr();
 }
 
+// NDA操作モーダル（削除・終了・取り下げ）
+function showNdaActionModal(nda, action){
+  const cfg={
+    delete: {title:'紙NDA削除',msg:'この紙締結記録を削除しますか？この操作は元に戻せません。',btn:'削除する',btnClass:'btn-danger',needPw:true},
+    terminate:{title:'NDA終了処理',msg:'このNDAを終了処理しますか？「終了済み」として記録されます。削除はされません。',btn:'終了処理する',btnClass:'btn-sec',needPw:true},
+    withdraw: {title:'申請取り下げ',msg:'このNDA申請を取り下げますか？',btn:'取り下げる',btnClass:'btn-sec',needPw:false},
+  };
+  const c=cfg[action];
+  const modal=h('div',{className:'modal',style:{maxWidth:'440px'}});
+  modal.appendChild(h('h3',{style:{fontSize:'15px',fontWeight:'800',marginBottom:'8px'}},c.title));
+  modal.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.7'}},c.msg));
+  modal.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'600',marginBottom:'6px'}},'対象：'+(nda.partner_org||nda.partner_login_id)));
+  if(c.needPw){
+    modal.appendChild(h('div',{style:{marginBottom:'12px',marginTop:'10px'}},
+      h('div',{style:{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'パスワード確認'),
+      h('div',{style:{position:'relative'}},
+        h('input',{id:'nda_action_pw',type:'password',placeholder:'現在のパスワード',
+          style:{width:'100%',padding:'8px 10px',paddingRight:'44px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}}),
+        h('button',{type:'button',style:{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'13px',color:'var(--ink-m)'},
+          onClick:()=>{const i=document.getElementById('nda_action_pw');if(i)i.type=i.type==='password'?'text':'password';}},'表示')
+      )
+    ));
+  }
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+    btn(c.btn,'btn-pri '+c.btnClass,async()=>{
+      const pw=c.needPw?document.getElementById('nda_action_pw')?.value?.trim():null;
+      if(c.needPw&&!pw){toast('パスワードを入力してください');return;}
+      let res;
+      if(action==='delete') res=await api('/nda/'+nda.id,{method:'DELETE',body:JSON.stringify({password:pw})});
+      else if(action==='terminate') res=await api('/nda/'+nda.id+'/terminate',{method:'POST',body:JSON.stringify({password:pw})});
+      else if(action==='withdraw') res=await api('/nda/'+nda.id+'/withdraw',{method:'POST',body:JSON.stringify({})});
+      if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
+      else toast(res?.error||'エラーが発生しました');
+    })
+  ));
+  S.modal=modal;rr();
+}
+
 function ndaPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'720px'}});
   w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}},
@@ -1759,7 +1798,10 @@ function ndaPage(){
           h('div',{style:{fontWeight:'700',fontSize:'13px'}},nda.is_requester?(nda.partner_org||nda.partner_login_id)+'に申請中':(nda.partner_org||nda.partner_login_id)+'からNDA締結申請が届いています'),
           h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
         ),
-        nda.is_requester?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'相手の署名待ち'):btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda))
+        h('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},
+          nda.is_requester?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'相手の署名待ち'):btn('NDAを確認して署名する','btn-pri btn-sm',()=>showNdaSignModal(nda)),
+          nda.is_requester?btn('取り下げ','btn-xs btn-out',()=>showNdaActionModal(nda,'withdraw')):null
+        )
       ));
     } else {
       ndaList.appendChild(h('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
@@ -1788,6 +1830,7 @@ function ndaPage(){
           }):null,
           nda.nda_type==='paper'&&!nda.has_file?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'添付なし'):null,
           nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,
+          nda.nda_type==='paper'?btn('削除','btn-xs btn-danger',()=>showNdaActionModal(nda,'delete')):btn('終了','btn-xs btn-out',()=>showNdaActionModal(nda,'terminate')),
           h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
         )
       ));
