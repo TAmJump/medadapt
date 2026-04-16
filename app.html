@@ -2124,7 +2124,6 @@ function sharedChartPage(){
       const inner=h('div',{style:{position:'relative',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',background:'#fafafa'}},
         h('iframe',{src:blobUrl,style:{width:'100%',height:'560px',border:'none',display:'block'}}),
         stage<4?h('div',{style:{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center',transform:'rotate(-25deg)',fontSize:'18px',fontWeight:'900',color:'rgba(8,145,178,0.08)',whiteSpace:'nowrap',userSelect:'none',letterSpacing:'4px'}},'閲覧専用 · '+(S.user?.org||'')+'· 閲覧専用 · '+(S.user?.org||'')):null,
-        stage<4?h('div',{style:{position:'absolute',top:0,left:0,width:'100%',height:'100%',background:'transparent'},onContextMenu:e=>e.preventDefault()}):null
       );
       pdfSection.replaceChild(inner,pdfSection.lastChild);
       if(stage<4){
