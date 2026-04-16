@@ -1057,7 +1057,7 @@ async function handleRequest(request, env, json, err) {
   }
 
   // POST /discharge/:id/meeting  — 発行者が面談URLを設定し、参加済み受信者をStage3へ
-  if (path.match(/^\\/discharge\\/[^/]+\\/meeting$/) && method === 'POST') {
+  if (path.match(/^\/discharge\/[^/]+\/meeting$/) && method === 'POST') {
     const noticeId = path.split('/')[2];
     const orgId = currentUser.org_id || currentUser.id;
     const { meeting_url } = await request.json().catch(() => ({}));
