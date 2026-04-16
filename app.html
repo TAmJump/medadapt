@@ -2107,28 +2107,78 @@ function sharedChartPage(){
 
   // PDF表示（全段階で表示。段階④のみDL可）
   if(n.has_pdf){
-    // base64 PDFをblobURLに変換して表示
-    const pdfSection=h('div',{style:{marginBottom:'16px'}},
-      h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px'}},'介護・看護サマリー（PDF）'),
-      h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-l)',background:'#fafafa',borderRadius:'8px',border:'1px solid var(--border)'}},'PDFを読み込み中...')
-    );
+    // PDF.jsで独自レンダリング（ダウンロードボタンなし・完全制御）
+    let pdfZoom=1.2;
+    const pdfSection=h('div',{style:{marginBottom:'16px'}});
+    pdfSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px'}},'介護・看護サマリー（PDF）'));
+    const pdfLoading=h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-l)',background:'#fafafa',borderRadius:'8px',border:'1px solid var(--border)'}},'PDFを読み込み中...');
+    pdfSection.appendChild(pdfLoading);
     w.appendChild(pdfSection);
-    // 非同期でPDF取得
-    api('/discharge/'+n.id+'/pdf').then(res=>{
-      if(!res?.data) return;
-      const byteChars=atob(res.data);
-      const byteArr=new Uint8Array(byteChars.length);
-      for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);
-      const blob=new Blob([byteArr],{type:res.file_type||'application/pdf'});
-      const blobUrl=URL.createObjectURL(blob);
-      const inner=h('div',{style:{position:'relative',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',background:'#fafafa'}},
-        h('iframe',{src:blobUrl,style:{width:'100%',height:'560px',border:'none',display:'block'}}),
-        stage<4?h('div',{style:{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center',transform:'rotate(-25deg)',fontSize:'18px',fontWeight:'900',color:'rgba(8,145,178,0.08)',whiteSpace:'nowrap',userSelect:'none',letterSpacing:'4px'}},'閲覧専用 · '+(S.user?.org||'')+'· 閲覧専用 · '+(S.user?.org||'')):null,
+
+    const renderPdf=async(pdfBytes,zoom)=>{
+      // PDF.jsロード
+      if(!window.pdfjsLib){
+        await new Promise((res,rej)=>{
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload=res; s.onerror=rej;
+          document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const pdf=await window.pdfjsLib.getDocument({data:pdfBytes}).promise;
+      // ズームコントロール
+      const ctrl=h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',background:'#f8fafc',borderRadius:'8px',padding:'6px 10px',border:'1px solid var(--border)'}},
+        h('span',{style:{fontSize:'12px',color:'var(--ink-m)',flex:1}},pdf.numPages+'ページ'),
+        h('button',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',padding:'3px 10px',cursor:'pointer',fontSize:'14px',fontFamily:'inherit'},
+          onClick:async()=>{pdfZoom=Math.max(0.5,pdfZoom-0.2);const nb=await reRender();pdfContainer.replaceWith(nb);}},'-'),
+        h('span',{style:{fontSize:'12px',minWidth:'40px',textAlign:'center'}},Math.round(pdfZoom*100)+'%'),
+        h('button',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',padding:'3px 10px',cursor:'pointer',fontSize:'14px',fontFamily:'inherit'},
+          onClick:async()=>{pdfZoom=Math.min(3,pdfZoom+0.2);const nb=await reRender();pdfContainer.replaceWith(nb);}},'+')
       );
-      pdfSection.replaceChild(inner,pdfSection.lastChild);
+      const reRender=async()=>{
+        const wrap=h('div',{style:{border:'1px solid var(--border)',borderRadius:'8px',overflow:'auto',background:'#525659',maxHeight:'600px',position:'relative'}});
+        for(let i=1;i<=pdf.numPages;i++){
+          const page=await pdf.getPage(i);
+          const vp=page.getViewport({scale:pdfZoom});
+          const canvas=document.createElement('canvas');
+          canvas.width=vp.width; canvas.height=vp.height;
+          canvas.style.cssText='display:block;margin:8px auto;box-shadow:0 2px 8px rgba(0,0,0,0.3)';
+          const ctx=canvas.getContext('2d');
+          await page.render({canvasContext:ctx,viewport:vp}).promise;
+          // ウォーターマーク描画
+          if(stage<4){
+            ctx.save();
+            ctx.translate(vp.width/2,vp.height/2);
+            ctx.rotate(-25*Math.PI/180);
+            ctx.font=`bold ${Math.round(vp.width/12)}px sans-serif`;
+            ctx.fillStyle='rgba(8,145,178,0.10)';
+            ctx.textAlign='center';
+            const wm='閲覧専用 · '+(S.user?.org||'');
+            ctx.fillText(wm,-vp.width*0.3,0);
+            ctx.fillText(wm,vp.width*0.3,vp.height*0.15);
+            ctx.restore();
+          }
+          wrap.appendChild(canvas);
+        }
+        return wrap;
+      };
+      const pdfContainer=await reRender();
+      // 既存コンテンツを置換
+      while(pdfSection.children.length>1)pdfSection.removeChild(pdfSection.lastChild);
+      pdfSection.appendChild(ctrl);
+      pdfSection.appendChild(pdfContainer);
       if(stage<4){
         pdfSection.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'4px',textAlign:'center'}},'閲覧専用です。受入確定後にダウンロードが可能になります。'));
       }
+    };
+
+    api('/discharge/'+n.id+'/pdf').then(res=>{
+      if(!res?.data) return;
+      const byteChars=atob(res.data);
+      const pdfBytes=new Uint8Array(byteChars.length);
+      for(let i=0;i<byteChars.length;i++)pdfBytes[i]=byteChars.charCodeAt(i);
+      renderPdf(pdfBytes,pdfZoom).catch(()=>{});
     }).catch(()=>{});
   } else {
     w.appendChild(h('div',{style:{background:'#fafafa',border:'1px dashed var(--border)',borderRadius:'8px',padding:'24px',textAlign:'center',color:'var(--ink-l)',marginBottom:'16px',fontSize:'13px'}},'PDFは添付されていません'));
