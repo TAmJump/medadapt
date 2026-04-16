@@ -684,10 +684,12 @@ async function handleRequest(request, env, json, err) {
     const orgId = currentUser.org_id || currentUser.id;
     let ndas = [];
     try {
+      // paper_file_dataは重いので除外し、has_fileフラグのみ返す
       const result = await env.DB.prepare(
-        'SELECT * FROM org_ndas WHERE org_id_a=? OR org_id_b=? ORDER BY requested_at DESC'
+        'SELECT id,org_id_a,org_id_b,status,requested_at,signed_at,signed_by,signed_ip,signer_name,signer_role,terminated_at,nda_type,custom_text,form_type,paper_note,paper_file_type FROM org_ndas WHERE org_id_a=? OR org_id_b=? ORDER BY requested_at DESC'
       ).bind(orgId, orgId).all();
       ndas = result.results || [];
+      // has_fileフラグを別クエリで取得
       for (const nda of ndas) {
         const partnerId = nda.org_id_a === orgId ? nda.org_id_b : nda.org_id_a;
         const partner = await env.DB.prepare(
@@ -696,9 +698,26 @@ async function handleRequest(request, env, json, err) {
         nda.partner_login_id = partner?.login_id || '';
         nda.partner_org = partner?.org || '';
         nda.is_requester = nda.org_id_a === orgId;
+        // ファイル有無チェック
+        const fileCheck = await env.DB.prepare(
+          'SELECT (paper_file_data IS NOT NULL AND paper_file_data != \'\') as has_file FROM org_ndas WHERE id=?'
+        ).bind(nda.id).first();
+        nda.has_file = !!(fileCheck?.has_file);
       }
     } catch(e) { console.error('nda/list error:', e); }
     return json({ ndas });
+  }
+
+  // GET /nda/:id/file
+  if (path.match(/^\/nda\/[^/]+\/file$/) && method === 'GET') {
+    const ndaId = path.split('/')[2];
+    const orgId = currentUser.org_id || currentUser.id;
+    let row = null;
+    try { row = await env.DB.prepare('SELECT paper_file_data, paper_file_type FROM org_ndas WHERE id=? AND (org_id_a=? OR org_id_b=?)').bind(ndaId, orgId, orgId).first(); } catch(e) {}
+    if (!row?.paper_file_data) return err('ファイルが見つかりません', 404);
+    return new Response(row.paper_file_data, {
+      headers: { ...cors, 'Content-Type': 'application/json' }
+    });
   }
 
   // POST /nda/request

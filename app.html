@@ -1775,6 +1775,18 @@ function ndaPage(){
           nda.paper_note?h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'メモ: '+nda.paper_note):null
         ),
         h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexShrink:'0'}},
+          nda.nda_type==='paper'&&nda.has_file?btn('原本を開く','btn-xs btn-out',async()=>{
+            const res=await api('/nda/'+nda.id+'/file');
+            if(!res||res.error){toast('ファイルの取得に失敗しました');return;}
+            const mimeType=nda.paper_file_type||'application/pdf';
+            const byteChars=atob(res);
+            const byteArr=new Uint8Array(byteChars.length);
+            for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);
+            const blob=new Blob([byteArr],{type:mimeType});
+            const url=URL.createObjectURL(blob);
+            window.open(url,'_blank');
+          }):null,
+          nda.nda_type==='paper'&&!nda.has_file?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'添付なし'):null,
           nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,
           h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
         )
