@@ -1994,7 +1994,17 @@ function dischargeNewPage(){
     ndaBox.appendChild(h('div',{style:{color:'var(--ink-l)',fontSize:'12px'}},'読み込み中...'));
     api('/nda/list').then(res=>{S.ndaList=res?.ndas||[];rr()});
   } else {
-    const activeNdas=S.ndaList.filter(n=>n.status==='active');
+    const myOrgId=S.user?.org_id||S.user?.id;
+    // 自分自身を除外 + 重複除去（同じ相手との複数NDAをまとめる）
+    const seen=new Set();
+    const activeNdas=S.ndaList.filter(n=>{
+      if(n.status!=='active')return false;
+      const partnerId=n.is_requester?n.org_id_b:n.org_id_a;
+      if(partnerId===myOrgId)return false; // 自分自身を除外
+      if(seen.has(partnerId))return false; // 重複除去
+      seen.add(partnerId);
+      return true;
+    });
     if(!activeNdas.length){
       ndaBox.appendChild(h('div',{style:{color:'var(--ink-l)',fontSize:'12px'}},'NDA締結済みの法人がありません。先にNDA管理からNDAを締結してください。'));
     } else {
