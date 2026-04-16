@@ -742,10 +742,11 @@ async function handleRequest(request, env, json, err) {
 
   // POST /nda/sign
   if (path === '/nda/sign' && method === 'POST') {
-    const { nda_id, password } = await request.json().catch(() => ({}));
+    const { nda_id, password, signer_name, signer_role } = await request.json().catch(() => ({}));
     if (!nda_id) return err('nda_idが必要です');
     // 本人確認：パスワード検証
     if (!password) return err('本人確認のためパスワードを入力してください');
+    if (!signer_name) return err('署名者氏名を入力してください');
     const pwOk = currentUser.pw_hash
       ? await verifyPassword(password, currentUser.pw_hash)
       : (currentUser.pw === password);
@@ -760,8 +761,8 @@ async function handleRequest(request, env, json, err) {
     const ip = request.headers.get('CF-Connecting-IP') || '';
     try {
       await env.DB.prepare(
-        'UPDATE org_ndas SET status=?,signed_at=?,signed_by=?,signed_ip=? WHERE id=?'
-      ).bind('active', now, currentUser.id, ip, nda_id).run();
+        'UPDATE org_ndas SET status=?,signed_at=?,signed_by=?,signed_ip=?,signer_name=?,signer_role=? WHERE id=?'
+      ).bind('active', now, currentUser.id, ip, signer_name, signer_role||'', nda_id).run();
     } catch(e) { return err('署名に失敗しました'); }
     // 申請元に通知
     try {

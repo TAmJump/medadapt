@@ -1368,14 +1368,25 @@ function showNdaSignModal(nda){
   // NDA全文表示
   modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'16px',maxHeight:'280px',overflowY:'auto',fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'serif',marginBottom:'16px'}},NDA_TEXT));
 
-  // 署名者情報（読み取り専用で表示）
-  modal.appendChild(h('div',{style:{background:'#f0fdfa',border:'1px solid #bae6fd',borderRadius:'8px',padding:'12px',fontSize:'12px',marginBottom:'12px'}},
-    h('div',{style:{fontWeight:'700',marginBottom:'6px'}},'署名者情報（自動記録）'),
-    h('div',null,'法人名：'+(S.user?.org||'')),
-    h('div',null,'署名者：'+(S.user?.name||S.user?.login_id||'')),
-    h('div',null,'ログインID：'+(S.user?.login_id||'')),
-    h('div',null,'署名日時：'+new Date().toLocaleString('ja-JP')),
-    h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'※ IPアドレス・タイムスタンプはサーバー側で記録されます')
+  // 署名者情報（自動記録分 + 手入力分）
+  modal.appendChild(h('div',{style:{background:'#f0fdfa',border:'1px solid #bae6fd',borderRadius:'8px',padding:'14px',fontSize:'12px',marginBottom:'12px'}},
+    h('div',{style:{fontWeight:'700',marginBottom:'10px'}},'署名者情報'),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}},
+      h('div',null,
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginBottom:'3px'}},'署名者氏名 *'),
+        h('input',{id:'nda_signer_name',type:'text',placeholder:'例：山田 太郎',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px',boxSizing:'border-box'}})
+      ),
+      h('div',null,
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginBottom:'3px'}},'役職'),
+        h('input',{id:'nda_signer_role',type:'text',placeholder:'例：代表取締役・管理者',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px',boxSizing:'border-box'}})
+      )
+    ),
+    h('div',{style:{fontSize:'11px',color:'var(--ink-l)',borderTop:'1px solid #bae6fd',paddingTop:'8px',lineHeight:'1.8'}},
+      h('div',null,'法人名：'+(S.user?.org||'')),
+      h('div',null,'ログインID：'+(S.user?.login_id||'')),
+      h('div',null,'署名日時：'+new Date().toLocaleString('ja-JP')),
+      h('div',null,'※ IPアドレス・タイムスタンプはサーバー側で記録されます')
+    )
   ));
 
   // 本人確認：パスワード再入力
@@ -1391,8 +1402,11 @@ function showNdaSignModal(nda){
     btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
     btn('上記内容に同意して電子署名する','btn-pri',async()=>{
       const pw=document.getElementById('nda_sign_pw')?.value?.trim();
+      const sname=document.getElementById('nda_signer_name')?.value?.trim();
+      const srole=document.getElementById('nda_signer_role')?.value?.trim();
+      if(!sname){toast('署名者氏名を入力してください');return;}
       if(!pw){toast('パスワードを入力してください');return;}
-      const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id,password:pw})});
+      const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id,password:pw,signer_name:sname,signer_role:srole||''})});
       if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
       else toast(res?.error||'署名に失敗しました');
     })
@@ -1483,13 +1497,96 @@ function ndaPage(){
     list.appendChild(h('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
       h('div',null,
         h('div',{style:{fontWeight:'700',fontSize:'13px'}},(nda.partner_org||nda.partner_login_id)),
-        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},'締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP'))
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},'締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP')+
+          (nda.signer_name?'　署名者: '+nda.signer_name+(nda.signer_role?' ('+nda.signer_role+')':''):''))
       ),
-      h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
+      h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+        btn('📄 PDF','btn-xs btn-out',()=>genNdaPdf(nda)),
+        h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
+      )
     ));
   }
   w.appendChild(list);
   return w;
+}
+
+// NDA署名済みPDF生成（jsPDF使用）
+function genNdaPdf(nda){
+  const script=document.createElement('script');
+  script.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  script.onload=()=>{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    // フォント設定（日本語はbase64埋め込みが必要なためUnicode対応で対処）
+    const lh=7, margin=20, pageW=210, contentW=pageW-margin*2;
+    let y=margin;
+
+    const addText=(text,opts={})=>{
+      const size=opts.size||10;
+      const bold=opts.bold||false;
+      doc.setFontSize(size);
+      doc.setFont('helvetica',bold?'bold':'normal');
+      const lines=doc.splitTextToSize(text,contentW);
+      lines.forEach(line=>{
+        if(y>280){doc.addPage();y=margin;}
+        doc.text(line,margin,y);
+        y+=size*0.4+2;
+      });
+      if(opts.after)y+=opts.after;
+    };
+
+    // タイトル
+    doc.setFillColor(8,145,178);
+    doc.rect(0,0,210,18,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(14);doc.setFont('helvetica','bold');
+    doc.text('NDA / Confidentiality Agreement',margin,12);
+    doc.setTextColor(0,0,0);
+    y=28;
+
+    addText('患者情報秘密保持契約書',{size:14,bold:true,after:4});
+
+    // 当事者情報ボックス
+    doc.setFillColor(240,253,250);
+    doc.setDrawColor(186,230,253);
+    doc.rect(margin,y,contentW,28,'FD');
+    doc.setFontSize(9);doc.setFont('helvetica','normal');
+    doc.text('甲（申請者）: '+(nda.partner_org||nda.partner_login_id||''),margin+4,y+7);
+    doc.text('乙（署名者）: '+(S.user?.org||''),margin+4,y+14);
+    doc.text('署名者氏名: '+(nda.signer_name||'')+(nda.signer_role?' ('+nda.signer_role+')':''),margin+4,y+21);
+    doc.text('締結日: '+new Date(nda.signed_at||nda.requested_at).toLocaleDateString('ja-JP'),margin+contentW/2,y+21);
+    y+=34;
+
+    // NDA本文（簡易ASCII変換で出力）
+    addText('--- 契約本文 ---',{size:9,bold:true,after:2});
+    const ndaLines=NDA_TEXT.split('\n');
+    ndaLines.forEach(line=>{
+      if(!line.trim())y+=3;
+      else addText(line,{size:8});
+    });
+
+    y+=6;
+    // 電子署名証明ボックス
+    doc.setFillColor(254,249,195);
+    doc.setDrawColor(253,224,71);
+    doc.rect(margin,y,contentW,24,'FD');
+    doc.setFontSize(9);doc.setFont('helvetica','bold');
+    doc.text('Electronic Signature Certificate',margin+4,y+7);
+    doc.setFont('helvetica','normal');
+    doc.text('Signed by: '+(nda.signer_name||'(not recorded)')+(nda.signer_role?' / '+nda.signer_role:''),margin+4,y+14);
+    doc.text('Date: '+new Date(nda.signed_at||'').toLocaleString('ja-JP')+'  IP: recorded on server',margin+4,y+21);
+    y+=30;
+
+    // フッター
+    doc.setFontSize(8);doc.setTextColor(150,150,150);
+    doc.text('Generated by MedAdapt  |  medadapt.scsgo.co.jp  |  '+new Date().toLocaleDateString('ja-JP'),margin,285);
+
+    const fname='NDA_'+(nda.partner_org||nda.partner_login_id).replace(/\s/g,'_')+'_'+new Date(nda.signed_at||Date.now()).toISOString().slice(0,10)+'.pdf';
+    doc.save(fname);
+    toast('PDFを出力しました');
+  };
+  if(!window.jspdf)document.head.appendChild(script);
+  else script.onload();
 }
 
 // ═══════════════════════════════════════════
@@ -1752,39 +1849,53 @@ function sharedChartPage(){
 }
 
 function notificationsPage(){
-  const u=S.user;
   const w=h('div',{style:{padding:'24px',maxWidth:'680px'}});
-  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}},
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'通知'),
     S.unreadCount>0?h('button',{
-      style:{fontSize:'12px',color:'var(--accent)',background:'none',border:'none',cursor:'pointer',padding:'4px 8px'},
+      style:{fontSize:'12px',color:'var(--accent)',background:'none',border:'1px solid var(--accent)',borderRadius:'20px',cursor:'pointer',padding:'5px 14px',fontFamily:'inherit',fontWeight:'600'},
       onClick:async()=>{await api('/notifications/read-all',{method:'POST'});S.unreadCount=0;await loadNotifList();rr();}
     },'全て既読にする'):null
   ));
 
   if(!S.notifList){
-    // 初回ロード
     loadNotifList().then(()=>rr());
     w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)'}},'読み込み中...'));
     return w;
   }
 
   if(!S.notifList.length){
-    w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'12px'}},
-      h('div',{style:{fontSize:'32px',marginBottom:'12px'}},''),
-      h('div',{style:{fontWeight:'700',marginBottom:'4px'}},'通知はありません'),
+    w.appendChild(h('div',{style:{textAlign:'center',padding:'64px 48px',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'16px',border:'1px solid var(--border)'}},
+      h('div',{style:{fontSize:'40px',marginBottom:'12px'}},'🔔'),
+      h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'6px',color:'var(--ink)'}},'通知はありません'),
       h('div',{style:{fontSize:'13px'}},'新しい通知が届くとここに表示されます')
     ));
     return w;
   }
 
-  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  // 通知タイプ別のアイコン・カラーマップ
+  const typeStyle={
+    nda_request:{icon:'🤝',color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
+    nda_signed:  {icon:'✅',color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
+    discharge:   {icon:'🏥',color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
+    default:     {icon:'🔔',color:'#f97316',bg:'#fff7ed',border:'#fed7aa'},
+  };
+
+  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
   for(const n of S.notifList){
     const isUnread=!n.is_read;
+    const ts=typeStyle[n.type]||typeStyle.default;
     const item=h('div',{
-      style:{background:isUnread?'#f0fdfa':'var(--surface)',border:'1px solid '+(isUnread?'#bae6fd':'var(--border)'),
-             borderRadius:'10px',padding:'14px 16px',cursor:'pointer',
-             borderLeft:isUnread?'4px solid var(--accent)':'4px solid transparent'},
+      style:{
+        background:isUnread?ts.bg:'var(--surface)',
+        border:'1px solid '+(isUnread?ts.border:'var(--border)'),
+        borderRadius:'12px',padding:'14px 16px',cursor:'pointer',
+        display:'flex',gap:'14px',alignItems:'flex-start',
+        transition:'box-shadow 0.15s',
+        boxShadow:isUnread?'0 1px 6px rgba(0,0,0,0.06)':'none'
+      },
+      onMouseEnter:e=>{e.currentTarget.style.boxShadow='0 2px 12px rgba(0,0,0,0.1)'},
+      onMouseLeave:e=>{e.currentTarget.style.boxShadow=isUnread?'0 1px 6px rgba(0,0,0,0.06)':'none'},
       onClick:async()=>{
         if(isUnread){
           await api('/notifications/'+n.id+'/read',{method:'POST'});
@@ -1792,29 +1903,32 @@ function notificationsPage(){
           n.is_read=1;
         }
         if(n.action_url){
-          // #patient:ID 形式 → 患者ハブへSPA遷移
           const patientMatch=n.action_url.match(/^#patient:(.+)$/);
           if(patientMatch){S.ptId=patientMatch[1];S.page='hub';S.hubTab='overview';rr();return;}
           const noticeMatch=n.action_url.match(/^#notice:(.+)$/);
           if(noticeMatch){S.noticeId=noticeMatch[1];S.noticeData=null;S.page='shared_chart';rr();return;}
-          // #page:NAME 形式 → ページ遷移
           const pageMatch=n.action_url.match(/^#page:(.+)$/);
           if(pageMatch){S.page=pageMatch[1];rr();return;}
-          // それ以外は外部URLとして開く
           window.open(n.action_url,'_blank');
-        } else {
-          rr();
-        }
+        } else { rr(); }
       }
     },
-      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'12px'}},
-        h('div',{style:{flex:'1'}},
-          h('div',{style:{fontWeight:isUnread?'700':'400',fontSize:'14px',marginBottom:'4px',color:isUnread?'var(--ink)':'var(--ink-m)'}},n.title),
-          h('div',{style:{fontSize:'12px',color:'var(--ink-l)',lineHeight:'1.6'}},n.body)
+      // アイコン
+      h('div',{style:{
+        width:'40px',height:'40px',borderRadius:'10px',flexShrink:'0',
+        background:isUnread?ts.color:'#e2e8f0',
+        display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'
+      }},ts.icon),
+      // テキスト
+      h('div',{style:{flex:'1',minWidth:'0'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px',marginBottom:'4px'}},
+          h('div',{style:{fontWeight:isUnread?'700':'500',fontSize:'13px',color:isUnread?'var(--ink)':'var(--ink-m)',lineHeight:'1.5'}},n.title),
+          h('div',{style:{fontSize:'11px',color:'var(--ink-l)',whiteSpace:'nowrap',flexShrink:'0',marginTop:'1px'}},
+            new Date(n.created_at).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+          )
         ),
-        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',whiteSpace:'nowrap',marginTop:'2px'}},
-          new Date(n.created_at).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
-        )
+        h('div',{style:{fontSize:'12px',color:'var(--ink-l)',lineHeight:'1.6'}},n.body),
+        isUnread?h('div',{style:{display:'inline-block',marginTop:'6px',fontSize:'10px',fontWeight:'700',color:ts.color,background:ts.bg,padding:'2px 8px',borderRadius:'20px',border:'1px solid '+ts.border}},'未読'):null
       )
     );
     list.appendChild(item);
