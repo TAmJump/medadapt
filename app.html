@@ -85,7 +85,7 @@ const APP_CONFIG = {
 const WHEREBY_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmFwcGVhci5pbiIsImF1ZCI6Imh0dHBzOi8vYXBpLmFwcGVhci5pbi92MSIsImV4cCI6OTAwNzE5OTI1NDc0MDk5MSwiaWF0IjoxNzc2MTM4NTA4LCJvcmdhbml6YXRpb25JZCI6MzM4NTAyLCJqdGkiOiI5NWExNjQ1ZC00YjkzLTQ0ZjQtYTE0Ni0xZTBiZDMxN2EzMjkifQ.Zj3MJ92mLCp-wpY6Jw00ul0Ka6HLy4tpcVHTlyOPXIo';
 
 let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[]};
-let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,
+let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,notifList:null,
   ptId:null,hubTab:'overview',caseId:null,caseTab:'schedule',confId:null,confTab:'info',monId:null,monTab:'status',assId:null,
   modal:null,signed:false,np:{n:'',r:''},shareStep:1,ptFilter:'all',token:null,pendingShares:[]};
 
@@ -514,6 +514,7 @@ else if(S.page==='admin'){main.appendChild(adminPage())}
 else if(S.page==='staff'){main.appendChild(staffPage())}
 else if(S.page==='integrations'){main.appendChild(integPage())}
 else if(S.page==='settings'){main.appendChild(settingsPage())}
+else if(S.page==='notifications'){main.appendChild(notificationsPage())}
 else{main.appendChild(patientsPage())}
 shell.appendChild(main);
 if(S.modal){const ov=h('div',{className:'modal-overlay',onClick:e=>{if(e.target===ov){S.modal=null;rr()}}});ov.appendChild(S.modal);shell.appendChild(ov)}
@@ -1278,6 +1279,73 @@ function showQRModal(opts){
 }
 
 // === SETTINGS PAGE ===
+function notificationsPage(){
+  const u=S.user;
+  const w=h('div',{style:{padding:'24px',maxWidth:'680px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
+    h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'通知'),
+    S.unreadCount>0?h('button',{
+      style:{fontSize:'12px',color:'var(--accent)',background:'none',border:'none',cursor:'pointer',padding:'4px 8px'},
+      onClick:async()=>{await api('/notifications/read-all',{method:'POST'});S.unreadCount=0;await loadNotifList();rr();}
+    },'全て既読にする'):null
+  ));
+
+  if(!S.notifList){
+    // 初回ロード
+    loadNotifList().then(()=>rr());
+    w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)'}},'読み込み中...'));
+    return w;
+  }
+
+  if(!S.notifList.length){
+    w.appendChild(h('div',{style:{textAlign:'center',padding:'48px',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'12px'}},
+      h('div',{style:{fontSize:'32px',marginBottom:'12px'}},''),
+      h('div',{style:{fontWeight:'700',marginBottom:'4px'}},'通知はありません'),
+      h('div',{style:{fontSize:'13px'}},'新しい通知が届くとここに表示されます')
+    ));
+    return w;
+  }
+
+  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  for(const n of S.notifList){
+    const isUnread=!n.is_read;
+    const item=h('div',{
+      style:{background:isUnread?'#f0fdfa':'var(--surface)',border:'1px solid '+(isUnread?'#bae6fd':'var(--border)'),
+             borderRadius:'10px',padding:'14px 16px',cursor:'pointer',
+             borderLeft:isUnread?'4px solid var(--accent)':'4px solid transparent'},
+      onClick:async()=>{
+        if(isUnread){
+          await api('/notifications/'+n.id+'/read',{method:'POST'});
+          if(S.unreadCount>0)S.unreadCount--;
+          await loadNotifList();rr();
+        }
+        if(n.action_url)window.location.href=n.action_url;
+      }
+    },
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'12px'}},
+        h('div',{style:{flex:'1'}},
+          h('div',{style:{fontWeight:isUnread?'700':'400',fontSize:'14px',marginBottom:'4px',color:isUnread?'var(--ink)':'var(--ink-m)'}},n.title),
+          h('div',{style:{fontSize:'12px',color:'var(--ink-l)',lineHeight:'1.6'}},n.body)
+        ),
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)',whiteSpace:'nowrap',marginTop:'2px'}},
+          new Date(n.created_at).toLocaleDateString('ja-JP',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+        )
+      )
+    );
+    list.appendChild(item);
+  }
+  w.appendChild(list);
+  return w;
+}
+
+async function loadNotifList(){
+  if(!S.token)return;
+  try{
+    const res=await api('/notifications');
+    if(res&&res.notifications)S.notifList=res.notifications;
+  }catch(e){}
+}
+
 function settingsPage(){const w=h('div');const u=S.user;
 w.appendChild(h('div',{className:'page-title'},'設定'));
 // Account
