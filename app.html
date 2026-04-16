@@ -1328,11 +1328,7 @@ function ndaPage(){
             h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'2px'}},new Date(nda.requested_at).toLocaleDateString('ja-JP'))
           ),
           btn('NDAに署名する','btn-pri btn-sm',async()=>{
-            if(!confirm('以下の内容でNDAに署名しますか？
-
-・取得した患者情報を退院支援の目的以外に使用しない
-・第三者に漏洩しない
-・案件終了後は適切に廃棄する')){return;}
+            if(!confirm('以下の内容でNDAに署名しますか？\n\n・取得した患者情報を退院支援の目的以外に使用しない\n・第三者に漏洩しない\n・案件終了後は適切に廃棄する')){return;}
             const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id})});
             if(res?.success){S.ndaList=null;toast(res.message);rr();}
             else toast(res?.error||'エラー');
