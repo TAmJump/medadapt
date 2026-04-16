@@ -703,7 +703,7 @@ async function handleRequest(request, env, json, err) {
 
   // POST /nda/request
   if (path === '/nda/request' && method === 'POST') {
-    const { partner_login_id } = await request.json().catch(() => ({}));
+    const { partner_login_id, nda_type, custom_text, form_type, paper_signed_at, paper_note } = await request.json().catch(() => ({}));
     if (!partner_login_id) return err('相手のログインIDを入力してください');
     const orgId = currentUser.org_id || currentUser.id;
     const partner = await env.DB.prepare(
@@ -722,20 +722,43 @@ async function handleRequest(request, env, json, err) {
     if (existing?.status === 'pending') return err('既に申請中です');
     const id = 'nda_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const now = new Date().toISOString();
+    const type = nda_type || 'standard';
+
+    // 紙締結済み：即座にactiveで保存
+    if (type === 'paper') {
+      if (!paper_signed_at) return err('締結日を入力してください');
+      try {
+        await env.DB.prepare(
+          'INSERT INTO org_ndas (id,org_id_a,org_id_b,status,requested_at,signed_at,nda_type,paper_note) VALUES (?,?,?,?,?,?,?,?)'
+        ).bind(id, orgId, partnerId, 'active', now, paper_signed_at+'T00:00:00.000Z', 'paper', paper_note||'').run();
+      } catch(e) { return err('記録に失敗しました: '+e.message); }
+      try {
+        await env.DB.prepare(
+          'INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)'
+        ).bind('notif_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4), partnerId,
+          'medical-adapt','nda_signed',
+          '【NDA記録】'+(currentUser.org||currentUser.login_id)+'が紙締結NDAを登録しました',
+          '退院通知の送受信が可能になりました。', '#page:nda', 0, now).run();
+      } catch(e) {}
+      return json({ success: true, message: '紙締結NDAを記録しました。退院通知の送受信が可能になりました。' });
+    }
+
+    // 標準・カスタム：pending申請
     try {
       await env.DB.prepare(
-        'INSERT INTO org_ndas (id,org_id_a,org_id_b,status,requested_at) VALUES (?,?,?,?,?)'
-      ).bind(id, orgId, partnerId, 'pending', now).run();
-    } catch(e) { return err('NDA申請の送信に失敗しました'); }
-    // 相手の管理者に通知
+        'INSERT INTO org_ndas (id,org_id_a,org_id_b,status,requested_at,nda_type,custom_text,form_type) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind(id, orgId, partnerId, 'pending', now, type, custom_text||'', form_type||'bilateral').run();
+    } catch(e) { return err('NDA申請の送信に失敗しました: '+e.message); }
+    const notifBody = type==='custom'
+      ? '自社書式のNDAに署名することで退院通知の送受信が可能になります。'
+      : 'MedAdapt上でNDAに署名することで退院通知の送受信が可能になります。';
     try {
       await env.DB.prepare(
         'INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)'
       ).bind('notif_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4), partnerId,
         'medical-adapt','nda_request',
         '【NDA申請】'+(currentUser.org||currentUser.login_id)+'からNDA締結申請が届いています',
-        'MedAdapt上でNDAに署名することで退院通知の送受信が可能になります。',
-        '#page:nda', 0, now).run();
+        notifBody, '#page:nda', 0, now).run();
     } catch(e) {}
     return json({ success: true, message: 'NDA締結申請を送信しました' });
   }
