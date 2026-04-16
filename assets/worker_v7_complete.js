@@ -703,7 +703,7 @@ async function handleRequest(request, env, json, err) {
 
   // POST /nda/request
   if (path === '/nda/request' && method === 'POST') {
-    const { partner_login_id, nda_type, custom_text, form_type, paper_signed_at, paper_note } = await request.json().catch(() => ({}));
+    const { partner_login_id, nda_type, custom_text, form_type, paper_signed_at, paper_note, paper_file_data, paper_file_type } = await request.json().catch(() => ({}));
     if (!partner_login_id) return err('相手のログインIDを入力してください');
     const orgId = currentUser.org_id || currentUser.id;
     const partner = await env.DB.prepare(
@@ -712,14 +712,7 @@ async function handleRequest(request, env, json, err) {
     if (!partner) return err('該当するアカウントが見つかりません');
     const partnerId = partner.org_id || partner.id;
     if (partnerId === orgId) return err('自法人には申請できません');
-    let existing = null;
-    try {
-      existing = await env.DB.prepare(
-        'SELECT * FROM org_ndas WHERE (org_id_a=? AND org_id_b=?) OR (org_id_a=? AND org_id_b=?)'
-      ).bind(orgId, partnerId, partnerId, orgId).first();
-    } catch(e) {}
-    if (existing?.status === 'active') return err('既にNDAが締結済みです');
-    if (existing?.status === 'pending') return err('既に申請中です');
+    // 重複チェックなし（同一法人間で複数締結可能）
     const id = 'nda_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const now = new Date().toISOString();
     const type = nda_type || 'standard';
@@ -729,8 +722,8 @@ async function handleRequest(request, env, json, err) {
       if (!paper_signed_at) return err('締結日を入力してください');
       try {
         await env.DB.prepare(
-          'INSERT INTO org_ndas (id,org_id_a,org_id_b,status,requested_at,signed_at,nda_type,paper_note) VALUES (?,?,?,?,?,?,?,?)'
-        ).bind(id, orgId, partnerId, 'active', now, paper_signed_at+'T00:00:00.000Z', 'paper', paper_note||'').run();
+          'INSERT INTO org_ndas (id,org_id_a,org_id_b,status,requested_at,signed_at,nda_type,paper_note,paper_file_data,paper_file_type) VALUES (?,?,?,?,?,?,?,?,?,?)'
+        ).bind(id, orgId, partnerId, 'active', now, paper_signed_at+'T00:00:00.000Z', 'paper', paper_note||'', paper_file_data||'', paper_file_type||'').run();
       } catch(e) { return err('記録に失敗しました: '+e.message); }
       try {
         await env.DB.prepare(
@@ -798,6 +791,57 @@ async function handleRequest(request, env, json, err) {
         '#page:nda', 0, now).run();
     } catch(e) {}
     return json({ success: true, message: 'NDAに署名しました。退院通知の送受信が可能になりました。' });
+  }
+
+  // NDAテンプレート API
+  // GET /nda/templates
+  if (path === '/nda/templates' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    let templates = [];
+    try {
+      const r = await env.DB.prepare('SELECT * FROM nda_templates WHERE org_id=? ORDER BY updated_at DESC').bind(orgId).all();
+      templates = r.results || [];
+    } catch(e) {}
+    return json({ templates });
+  }
+
+  // POST /nda/templates
+  if (path === '/nda/templates' && method === 'POST') {
+    const { name, form_type, content } = await request.json().catch(() => ({}));
+    if (!name || !content) return err('テンプレート名と内容は必須です');
+    const orgId = currentUser.org_id || currentUser.id;
+    const id = 'tmpl_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO nda_templates (id,org_id,name,form_type,content,created_at,updated_at) VALUES (?,?,?,?,?,?,?)'
+      ).bind(id, orgId, name, form_type||'bilateral', content, now, now).run();
+    } catch(e) { return err('保存に失敗しました: '+e.message); }
+    return json({ success: true, id, message: 'テンプレートを保存しました' });
+  }
+
+  // PUT /nda/templates/:id
+  if (path.match(/^\/nda\/templates\/[^/]+$/) && method === 'PUT') {
+    const tmplId = path.split('/').pop();
+    const { name, form_type, content } = await request.json().catch(() => ({}));
+    const orgId = currentUser.org_id || currentUser.id;
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(
+        'UPDATE nda_templates SET name=?,form_type=?,content=?,updated_at=? WHERE id=? AND org_id=?'
+      ).bind(name, form_type||'bilateral', content, now, tmplId, orgId).run();
+    } catch(e) { return err('更新に失敗しました'); }
+    return json({ success: true, message: 'テンプレートを更新しました' });
+  }
+
+  // DELETE /nda/templates/:id
+  if (path.match(/^\/nda\/templates\/[^/]+$/) && method === 'DELETE') {
+    const tmplId = path.split('/').pop();
+    const orgId = currentUser.org_id || currentUser.id;
+    try {
+      await env.DB.prepare('DELETE FROM nda_templates WHERE id=? AND org_id=?').bind(tmplId, orgId).run();
+    } catch(e) { return err('削除に失敗しました'); }
+    return json({ success: true, message: '削除しました' });
   }
 
   // ═══════════════════════════════════════════════

@@ -1337,9 +1337,9 @@ function showNdaRequestModal(){
   modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'締結方法を選択してください。'));
 
   const types=[
-    {id:'standard',icon:'📋',label:'MedAdapt標準書式',desc:'MedAdaptの7条テンプレートで電子署名。すぐ使えます。',color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
-    {id:'custom',  icon:'✏️',label:'自社書式をコピペ', desc:'既存のNDAをテキストで貼り付け。双方型・差入れ型どちらでも対応。',color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
-    {id:'paper',   icon:'📄',label:'紙で締結済み（証跡記録）',desc:'すでに紙で署名済みの場合。締結日とメモだけ記録します。',color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
+    {id:'standard',label:'MedAdapt標準書式',desc:'MedAdaptの7条テンプレートで電子署名。すぐ使えます。',color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
+    {id:'custom',  label:'自社書式をコピペ', desc:'既存のNDAをテキストで貼り付け。双方型・差入れ型どちらでも対応。',color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
+    {id:'paper',   label:'紙で締結済み（証跡記録）',desc:'すでに紙で署名済みの場合。締結日とメモだけ記録します。',color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
   ];
 
   let selected='standard';
@@ -1353,7 +1353,7 @@ function showNdaRequestModal(){
                background:sel?t.bg:'var(--surface)',display:'flex',gap:'12px',alignItems:'flex-start',transition:'all 0.15s'},
         onClick:()=>{selected=t.id;render();}
       },
-        h('div',{style:{fontSize:'22px',marginTop:'1px'}},t.icon),
+
         h('div',{style:{flex:'1'}},
           h('div',{style:{fontWeight:'700',fontSize:'13px',color:sel?t.color:'var(--ink)',marginBottom:'2px'}},t.label),
           h('div',{style:{fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.6'}},t.desc)
@@ -1403,20 +1403,48 @@ function showNdaStandardModal(){
 }
 
 // ② 自社書式コピペモーダル
-function showNdaCustomModal(){
+function showNdaCustomModal(preload){
   const modal=h('div',{className:'modal',style:{maxWidth:'640px'}});
   modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'NDA締結申請（自社書式）'));
-  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'WordやPDFからNDA文面をコピーして貼り付けてください。'));
+  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'10px'}},'WordやPDFからNDA文面をコピーして貼り付けてください。'));
+
+  // 保存済みテンプレート読込
+  const tmplArea=h('div',{style:{marginBottom:'10px'}});
+  const loadTemplates=async()=>{
+    const res=await api('/nda/templates');
+    const tmpls=res?.templates||[];
+    tmplArea.textContent='';
+    if(tmpls.length){
+      const row=h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap',marginBottom:'6px'}});
+      row.appendChild(h('span',{style:{fontSize:'11px',color:'var(--ink-l)',whiteSpace:'nowrap'}},'保存済み:'));
+      tmpls.forEach(t=>{
+        const chip=h('div',{style:{display:'inline-flex',gap:'4px',alignItems:'center',fontSize:'11px',border:'1px solid var(--border)',borderRadius:'4px',overflow:'hidden'}},
+          h('span',{style:{padding:'3px 8px',cursor:'pointer',color:'var(--accent)'},onClick:()=>{
+            document.getElementById('nda_custom_text').value=t.content;
+            document.querySelector(`input[name="nda_form_type"][value="${t.form_type}"]`).checked=true;
+            toast(t.name+'を読み込みました');
+          }},t.name),
+          h('span',{style:{padding:'3px 6px',cursor:'pointer',color:'var(--red)',borderLeft:'1px solid var(--border)'},onClick:async()=>{
+            if(!confirm(t.name+'を削除しますか？'))return;
+            await api('/nda/templates/'+t.id,{method:'DELETE'});
+            loadTemplates();
+          }},'×')
+        );
+        row.appendChild(chip);
+      });
+      tmplArea.appendChild(row);
+    }
+  };
+  modal.appendChild(tmplArea);
+  loadTemplates();
 
   // 書式タイプ選択
-  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},
-    ...[['bilateral','双方契約型（甲乙）'],['unilateral','差入れ型（誓約書）']].map(([v,l])=>{
-      const selected=h('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',fontWeight:'600',padding:'6px 12px',border:'1px solid var(--border)',borderRadius:'20px',background:'var(--surface)'}},
-        h('input',{type:'radio',name:'nda_form_type',value:v,defaultChecked:v==='bilateral',style:{accentColor:'var(--accent)'}}),
-        l
-      );
-      return selected;
-    })
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',marginBottom:'10px'}},
+    ...[['bilateral','双方契約型（甲乙）'],['unilateral','差入れ型（誓約書）']].map(([v,l])=>
+      h('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',fontWeight:'600',padding:'6px 12px',border:'1px solid var(--border)',borderRadius:'20px',background:'var(--surface)'}},
+        h('input',{type:'radio',name:'nda_form_type',value:v,defaultChecked:v==='bilateral',style:{accentColor:'var(--accent)'}}),l
+      )
+    )
   ));
 
   modal.appendChild(h('div',{style:{marginBottom:'10px'}},
@@ -1424,21 +1452,34 @@ function showNdaCustomModal(){
     h('input',{id:'nda_custom_partner',type:'text',placeholder:'ADM-XXXXXX',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
   ));
 
-  modal.appendChild(h('div',{style:{marginBottom:'10px'}},
+  modal.appendChild(h('div',{style:{marginBottom:'8px'}},
     h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},
-      h('div',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-m'}},'NDA文面（コピペ）'),
+      h('div',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-m)'}},'NDA文面（コピペ）'),
       h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'Word・PDFから全文コピーして貼り付け')
     ),
     h('textarea',{id:'nda_custom_text',placeholder:'ここにNDA全文を貼り付けてください…\n\n秘密保持契約書\n\n甲（　　）と乙（　　）は、以下の通り合意する。\n\n第1条（目的）…',
-      style:{width:'100%',height:'240px',padding:'10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',lineHeight:'1.8',fontFamily:'serif',resize:'vertical',boxSizing:'border-box'}})
+      style:{width:'100%',height:'220px',padding:'10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',lineHeight:'1.8',fontFamily:'serif',resize:'vertical',boxSizing:'border-box'}},
+      preload?.content||'')
   ));
 
-  modal.appendChild(h('div',{style:{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:'8px',padding:'10px 12px',fontSize:'11px',color:'#5b21b6',marginBottom:'12px',lineHeight:'1.7'}},
-    '💡 貼り付け後、甲・乙の会社名がテンプレートのままの場合は編集してください。相手方が署名するとそのまま記録されます。'
+  modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'10px 12px',fontSize:'11px',color:'var(--ink-m)',marginBottom:'10px',lineHeight:'1.7'}},
+    '貼り付け後、甲・乙の会社名がテンプレートのままの場合は編集してください。相手方が署名するとそのまま記録されます。'
   ));
 
-  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
-    btn('← 戻る','btn-sec',()=>{showNdaRequestModal()}),
+  modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'space-between'}},
+    h('div',{style:{display:'flex',gap:'8px'}},
+      btn('← 戻る','btn-sec',()=>{showNdaRequestModal()}),
+      btn('テンプレートとして保存','btn-out btn-sm',async()=>{
+        const text=document.getElementById('nda_custom_text')?.value?.trim();
+        const formType=document.querySelector('input[name="nda_form_type"]:checked')?.value||'bilateral';
+        if(!text||text.length<50){toast('NDA文面を入力してください');return;}
+        const name=prompt('テンプレート名を入力してください（例：標準NDA・介護連携用）');
+        if(!name)return;
+        const res=await api('/nda/templates',{method:'POST',body:JSON.stringify({name,form_type:formType,content:text})});
+        if(res?.success){toast('テンプレートを保存しました');loadTemplates();}
+        else toast(res?.error||'保存に失敗しました');
+      })
+    ),
     btn('この書式で申請する','btn-pri',async()=>{
       const pid=document.getElementById('nda_custom_partner')?.value?.trim();
       const text=document.getElementById('nda_custom_text')?.value?.trim();
@@ -1459,6 +1500,9 @@ function showNdaPaperModal(){
   modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'紙NDA締結済みの記録'));
   modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'すでに紙で締結済みのNDAを証跡として記録します。'));
 
+  let fileData='', fileType='', fileName='';
+  const filePreview=h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'4px'}});
+
   modal.appendChild(h('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'12px'}},
     h('div',null,
       h('div',{style:{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'相手法人のログインID'),
@@ -1469,14 +1513,33 @@ function showNdaPaperModal(){
       h('input',{id:'nda_paper_date',type:'date',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
     ),
     h('div',null,
+      h('div',{style:{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'原本ファイル（PDF・写真）'),
+      h('input',{type:'file',accept:'application/pdf,image/*',style:{width:'100%',fontSize:'12px'},
+        onChange:e=>{
+          const file=e.target.files[0];
+          if(!file)return;
+          if(file.size>3*1024*1024){toast('3MB以下のファイルを選択してください');e.target.value='';return;}
+          fileName=file.name; fileType=file.type;
+          const reader=new FileReader();
+          reader.onload=ev=>{
+            fileData=ev.target.result.split(',')[1];
+            filePreview.textContent='選択: '+fileName+' ('+Math.round(file.size/1024)+'KB)';
+            filePreview.style.color='var(--accent)';
+          };
+          reader.readAsDataURL(file);
+        }
+      }),
+      filePreview
+    ),
+    h('div',null,
       h('div',{style:{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'メモ（任意）'),
       h('textarea',{id:'nda_paper_note',placeholder:'例：郵送にて締結。原本はファイルNo.12に保管。',
-        style:{width:'100%',height:'72px',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',resize:'none',boxSizing:'border-box'}})
+        style:{width:'100%',height:'60px',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',resize:'none',boxSizing:'border-box'}})
     )
   ));
 
   modal.appendChild(h('div',{style:{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'8px',padding:'10px 12px',fontSize:'11px',color:'#15803d',marginBottom:'12px',lineHeight:'1.7'}},
-    '✅ 記録後は「締結済み」として扱われ、退院通知の送受信が可能になります。\n📎 原本スキャンの添付は今後のアップデートで対応予定です。'
+    '記録後は「締結済み」として扱われ、退院通知の送受信が可能になります。ファイルはサーバーに保存されます（3MB以下）。'
   ));
 
   modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
@@ -1487,7 +1550,10 @@ function showNdaPaperModal(){
       const note=document.getElementById('nda_paper_note')?.value?.trim();
       if(!pid){toast('ログインIDを入力してください');return;}
       if(!date){toast('締結日を入力してください');return;}
-      const res=await api('/nda/request',{method:'POST',body:JSON.stringify({partner_login_id:pid,nda_type:'paper',paper_signed_at:date,paper_note:note||''})});
+      const res=await api('/nda/request',{method:'POST',body:JSON.stringify({
+        partner_login_id:pid,nda_type:'paper',paper_signed_at:date,paper_note:note||'',
+        paper_file_data:fileData,paper_file_type:fileType
+      })});
       if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
       else toast(res?.error||'エラー');
     })
@@ -1647,7 +1713,7 @@ function ndaPage(){
         )
       ),
       h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexShrink:'0'}},
-        nda.nda_type!=='paper'?btn('📄 PDF','btn-xs btn-out',()=>genNdaPdf(nda)):null,
+        nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,
         h('span',{style:{background:'#dcfce7',color:'#15803d',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},'締結済み')
       )
     ));
@@ -2021,10 +2087,10 @@ function notificationsPage(){
 
   // 通知タイプ別のアイコン・カラーマップ
   const typeStyle={
-    nda_request:{icon:'🤝',color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
-    nda_signed:  {icon:'✅',color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
-    discharge:   {icon:'🏥',color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
-    default:     {icon:'🔔',color:'#f97316',bg:'#fff7ed',border:'#fed7aa'},
+    nda_request:{color:'#0891b2',bg:'#e0f2fe',border:'#bae6fd'},
+    nda_signed:  {color:'#16a34a',bg:'#f0fdf4',border:'#bbf7d0'},
+    discharge:   {color:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'},
+    default:     {color:'#f97316',bg:'#fff7ed',border:'#fed7aa'},
   };
 
   const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
@@ -2059,12 +2125,10 @@ function notificationsPage(){
         } else { rr(); }
       }
     },
-      // アイコン
       h('div',{style:{
-        width:'40px',height:'40px',borderRadius:'10px',flexShrink:'0',
-        background:isUnread?ts.color:'#e2e8f0',
-        display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'
-      }},ts.icon),
+        width:'8px',borderRadius:'4px',flexShrink:'0',alignSelf:'stretch',
+        background:isUnread?ts.color:'#e2e8f0'
+      }}),
       // テキスト
       h('div',{style:{flex:'1',minWidth:'0'}},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px',marginBottom:'4px'}},
