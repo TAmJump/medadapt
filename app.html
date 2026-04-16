@@ -1345,8 +1345,7 @@ function ndaPage(){
 
   w.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px',marginTop:'20px'}},'締結済み（'+active.length+'件）'));
   if(!active.length){
-    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}},'締結済みのNDAはありません。
-上の「NDA締結を申請する」から相手に申請してください。'));
+    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'var(--ink-l)',background:'var(--surface)',borderRadius:'10px',fontSize:'13px'}},'締結済みのNDAはありません。上の「NDA締結を申請する」から相手に申請してください。'));
     return w;
   }
   const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
