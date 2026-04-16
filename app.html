@@ -1378,23 +1378,32 @@ function showNdaRequestModal(){
   S.modal=modal;rr();
 }
 
-// ① 標準書式モーダル
+// ① 標準書式モーダル（編集可能）
 function showNdaStandardModal(){
   const modal=h('div',{className:'modal',style:{maxWidth:'600px'}});
   modal.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'NDA締結申請（標準書式）'));
-  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px'}},'申請前にNDA（秘密保持契約書）の内容をご確認ください。'));
-  modal.appendChild(h('div',{style:{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'8px',padding:'16px',maxHeight:'280px',overflowY:'auto',fontSize:'12px',lineHeight:'1.8',whiteSpace:'pre-wrap',fontFamily:'serif',marginBottom:'16px'}},NDA_TEXT));
+  modal.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'10px'}},'内容を確認・編集してから申請してください。社名・甲乙の記載を修正できます。'));
+
+  modal.appendChild(h('textarea',{id:'nda_standard_text',
+    style:{width:'100%',height:'260px',padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',
+           fontSize:'12px',lineHeight:'1.8',fontFamily:'serif',resize:'vertical',boxSizing:'border-box',marginBottom:'12px'}},
+    NDA_TEXT));
+
   modal.appendChild(h('div',{style:{marginBottom:'12px'}},
     h('div',{style:{fontSize:'13px',fontWeight:'700',marginBottom:'6px'}},'申請先のログインID'),
     h('input',{id:'nda_partner_id',type:'text',placeholder:'ADM-XXXXXX',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box'}})
   ));
+
   modal.appendChild(h('div',{style:{background:'#fef9c3',border:'1px solid #fde047',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#854d0e',marginBottom:'12px'}},'上記の内容に同意の上、申請してください。相手方が署名することで契約が成立します。'));
+
   modal.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
     btn('← 戻る','btn-sec',()=>{showNdaRequestModal()}),
     btn('内容に同意して申請する','btn-pri',async()=>{
       const pid=document.getElementById('nda_partner_id')?.value?.trim();
+      const text=document.getElementById('nda_standard_text')?.value?.trim();
       if(!pid){toast('ログインIDを入力してください');return;}
-      const res=await api('/nda/request',{method:'POST',body:JSON.stringify({partner_login_id:pid,nda_type:'standard'})});
+      if(!text){toast('NDA文面を入力してください');return;}
+      const res=await api('/nda/request',{method:'POST',body:JSON.stringify({partner_login_id:pid,nda_type:'standard',custom_text:text})});
       if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
       else toast(res?.error||'エラー');
     })
