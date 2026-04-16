@@ -2043,6 +2043,39 @@ function dischargeNewPage(){
     h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'4px'}},'受信側はウォーターマーク付きで閲覧のみ可能です。受入確定後にダウンロード可能になります。')
   ));
 
+  // 病院側の要件（構造化）
+  w.appendChild(h('div',{style:{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'10px',padding:'14px 16px',marginBottom:'16px'}},
+    h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'12px',color:'#0369a1'}},'受入先への確認事項（事前に共有）'),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},
+      h('div',{className:'field',style:{margin:'0'}},
+        h('label',{style:{fontSize:'12px'}},'予算感（目安）'),
+        h('input',{id:'dn_req_budget',type:'text',placeholder:'例：月額15万円程度',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}})
+      ),
+      h('div',{className:'field',style:{margin:'0'}},
+        h('label',{style:{fontSize:'12px'}},'医療行為の必要性'),
+        h('select',{id:'dn_req_nursing',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px'}},
+          h('option',{value:''},'選択してください'),
+          h('option',{value:'required'},'必要あり'),
+          h('option',{value:'not_required'},'不要'),
+          h('option',{value:'tbd'},'要確認')
+        )
+      ),
+      h('div',{className:'field',style:{margin:'0'}},
+        h('label',{style:{fontSize:'12px'}},'現在のケアマネ'),
+        h('select',{id:'dn_req_caremanager',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px'}},
+          h('option',{value:''},'選択してください'),
+          h('option',{value:'active'},'利用中'),
+          h('option',{value:'none'},'なし'),
+          h('option',{value:'tbd'},'要確認')
+        )
+      ),
+      h('div',{className:'field',style:{margin:'0'}},
+        h('label',{style:{fontSize:'12px'}},'その他の要件'),
+        h('input',{id:'dn_req_other',type:'text',placeholder:'例：ペット同伴希望など',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}})
+      )
+    )
+  ));
+
   // メモ
   w.appendChild(h('div',{className:'field'},
     h('label',null,'メモ（受信側に表示）'),
@@ -2109,8 +2142,14 @@ function dischargeNewPage(){
         pdfFilename=pdfFile.name;
         pdfFileType=pdfFile.type||'application/pdf';
       }
+      const requirements_data={
+        budget:document.getElementById('dn_req_budget')?.value?.trim()||'',
+        nursing:document.getElementById('dn_req_nursing')?.value||'',
+        caremanager:document.getElementById('dn_req_caremanager')?.value||'',
+        other:document.getElementById('dn_req_other')?.value?.trim()||''
+      };
       const res=await api('/discharge/new',{method:'POST',body:JSON.stringify({
-        patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks
+        patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks,requirements_data
       })});
       if(res?.success){
         S.page='discharge';S.dischargeList=null;
@@ -2166,6 +2205,30 @@ function sharedChartPage(){
       h('div',{style:{fontWeight:'700',fontSize:'11px',color:'var(--ink-l)',marginBottom:'4px'}},'病院からのメモ'),
       n.memo
     ));
+  }
+
+  // 病院からの要件（構造化）
+  if(n.requirements_data){
+    const req=n.requirements_data;
+    const nursingLabel={required:'必要あり',not_required:'不要',tbd:'要確認'};
+    const cmLabel={active:'利用中',none:'なし',tbd:'要確認'};
+    const reqItems=[
+      req.budget?['予算感',req.budget]:null,
+      req.nursing?['医療行為',nursingLabel[req.nursing]||req.nursing]:null,
+      req.caremanager?['ケアマネ',cmLabel[req.caremanager]||req.caremanager]:null,
+      req.other?['その他',req.other]:null
+    ].filter(Boolean);
+    if(reqItems.length){
+      w.appendChild(h('div',{style:{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px'}},
+        h('div',{style:{fontWeight:'700',fontSize:'11px',color:'#0369a1',marginBottom:'8px'}},'病院からの確認事項'),
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}},
+          ...reqItems.map(([k,v])=>h('div',{style:{fontSize:'12px'}},
+            h('span',{style:{color:'var(--ink-l)',marginRight:'6px'}},k+'：'),
+            h('span',{style:{fontWeight:'600'}},v)
+          ))
+        )
+      ));
+    }
   }
 
   // PDF表示（全段階で表示。段階④のみDL可）
@@ -2260,10 +2323,19 @@ function sharedChartPage(){
       h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}},
         ...(n.recipients.map(r=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 12px',fontSize:'12px'}},
           h('span',null,r.org||r.login_id||r.recipient_org_id),
-          h('span',{style:{padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',
-            background:r.declined_at?'#f1f5f9':r.joined_at?'#dbeafe':'#fef9c3',
-            color:r.declined_at?'#64748b':r.joined_at?'#1d4ed8':'#854d0e'}},
-            r.declined_at?'辞退':r.joined_at?'面談参加':'未回答')
+          h('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'4px'}},
+            h('span',{style:{padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',
+              background:r.declined_at?'#f1f5f9':r.joined_at?'#dbeafe':'#fef9c3',
+              color:r.declined_at?'#64748b':r.joined_at?'#1d4ed8':'#854d0e'}},
+              r.declined_at?'辞退':r.joined_at?'面談参加':'未回答'),
+            r.declined_at&&r.decline_reason?h('div',{style:{fontSize:'10px',color:'var(--ink-l)',maxWidth:'200px',textAlign:'right'}},r.decline_reason):null,
+            r.joined_at&&r.proposal_data?(()=>{
+              const p=typeof r.proposal_data==='string'?JSON.parse(r.proposal_data):r.proposal_data;
+              const nurseL={yes:'看護師あり',no:'なし',parttime:'非常勤のみ'};
+              const items=[p.nurse?nurseL[p.nurse]:null,p.fee?'料金:'+p.fee:null].filter(Boolean);
+              return items.length?h('div',{style:{fontSize:'10px',color:'#1d4ed8',textAlign:'right'}},items.join('・')):null;
+            })():null
+          )
         )))
       )
     ));
@@ -2273,23 +2345,92 @@ function sharedChartPage(){
   if(!isIssuer && !n.declined_at){
     if(stage===1){
       w.appendChild(h('div',{style:{display:'flex',gap:'12px',marginTop:'8px'}},
-        btn('今回は辞退する','btn-sec',async()=>{
-          if(!confirm('辞退しますか？辞退後はこの退院通知を参照できなくなります。')){return;}
-          const res=await api('/discharge/'+n.id+'/decline',{method:'POST'});
-          if(res?.success){S.noticeData=null;S.dischargeList=null;toast('辞退しました');S.page='discharge';rr();}
-          else toast(res?.error||'エラー');
+        btn('今回は辞退する','btn-sec',()=>{
+          // 辞退理由モーダル
+          const m=h('div',{className:'modal',style:{maxWidth:'480px'}});
+          m.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'16px'}},'辞退理由'));
+          m.appendChild(h('p',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px'}},'辞退後はこの退院通知を参照できなくなります。'));
+          m.appendChild(h('div',{className:'field'},
+            h('label',null,'理由（任意）'),
+            h('textarea',{id:'decline_reason_input',rows:3,placeholder:'例：現在の受入状況が厳しいため、今回は辞退します',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box',resize:'vertical'}})
+          ));
+          m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+            btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+            btn('辞退する','btn-danger',async()=>{
+              const reason=document.getElementById('decline_reason_input')?.value?.trim()||'';
+              const res=await api('/discharge/'+n.id+'/decline',{method:'POST',body:JSON.stringify({reason})});
+              if(res?.success){S.modal=null;S.noticeData=null;S.dischargeList=null;toast('辞退しました');S.page='discharge';rr();}
+              else toast(res?.error||'エラー');
+            })
+          ));
+          S.modal=m;rr();
         }),
-        btn('面談に参加する','btn-pri',async()=>{
-          const res=await api('/discharge/'+n.id+'/join',{method:'POST'});
-          if(res?.success){
-            S.noticeData=null;S.dischargeList=null;
-            toast(res.message);
-            await api('/discharge/'+S.noticeId).then(r=>{S.noticeData=r;rr();});
-          } else toast(res?.error||'エラー');
+        btn('面談に参加する','btn-pri',()=>{
+          // 提案フォームモーダル
+          const m=h('div',{className:'modal',style:{maxWidth:'520px'}});
+          m.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'4px'}},'面談参加・施設情報の提案'));
+          m.appendChild(h('p',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'参加表明と合わせて、施設の情報を病院側に送ることができます（任意）'));
+          m.appendChild(h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'12px'}},
+            h('div',{className:'field',style:{margin:'0'}},
+              h('label',{style:{fontSize:'12px'}},'看護師の在籍'),
+              h('select',{id:'prop_nurse',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px'}},
+                h('option',{value:''},'選択してください'),
+                h('option',{value:'yes'},'在籍あり'),
+                h('option',{value:'no'},'なし'),
+                h('option',{value:'parttime'},'非常勤のみ')
+              )
+            ),
+            h('div',{className:'field',style:{margin:'0'}},
+              h('label',{style:{fontSize:'12px'}},'保険外料金の目安'),
+              h('input',{id:'prop_fee',type:'text',placeholder:'例：月額2万円程度',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}})
+            ),
+            h('div',{className:'field',style:{margin:'0',gridColumn:'1/-1'}},
+              h('label',{style:{fontSize:'12px'}},'施設のWebサイト（URL）'),
+              h('input',{id:'prop_url',type:'url',placeholder:'https://',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box'}})
+            ),
+            h('div',{className:'field',style:{margin:'0',gridColumn:'1/-1'}},
+              h('label',{style:{fontSize:'12px'}},'その他・特記事項'),
+              h('textarea',{id:'prop_other',rows:2,placeholder:'例：個室あり・ターミナルケア対応可など',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',boxSizing:'border-box',resize:'vertical'}})
+            )
+          ));
+          m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'4px'}},
+            btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
+            btn('参加を表明する','btn-pri',async()=>{
+              const proposal_data={
+                nurse:document.getElementById('prop_nurse')?.value||'',
+                fee:document.getElementById('prop_fee')?.value?.trim()||'',
+                url:document.getElementById('prop_url')?.value?.trim()||'',
+                other:document.getElementById('prop_other')?.value?.trim()||''
+              };
+              const res=await api('/discharge/'+n.id+'/join',{method:'POST',body:JSON.stringify({proposal_data})});
+              if(res?.success){
+                S.modal=null;S.noticeData=null;S.dischargeList=null;
+                toast(res.message);
+                await api('/discharge/'+S.noticeId).then(r=>{S.noticeData=r;rr();});
+              } else toast(res?.error||'エラー');
+            })
+          ));
+          S.modal=m;rr();
         })
       ));
     } else if(stage===2){
-      w.appendChild(h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',fontSize:'13px',color:'#15803d',fontWeight:'600'}},'面談への参加を表明しました。病院スタッフから日程調整の案内が届くまでお待ちください。'));
+      const propDisp=n.proposal_data?(()=>{
+        const p=n.proposal_data;
+        const nurseL={yes:'看護師在籍あり',no:'看護師なし',parttime:'非常勤のみ'};
+        const items=[];
+        if(p.nurse)items.push(nurseL[p.nurse]||p.nurse);
+        if(p.fee)items.push('保険外料金: '+p.fee);
+        if(p.url)items.push(h('a',{href:p.url,target:'_blank',rel:'noopener',style:{color:'var(--accent)',fontSize:'12px'}},p.url));
+        if(p.other)items.push(p.other);
+        return items;
+      })():[];
+      w.appendChild(h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',fontSize:'13px',color:'#15803d'}},
+        h('div',{style:{fontWeight:'700',marginBottom:propDisp.length?'8px':'0'}},'面談への参加を表明しました。病院スタッフから日程調整の案内が届くまでお待ちください。'),
+        propDisp.length?h('div',{style:{fontSize:'12px',color:'var(--ink-m)',borderTop:'1px solid #86efac',paddingTop:'8px',marginTop:'4px'}},
+          h('div',{style:{fontWeight:'600',marginBottom:'4px'}},'送信した情報：'),
+          ...propDisp.map(item=>typeof item==='string'?h('div',null,item):item)
+        ):null
+      ));
     } else if(stage>=3){
       // Stage3：Whereby面談リンク表示
       w.appendChild(h('div',{style:{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'10px',padding:'14px 16px',marginTop:'8px'}},
