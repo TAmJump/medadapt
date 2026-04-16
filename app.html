@@ -2236,6 +2236,7 @@ function dischargeNewPage(){
         pdfFilename=pdfFile.name;
         pdfFileType=pdfFile.type||'application/pdf';
       }
+      const discharge_date=document.getElementById('dn_discharge_date')?.value||'';
       const requirements_data={
         budget:document.getElementById('dn_req_budget')?.value?.trim()||'',
         nursing:document.getElementById('dn_req_nursing')?.value||'',
@@ -2243,7 +2244,6 @@ function dischargeNewPage(){
         other:document.getElementById('dn_req_other')?.value?.trim()||'',
         discharge_date:discharge_date
       };
-      const discharge_date=document.getElementById('dn_discharge_date')?.value||'';
       const schedule_slots=[...(S.dnSlots||[])].sort((a,b)=>a.date.localeCompare(b.date)).filter(s=>s.date).map(s=>{
         const d=new Date(s.date+'T12:00:00');
         const wdl=['日','月','火','水','木','金','土'][d.getDay()];
