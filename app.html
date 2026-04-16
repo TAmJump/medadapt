@@ -2331,7 +2331,7 @@ function sharedChartPage(){
             r.declined_at&&r.decline_reason?h('div',{style:{fontSize:'10px',color:'var(--ink-l)',maxWidth:'200px',textAlign:'right'}},r.decline_reason):null,
             r.joined_at&&r.proposal_data?(()=>{
               const p=typeof r.proposal_data==='string'?JSON.parse(r.proposal_data):r.proposal_data;
-              const nurseL={yes:'看護師あり',no:'なし',parttime:'非常勤のみ'};
+              const nurseL={fulltime:'看護師24h',daytime:'看護師日中のみ',none:'看護師なし'};
               const items=[p.nurse?nurseL[p.nurse]:null,p.fee?'料金:'+p.fee:null].filter(Boolean);
               return items.length?h('div',{style:{fontSize:'10px',color:'#1d4ed8',textAlign:'right'}},items.join('・')):null;
             })():null
@@ -2376,9 +2376,9 @@ function sharedChartPage(){
               h('label',{style:{fontSize:'12px'}},'看護師の在籍'),
               h('select',{id:'prop_nurse',style:{width:'100%',padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px'}},
                 h('option',{value:''},'選択してください'),
-                h('option',{value:'yes'},'在籍あり'),
-                h('option',{value:'no'},'なし'),
-                h('option',{value:'parttime'},'非常勤のみ')
+                h('option',{value:'fulltime'},'24時間在籍'),
+                h('option',{value:'daytime'},'日中のみ在籍'),
+                h('option',{value:'none'},'在籍していない')
               )
             ),
             h('div',{className:'field',style:{margin:'0'}},
@@ -2417,7 +2417,7 @@ function sharedChartPage(){
     } else if(stage===2){
       const propDisp=n.proposal_data?(()=>{
         const p=n.proposal_data;
-        const nurseL={yes:'看護師在籍あり',no:'看護師なし',parttime:'非常勤のみ'};
+        const nurseL={fulltime:'看護師24時間在籍',daytime:'看護師日中のみ在籍',none:'看護師在籍なし'};
         const items=[];
         if(p.nurse)items.push(nurseL[p.nurse]||p.nurse);
         if(p.fee)items.push('保険外料金: '+p.fee);
