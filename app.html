@@ -2124,78 +2124,92 @@ function dischargeNewPage(){
     h('input',{id:'dn_discharge_date',type:'date',style:{padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',width:'200px'}})
   ));
 
-  // 候補日程カレンダー
+  // 候補日程カレンダー（DOM直接更新方式 - rr()なし）
   if(!S.dnSlots)S.dnSlots=[];
   if(S.dnCalYear===undefined){S.dnCalYear=new Date().getFullYear();S.dnCalMonth=new Date().getMonth();}
+
   const slotSection=h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'10px',padding:'14px 16px',marginTop:'8px'}});
   slotSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'2px',color:'#15803d'}},'面談の候補日程'));
   slotSection.appendChild(h('div',{style:{fontSize:'11px',color:'#16a34a',marginBottom:'10px'}},'カレンダーから日付をタップして選択してください（複数選択可）'));
 
-  // カレンダー本体
-  const yr=S.dnCalYear,mo=S.dnCalMonth;
-  const firstDay=new Date(yr,mo,1).getDay();
-  const daysInMo=new Date(yr,mo+1,0).getDate();
-  const weekdays=['日','月','火','水','木','金','土'];
-  const toDateStr=d=>`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  const isSelected=d=>S.dnSlots.some(s=>s.date===toDateStr(d));
-  const today=new Date();
-  const isPast=d=>new Date(yr,mo,d)<new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  // カレンダーとリストのコンテナ（DOM直接更新用）
+  const calContainer=h('div');
 
-  const calWrap=h('div',{style:{background:'#fff',borderRadius:'8px',border:'1px solid #d1fae5',overflow:'hidden',marginBottom:'10px'}});
-  // ヘッダー
-  calWrap.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#16a34a',color:'#fff'}},
-    h('button',{style:{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'18px',padding:'0 6px',fontFamily:'inherit'},
-      onClick:()=>{if(S.dnCalMonth===0){S.dnCalMonth=11;S.dnCalYear--;}else{S.dnCalMonth--;}rr()}},'‹'),
-    h('span',{style:{fontWeight:'700',fontSize:'14px'}},(mo+1)+'月 '+yr),
-    h('button',{style:{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'18px',padding:'0 6px',fontFamily:'inherit'},
-      onClick:()=>{if(S.dnCalMonth===11){S.dnCalMonth=0;S.dnCalYear++;}else{S.dnCalMonth++;}rr()}},'›')
-  ));
-  // 曜日ヘッダー
-  const wRow=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'#f0fdf4'}});
-  weekdays.forEach((w2,i)=>wRow.appendChild(h('div',{style:{textAlign:'center',padding:'6px 0',fontSize:'11px',fontWeight:'700',color:i===0?'#dc2626':i===6?'#2563eb':'#374151'}},w2)));
-  calWrap.appendChild(wRow);
-  // 日付グリッド
-  const grid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}});
-  for(let i=0;i<firstDay;i++)grid.appendChild(h('div',null));
-  for(let d=1;d<=daysInMo;d++){
-    const ds=toDateStr(d);
-    const sel=isSelected(d);
-    const past=isPast(d);
-    const dow=new Date(yr,mo,d).getDay();
-    grid.appendChild(h('div',{
-      style:{textAlign:'center',padding:'8px 2px',cursor:past?'default':'pointer',
-        background:sel?'#16a34a':'transparent',
-        color:sel?'#fff':past?'#cbd5e1':dow===0?'#dc2626':dow===6?'#2563eb':'var(--ink)',
-        borderRadius:'50%',margin:'2px auto',width:'32px',fontSize:'13px',fontWeight:sel?'700':'400',
-        opacity:past?'0.4':'1'},
-      onClick:()=>{
-        if(past)return;
-        if(sel){S.dnSlots=S.dnSlots.filter(s=>s.date!==ds);}
-        else{S.dnSlots.push({id:'s'+Date.now(),date:ds});}
-        rr();
-      }
-    },d));
-  }
-  calWrap.appendChild(grid);
-  slotSection.appendChild(calWrap);
+  function buildCal(){
+    calContainer.innerHTML='';
+    const yr=S.dnCalYear,mo=S.dnCalMonth;
+    const firstDay=new Date(yr,mo,1).getDay();
+    const daysInMo=new Date(yr,mo+1,0).getDate();
+    const weekdays=['日','月','火','水','木','金','土'];
+    const toDateStr=d=>`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSel=d=>S.dnSlots.some(s=>s.date===toDateStr(d));
+    const today2=new Date();
+    const isPast=d=>new Date(yr,mo,d)<new Date(today2.getFullYear(),today2.getMonth(),today2.getDate());
 
-  // 選択済み日程リスト
-  if(S.dnSlots.length){
-    const selList=h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
-    [...S.dnSlots].sort((a,b)=>a.date.localeCompare(b.date)).forEach(sl=>{
-      const d=new Date(sl.date+'T12:00:00');
-      const wdl=['日','月','火','水','木','金','土'][d.getDay()];
-      const label=`${d.getMonth()+1}/${d.getDate()}(${wdl})`;
-      selList.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fff',border:'1px solid #86efac',borderRadius:'8px',padding:'8px 12px'}},
-        h('span',{style:{fontSize:'13px',fontWeight:'600'}},'　'+label),
-        h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'12px',padding:'0',fontFamily:'inherit'},
-          onClick:()=>{S.dnSlots=S.dnSlots.filter(s=>s.date!==sl.date);rr()}},'削除')
-      ));
-    });
-    slotSection.appendChild(selList);
-  } else {
-    slotSection.appendChild(h('div',{style:{textAlign:'center',padding:'8px',fontSize:'12px',color:'#6b7280'}},'カレンダーから候補日を選択してください'));
+    // カレンダー本体
+    const calWrap=h('div',{style:{background:'#fff',borderRadius:'8px',border:'1px solid #d1fae5',overflow:'hidden',marginBottom:'10px'}});
+    calWrap.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#16a34a',color:'#fff'}},
+      h('button',{style:{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'18px',padding:'0 6px',fontFamily:'inherit'},
+        onClick:()=>{if(S.dnCalMonth===0){S.dnCalMonth=11;S.dnCalYear--;}else{S.dnCalMonth--;}buildCal();}},'‹'),
+      h('span',{style:{fontWeight:'700',fontSize:'14px'}},(mo+1)+'月 '+yr),
+      h('button',{style:{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'18px',padding:'0 6px',fontFamily:'inherit'},
+        onClick:()=>{if(S.dnCalMonth===11){S.dnCalMonth=0;S.dnCalYear++;}else{S.dnCalMonth++;}buildCal();}},'›')
+    ));
+    const wRow=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'#f0fdf4'}});
+    weekdays.forEach((w2,i)=>wRow.appendChild(h('div',{style:{textAlign:'center',padding:'6px 0',fontSize:'11px',fontWeight:'700',color:i===0?'#dc2626':i===6?'#2563eb':'#374151'}},w2)));
+    calWrap.appendChild(wRow);
+    const grid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'4px'}});
+    for(let i=0;i<firstDay;i++)grid.appendChild(h('div',null));
+    for(let d=1;d<=daysInMo;d++){
+      const ds=toDateStr(d);
+      const sel=isSel(d);
+      const past=isPast(d);
+      const dow=new Date(yr,mo,d).getDay();
+      const cell=h('div',{
+        style:{textAlign:'center',padding:'7px 0',cursor:past?'default':'pointer',
+          background:sel?'#16a34a':'transparent',
+          color:sel?'#fff':past?'#cbd5e1':dow===0?'#dc2626':dow===6?'#2563eb':'var(--ink)',
+          borderRadius:'50%',margin:'2px auto',width:'34px',fontSize:'13px',fontWeight:sel?'700':'400',
+          opacity:past?'0.4':'1',userSelect:'none'},
+        onClick:()=>{
+          if(past)return;
+          if(isSel(d)){S.dnSlots=S.dnSlots.filter(s=>s.date!==ds);}
+          else{S.dnSlots.push({id:'s'+Date.now(),date:ds,time:''});}
+          buildCal(); // カレンダーだけ再描画
+        }
+      },d);
+      grid.appendChild(cell);
+    }
+    calWrap.appendChild(grid);
+    calContainer.appendChild(calWrap);
+
+    // 選択済みリスト
+    if(S.dnSlots.length){
+      const selList=h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
+      [...S.dnSlots].sort((a,b)=>a.date.localeCompare(b.date)).forEach(sl=>{
+        const dd=new Date(sl.date+'T12:00:00');
+        const wdl=['日','月','火','水','木','金','土'][dd.getDay()];
+        const label=`${dd.getMonth()+1}/${dd.getDate()}(${wdl})`;
+        selList.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'#fff',border:'1px solid #86efac',borderRadius:'8px',padding:'8px 12px'}},
+          h('span',{style:{fontSize:'13px',fontWeight:'600',flex:1}},label),
+          h('select',{style:{padding:'4px 8px',border:'1px solid #86efac',borderRadius:'6px',fontSize:'12px',color:'#374151'},
+            onChange:e=>{const idx=S.dnSlots.findIndex(s=>s.date===sl.date);if(idx>=0)S.dnSlots[idx].time=e.target.value;}},
+            h('option',{value:''},'時間未定'),
+            ...[8,9,10,11,12,13,14,15,16,17,18,19].map(hh=>
+              h('option',{value:hh+':00',selected:sl.time===hh+':00'},hh+'時')
+            )
+          ),
+          h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'12px',padding:'0',fontFamily:'inherit'},
+            onClick:()=>{S.dnSlots=S.dnSlots.filter(s=>s.date!==sl.date);buildCal();}},'削除')
+        ));
+      });
+      calContainer.appendChild(selList);
+    } else {
+      calContainer.appendChild(h('div',{style:{textAlign:'center',padding:'8px',fontSize:'12px',color:'#6b7280'}},'カレンダーから候補日を選択してください'));
+    }
   }
+  buildCal();
+  slotSection.appendChild(calContainer);
   w.appendChild(slotSection);
 
   w.appendChild(h('div',{style:{marginTop:'16px',display:'flex',gap:'8px'}},
@@ -2233,7 +2247,8 @@ function dischargeNewPage(){
       const schedule_slots=[...(S.dnSlots||[])].sort((a,b)=>a.date.localeCompare(b.date)).filter(s=>s.date).map(s=>{
         const d=new Date(s.date+'T12:00:00');
         const wdl=['日','月','火','水','木','金','土'][d.getDay()];
-        return {id:s.id,datetime:s.date,label:`${d.getMonth()+1}/${d.getDate()}(${wdl})`};
+        const timeLabel=s.time?` ${parseInt(s.time)}時`:'';
+        return {id:s.id,datetime:s.date+(s.time?'T'+s.time:''),label:`${d.getMonth()+1}/${d.getDate()}(${wdl})${timeLabel}`};
       });
       const res=await api('/discharge/new',{method:'POST',body:JSON.stringify({
         patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks,requirements_data,schedule_slots
