@@ -2351,13 +2351,14 @@ function sharedChartPage(){
           m.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'800',marginBottom:'16px'}},'辞退理由'));
           m.appendChild(h('p',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px'}},'辞退後はこの退院通知を参照できなくなります。'));
           m.appendChild(h('div',{className:'field'},
-            h('label',null,'理由（任意）'),
-            h('textarea',{id:'decline_reason_input',rows:3,placeholder:'例：現在の受入状況が厳しいため、今回は辞退します',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box',resize:'vertical'}})
+            h('label',null,'理由（必須）'),
+            h('textarea',{id:'decline_reason_input',rows:3,placeholder:'例：現在の受入状況が厳しいため、今回は辞退します',required:true,style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',boxSizing:'border-box',resize:'vertical'}})
           ));
           m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
             btn('キャンセル','btn-sec',()=>{S.modal=null;rr()}),
             btn('辞退する','btn-danger',async()=>{
               const reason=document.getElementById('decline_reason_input')?.value?.trim()||'';
+              if(!reason){toast('辞退理由を入力してください');return;}
               const res=await api('/discharge/'+n.id+'/decline',{method:'POST',body:JSON.stringify({reason})});
               if(res?.success){S.modal=null;S.noticeData=null;S.dischargeList=null;toast('辞退しました');S.page='discharge';rr();}
               else toast(res?.error||'エラー');
