@@ -921,15 +921,16 @@ async function handleRequest(request, env, json, err) {
 
   // POST /discharge/new
   if (path === '/discharge/new' && method === 'POST') {
-    const { patient_id, title, memo, pdf_url, pdf_filename, recipient_org_ids } = await request.json().catch(() => ({}));
+    const { patient_id, title, memo, pdf_data, pdf_filename, pdf_file_type, recipient_org_ids } = await request.json().catch(() => ({}));
     if (!patient_id || !title || !recipient_org_ids?.length) return err('患者・タイトル・通知先は必須です');
+    if (pdf_data && pdf_data.length > 4 * 1024 * 1024) return err('PDFは3MB以下にしてください');
     const orgId = currentUser.org_id || currentUser.id;
     const id = 'dn_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const now = new Date().toISOString();
     try {
       await env.DB.prepare(
-        'INSERT INTO discharge_notices (id,patient_id,issued_by,org_id,title,memo,pdf_url,pdf_filename,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)'
-      ).bind(id, patient_id, currentUser.id, orgId, title, memo||'', pdf_url||'', pdf_filename||'', 'active', now).run();
+        'INSERT INTO discharge_notices (id,patient_id,issued_by,org_id,title,memo,pdf_url,pdf_filename,pdf_data,pdf_file_type,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).bind(id, patient_id, currentUser.id, orgId, title, memo||'', '', pdf_filename||'', pdf_data||'', pdf_file_type||'', 'active', now).run();
     } catch(e) { return err('退院通知の作成に失敗しました: '+e.message); }
 
     for (const recipientOrgId of recipient_org_ids) {
@@ -1004,6 +1005,7 @@ async function handleRequest(request, env, json, err) {
       status: notice.status, created_at: notice.created_at,
       access_stage: accessStage, is_issuer: isIssuer,
       pdf_url: notice.pdf_url, pdf_filename: notice.pdf_filename,
+      has_pdf: !!(notice.pdf_data),
       meeting_url: notice.meeting_url || '',
       joined_at: recipient?.joined_at || null,
       declined_at: recipient?.declined_at || null,
@@ -1054,6 +1056,23 @@ async function handleRequest(request, env, json, err) {
       ).bind(now, noticeId, orgId).run();
     } catch(e) { return err('更新に失敗しました'); }
     return json({ success: true, message: '辞退しました' });
+  }
+
+  // GET /discharge/:id/pdf  — PDF取得（base64）
+  if (path.match(/^\/discharge\/[^/]+\/pdf$/) && method === 'GET') {
+    const noticeId = path.split('/')[2];
+    const orgId = currentUser.org_id || currentUser.id;
+    let notice = null;
+    try { notice = await env.DB.prepare('SELECT org_id, pdf_data, pdf_file_type FROM discharge_notices WHERE id=?').bind(noticeId).first(); } catch(e) {}
+    if (!notice?.pdf_data) return err('PDFが見つかりません', 404);
+    // 発行者 or 受信者のみ取得可
+    const isIssuer = notice.org_id === orgId;
+    if (!isIssuer) {
+      let rec = null;
+      try { rec = await env.DB.prepare('SELECT id FROM notice_recipients WHERE notice_id=? AND recipient_org_id=? AND declined_at IS NULL').bind(noticeId, orgId).first(); } catch(e) {}
+      if (!rec) return err('アクセス権限がありません', 403);
+    }
+    return json({ data: notice.pdf_data, file_type: notice.pdf_file_type || 'application/pdf' });
   }
 
   // POST /discharge/:id/meeting  — 発行者が面談URLを設定し、参加済み受信者をStage3へ

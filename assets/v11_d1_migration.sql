@@ -1,7 +1,8 @@
 -- v11 D1マイグレーション（退院通知フロー改修）
--- discharge_notices に meeting_url カラム追加
 
+-- 1. discharge_notices に meeting_url カラム追加（既に実行済みの場合はスキップ）
 ALTER TABLE discharge_notices ADD COLUMN meeting_url TEXT DEFAULT '';
 
--- 動作確認用：現在のdischarge_noticesの内容確認
--- SELECT id, title, status, meeting_url FROM discharge_notices ORDER BY created_at DESC LIMIT 10;
+-- 2. discharge_notices に PDF保存用カラム追加
+ALTER TABLE discharge_notices ADD COLUMN pdf_data TEXT DEFAULT '';
+ALTER TABLE discharge_notices ADD COLUMN pdf_file_type TEXT DEFAULT '';
