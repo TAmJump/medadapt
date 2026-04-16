@@ -1820,13 +1820,15 @@ function ndaPage(){
           nda.nda_type==='paper'&&nda.has_file?btn('原本を開く','btn-xs btn-out',async()=>{
             const res=await api('/nda/'+nda.id+'/file');
             if(!res||res.error){toast('ファイルの取得に失敗しました');return;}
-            const mimeType=nda.paper_file_type||'application/pdf';
-            const byteChars=atob(res);
-            const byteArr=new Uint8Array(byteChars.length);
-            for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);
-            const blob=new Blob([byteArr],{type:mimeType});
-            const url=URL.createObjectURL(blob);
-            window.open(url,'_blank');
+            try{
+              const mimeType=res.file_type||'application/pdf';
+              const byteChars=atob(res.data);
+              const byteArr=new Uint8Array(byteChars.length);
+              for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);
+              const blob=new Blob([byteArr],{type:mimeType});
+              const url=URL.createObjectURL(blob);
+              window.open(url,'_blank');
+            }catch(e){toast('ファイルの展開に失敗しました');}
           }):null,
           nda.nda_type==='paper'&&!nda.has_file?h('span',{style:{fontSize:'11px',color:'var(--ink-l)'}},'添付なし'):null,
           nda.nda_type!=='paper'?btn('PDF出力','btn-xs btn-out',()=>genNdaPdf(nda)):null,

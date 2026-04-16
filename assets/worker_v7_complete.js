@@ -715,9 +715,7 @@ async function handleRequest(request, env, json, err) {
     let row = null;
     try { row = await env.DB.prepare('SELECT paper_file_data, paper_file_type FROM org_ndas WHERE id=? AND (org_id_a=? OR org_id_b=?)').bind(ndaId, orgId, orgId).first(); } catch(e) {}
     if (!row?.paper_file_data) return err('ファイルが見つかりません', 404);
-    return new Response(row.paper_file_data, {
-      headers: { ...cors, 'Content-Type': 'application/json' }
-    });
+    return json({ data: row.paper_file_data, file_type: row.paper_file_type });
   }
 
   // POST /nda/request
