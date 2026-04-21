@@ -1,4 +1,4 @@
-// MedAdapt API Worker v6
+// Medvoo API Worker v6
 // v8追加: モジュール権限チェック・通知・クーポン
 // v6追加: /auth/reset で login_id にも対応
 // Bindings: DB (D1), AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, FROM_EMAIL
@@ -71,10 +71,10 @@ async function handleRequest(request, env, json, err) {
       const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&login_id=${loginId}`;
       await sendEmail(env, {
         to: email.trim(),
-        subject: '【MedAdapt】メールアドレスの確認',
+        subject: '【Medvoo】メールアドレスの確認',
         html: `
           <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
-            <h2 style="color:#0891b2;">MedAdaptへようこそ</h2>
+            <h2 style="color:#0891b2;">Medvooへようこそ</h2>
             <p>${name} 様</p>
             <p>ご登録ありがとうございます。</p>
             <div style="background:#f0fdfa;border:1px solid #0891b2;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
@@ -86,7 +86,7 @@ async function handleRequest(request, env, json, err) {
             <a href="${verifyUrl}" style="display:inline-block;padding:12px 24px;background:#0891b2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;margin:16px 0;">メールアドレスを確認する</a>
             <p style="font-size:12px;color:#666;">このリンクは24時間有効です。</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-            <p style="font-size:11px;color:#999;">タムジ.Corp | MedAdapt 医療介護連携OS</p>
+            <p style="font-size:11px;color:#999;">タムジ.Corp | Medvoo 医療介護連携OS</p>
           </div>
         `
       });
@@ -131,7 +131,7 @@ async function handleRequest(request, env, json, err) {
     const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&email=${encodeURIComponent(email)}`;
     await sendEmail(env, {
       to: email,
-      subject: '【MedAdapt】メールアドレスの確認（再送）',
+      subject: '【Medvoo】メールアドレスの確認（再送）',
       html: `
         <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
           <h2 style="color:#0891b2;">確認メールの再送</h2>
@@ -220,7 +220,7 @@ async function handleRequest(request, env, json, err) {
         : `${baseUrl}/app.html?reset=${resetToken}&email=${encodeURIComponent(email)}`;
       await sendEmail(env, {
         to: email,
-        subject: '【MedAdapt】パスワードリセット',
+        subject: '【Medvoo】パスワードリセット',
         html: `
           <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
             <h2 style="color:#0891b2;">パスワードリセット</h2>
@@ -303,12 +303,12 @@ async function handleRequest(request, env, json, err) {
       try {
         await sendEmail(env, {
           to: email.trim(),
-          subject: `【MedAdapt】スタッフ登録完了 - あなたのログインID`,
+          subject: `【Medvoo】スタッフ登録完了 - あなたのログインID`,
           html: `
             <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
               <h2 style="color:#0891b2;">スタッフ登録完了</h2>
               <p>${name} 様</p>
-              <p>${adminUser.org} のMedAdaptへの登録が完了しました。</p>
+              <p>${adminUser.org} のMedvooへの登録が完了しました。</p>
               <div style="background:#f0fdfa;border:1px solid #0891b2;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
                 <div style="font-size:12px;color:#64748b;">あなたのログインIDは</div>
                 <div style="font-size:28px;font-weight:900;color:#0891b2;letter-spacing:2px;">${loginId}</div>
@@ -477,11 +477,11 @@ async function handleRequest(request, env, json, err) {
     if (email) {
       await sendEmail(env, {
         to: email,
-        subject: `【MedAdapt】${currentUser.org}からスタッフ招待が届いています`,
+        subject: `【Medvoo】${currentUser.org}からスタッフ招待が届いています`,
         html: `
           <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
-            <h2 style="color:#0891b2;">MedAdaptへの招待</h2>
-            <p>${currentUser.org} の管理者からMedAdaptへの招待が届いています。</p>
+            <h2 style="color:#0891b2;">Medvooへの招待</h2>
+            <p>${currentUser.org} の管理者からMedvooへの招待が届いています。</p>
             <a href="${inviteUrl}" style="display:inline-block;padding:12px 24px;background:#0891b2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;margin:16px 0;">アカウントを作成する</a>
             <p style="font-size:12px;color:#666;">このリンクは7日間有効です。</p>
           </div>
