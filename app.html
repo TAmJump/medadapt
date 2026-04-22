@@ -3100,13 +3100,19 @@ function tryLocalLogin(){
   const verifyToken=params.get('verify');
   const resetToken=params.get('reset');
   const paramEmail=params.get('email');
+  const paramLoginId=params.get('login_id')||params.get('id');
 
-  if(verifyToken&&paramEmail){
-    // メールアドレス認証
-    const res=await api('/auth/verify?token='+encodeURIComponent(verifyToken)+'&email='+encodeURIComponent(paramEmail),{});
+  if(verifyToken&&(paramEmail||paramLoginId)){
+    // メールアドレス認証（login_id または email どちらかがあれば実行）
+    let verifyUrl='/auth/verify?token='+encodeURIComponent(verifyToken);
+    if(paramLoginId){verifyUrl+='&login_id='+encodeURIComponent(paramLoginId);}
+    else if(paramEmail){verifyUrl+='&email='+encodeURIComponent(paramEmail);}
+    const res=await api(verifyUrl,{});
     window.history.replaceState({},'',window.location.pathname);
     if(res&&res.success){
       S.scr='login';S.loginErr='';
+      // ログインIDを自動入力できるように保存
+      if(res.login_id){try{localStorage.setItem('medadapt-last-email',res.login_id);}catch(e){}}
       // 認証完了モーダル表示
       setTimeout(()=>{
         const m=document.createElement('div');
@@ -3151,13 +3157,13 @@ function tryLocalLogin(){
   }
 
   if(resetToken){
-    const paramLoginId=params.get('login_id');
-    if(paramLoginId||paramEmail){
+    const paramLoginIdReset=params.get('login_id')||params.get('id');
+    if(paramLoginIdReset||paramEmail){
       // パスワードリセット画面（新PW設定モード）
       S.scr='resetpw';
       S.resetToken=resetToken;
       S.resetMode='set';
-      S.resetLoginId=paramLoginId||null;
+      S.resetLoginId=paramLoginIdReset||null;
       S.resetEmail=paramEmail||'';
       S.resetSetDone=false;
       window.history.replaceState({},'',window.location.pathname);
