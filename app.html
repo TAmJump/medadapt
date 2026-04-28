@@ -62,6 +62,11 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
 .import-zone{border:2px dashed var(--border);border-radius:var(--r-lg);padding:40px;text-align:center;cursor:pointer;background:var(--border-l)}.import-zone:hover{border-color:var(--accent);background:var(--yellow-l)}
 @media(max-width:768px){.app-shell{flex-direction:column}.sidebar{width:100%;flex-direction:row;padding:0;overflow-x:auto}.sidebar-logo{display:none}.sidebar-nav{display:flex;padding:0}.sidebar-item{padding:12px 14px;white-space:nowrap;border-left:0;border-bottom:3px solid transparent}.sidebar-item.active{border-bottom-color:var(--yellow)}.sidebar-foot{display:none}.main{padding:16px}.plan-grid,.assess-grid{grid-template-columns:1fr}}
 </style>
+
+<!-- PWA / TWA manifest（Android 申請用） -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0891b2">
+<link rel="apple-touch-icon" href="/icon-192.png">
 </head>
 <body>
 <div id="app"></div>
