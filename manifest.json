@@ -1,7 +1,7 @@
 {
-  "name": "Medvoo",
-  "short_name": "Medvoo",
-  "description": "医療・介護機関の受入れ・移行・連携をスムーズに支援する業務システム（Adavoo ファミリー）",
+  "name": "ｍやるゼ！",
+  "short_name": "ｍやるゼ！",
+  "description": "医療・介護機関の受入れ・移行・連携をスムーズに支援する業務システム（やるゼ！ ファミリー）",
   "start_url": "/app.html",
   "scope": "/",
   "display": "standalone",
