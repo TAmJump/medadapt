@@ -68,7 +68,7 @@ async function handleRequest(request, env, json, err) {
     } catch(e) { /* subscriptionsテーブルがない場合はスキップ */ }
 
     if (hasEmail && verifyToken) {
-      const baseUrl = 'https://medadapt.scsgo.co.jp';
+      const baseUrl = 'https://myaruze.tamjump.com';
       const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&login_id=${loginId}`;
       await sendEmail(env, {
         to: email.trim(),
@@ -128,7 +128,7 @@ async function handleRequest(request, env, json, err) {
     if (user.email_verified) return err('既に認証済みです');
     const verifyToken = crypto.randomUUID();
     await env.DB.prepare('UPDATE users SET verify_token=? WHERE email=?').bind(verifyToken, email).run();
-    const baseUrl = 'https://medadapt.scsgo.co.jp';
+    const baseUrl = 'https://myaruze.tamjump.com';
     const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&email=${encodeURIComponent(email)}`;
     await sendEmail(env, {
       to: email,
@@ -214,7 +214,7 @@ async function handleRequest(request, env, json, err) {
       const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       await env.DB.prepare('UPDATE users SET reset_token=?, reset_expires=? WHERE email=?')
         .bind(resetToken, resetExpires, email).run();
-      const baseUrl = 'https://medadapt.scsgo.co.jp';
+      const baseUrl = 'https://myaruze.tamjump.com';
       // login_id があればURLに含める（新しいリセット画面対応）
       const resetUrl = user.login_id
         ? `${baseUrl}/app.html?reset=${resetToken}&login_id=${user.login_id}`
@@ -314,7 +314,7 @@ async function handleRequest(request, env, json, err) {
                 <div style="font-size:12px;color:#64748b;">あなたのログインIDは</div>
                 <div style="font-size:28px;font-weight:900;color:#0891b2;letter-spacing:2px;">${loginId}</div>
               </div>
-              <p style="font-size:12px;color:#666;">ログインURL: https://medadapt.scsgo.co.jp/app.html</p>
+              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.tamjump.com/app.html</p>
             </div>
           `
         });
@@ -473,7 +473,7 @@ async function handleRequest(request, env, json, err) {
     const now = new Date().toISOString();
     await env.DB.prepare('INSERT INTO invites (id,org_id,org_name,email,token,expires,used,created) VALUES (?,?,?,?,?,?,?,?)')
       .bind(id, currentUser.org_id || currentUser.id, currentUser.org, email || '', inviteToken, expires, 0, now).run();
-    const baseUrl = 'https://medadapt.scsgo.co.jp';
+    const baseUrl = 'https://myaruze.tamjump.com';
     const inviteUrl = `${baseUrl}/app.html?invite=${inviteToken}`;
     if (email) {
       await sendEmail(env, {
@@ -529,7 +529,7 @@ async function handleRequest(request, env, json, err) {
     if (!target) return err('対象スタッフが見つかりません');
     const qrToken = crypto.randomUUID().replace(/-/g,'') + crypto.randomUUID().replace(/-/g,'');
     await env.DB.prepare('UPDATE users SET qr_token=? WHERE id=?').bind(qrToken, staff_id).run();
-    const baseUrl = 'https://medadapt.scsgo.co.jp';
+    const baseUrl = 'https://myaruze.tamjump.com';
     const qrUrl = `${baseUrl}/app.html?qr=${qrToken}`;
     return json({ success: true, qr_url: qrUrl, qr_token: qrToken });
   }
