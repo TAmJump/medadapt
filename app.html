@@ -211,7 +211,7 @@ function compactSection(opts){
   const visible=expanded?filtered:filtered.slice(0,size);
   // 上部コントロール: 件数切替（3/5）+ 展開時の閉じるボタン
   const ctrl=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'8px',justifyContent:'flex-end',flexWrap:'wrap'}});
-  if(filtered.length>3){
+  if(total>3){
     [3,5].forEach(n=>{const isAct=size===n;ctrl.appendChild(h('div',{style:{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',background:isAct?'#1e293b':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:'1px solid '+(isAct?'#1e293b':'#e2e8f0')},onClick:()=>{S[opts.sizeKey]=n;S[opts.expandKey]=false;rr()}},n+'件'))});
   }
   if(expanded&&filtered.length>size){ctrl.appendChild(h('div',{style:{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',color:'var(--accent)',border:'1px solid var(--accent)',background:'#fff'},onClick:()=>{S[opts.expandKey]=false;rr()}},'▲ 閉じる'))}
