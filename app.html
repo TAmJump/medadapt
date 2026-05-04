@@ -2441,7 +2441,26 @@ function dischargeNewPage(){
   const deadlineSection=h('div',{style:{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'10px',padding:'14px 16px',marginTop:'12px'}});
   deadlineSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'2px',color:'#0c4a6e'}},'⏰ 回答期限・自動確定（任意）'));
   deadlineSection.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginBottom:'10px'}},'期限到達時または全員回答時に、○票が最多の日時に自動で確定します（面談URLも自動生成）'));
-  deadlineSection.appendChild(h('input',{id:'dn_schedule_deadline',type:'datetime-local',style:{padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px',width:'100%',maxWidth:'260px',boxSizing:'border-box'}}));
+  // プリセットボタン
+  const presetWrap=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}});
+  const fmt=d=>{const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())};
+  const presets=[
+    {l:'3時間後',calc:()=>{const d=new Date();d.setHours(d.getHours()+3,0,0,0);return d}},
+    {l:'明日17時',calc:()=>{const d=new Date();d.setDate(d.getDate()+1);d.setHours(17,0,0,0);return d}},
+    {l:'3日後17時',calc:()=>{const d=new Date();d.setDate(d.getDate()+3);d.setHours(17,0,0,0);return d}},
+    {l:'1週間後17時',calc:()=>{const d=new Date();d.setDate(d.getDate()+7);d.setHours(17,0,0,0);return d}}
+  ];
+  presets.forEach(p=>{
+    presetWrap.appendChild(h('button',{type:'button',style:{padding:'6px 12px',background:'#fff',border:'1px solid #0891b2',borderRadius:'14px',color:'#0891b2',fontSize:'12px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'},onClick:e=>{e.preventDefault();const inp=document.getElementById('dn_schedule_deadline');if(inp){inp.value=fmt(p.calc());const lbl=document.getElementById('dn_deadline_label');if(lbl)lbl.textContent='設定: '+p.calc().toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}}},p.l));
+  });
+  deadlineSection.appendChild(presetWrap);
+  // カスタム入力（30分刻み）+ クリア
+  const inputRow=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}},
+    h('input',{id:'dn_schedule_deadline',type:'datetime-local',step:'1800',style:{padding:'7px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'12px',flex:'1 1 200px',minWidth:'180px',boxSizing:'border-box'},onChange:e=>{const lbl=document.getElementById('dn_deadline_label');if(lbl){if(e.target.value){const d=new Date(e.target.value);lbl.textContent='設定: '+d.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}else{lbl.textContent=''}}}}),
+    h('button',{type:'button',style:{padding:'6px 10px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'8px',color:'var(--ink-m)',fontSize:'11px',cursor:'pointer',fontFamily:'inherit'},onClick:e=>{e.preventDefault();const inp=document.getElementById('dn_schedule_deadline');if(inp)inp.value='';const lbl=document.getElementById('dn_deadline_label');if(lbl)lbl.textContent=''}},'クリア')
+  );
+  deadlineSection.appendChild(inputRow);
+  deadlineSection.appendChild(h('div',{id:'dn_deadline_label',style:{marginTop:'6px',fontSize:'11px',color:'#0891b2',fontWeight:'600'}},''));
   w.appendChild(deadlineSection);
 
   w.appendChild(h('div',{style:{marginTop:'16px',display:'flex',gap:'8px'}},
