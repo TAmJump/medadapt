@@ -1146,19 +1146,28 @@ w.appendChild(kpi);
 const alerts=[];
 activePts.forEach(p=>{
 const pa=allA.filter(a=>a.patientId===p.id&&a.type!=='pre_admission');
-if(!pa.length){alerts.push({pid:p.id,pn:p.name,msg:'初期アセス未実施',tab:'transition',c:'#dc2626'})}
-else{const last=pa.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];const d=new Date(last.date);d.setMonth(d.getMonth()+3);if(d<new Date())alerts.push({pid:p.id,pn:p.name,msg:'定期アセス期限超過（'+last.date+'以降未実施）',tab:'transition',c:'#dc2626'})}
-if(!allM.some(m=>m.patientId===p.id&&m.date?.startsWith(thisMo)))alerts.push({pid:p.id,pn:p.name,msg:'今月モニタリング未実施',tab:'monitors',c:'#0e7490'});
+if(!pa.length){alerts.push({pid:p.id,pn:p.name,msg:'初期アセス未実施',tab:'transition',c:'#dc2626',cat:'init'})}
+else{const last=pa.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];const d=new Date(last.date);d.setMonth(d.getMonth()+3);if(d<new Date())alerts.push({pid:p.id,pn:p.name,msg:'定期アセス期限超過',tab:'transition',c:'#dc2626',cat:'over'})}
+if(!allM.some(m=>m.patientId===p.id&&m.date?.startsWith(thisMo)))alerts.push({pid:p.id,pn:p.name,msg:'今月モニタリング未実施',tab:'monitors',c:'#0e7490',cat:'mon'});
 });
 prePts.forEach(p=>{
-if(!allA.some(a=>a.patientId===p.id&&a.type==='pre_admission'))alerts.push({pid:p.id,pn:p.name,msg:'入居前アセス未実施',tab:'transition',c:'#0e7490'});
+if(!allA.some(a=>a.patientId===p.id&&a.type==='pre_admission'))alerts.push({pid:p.id,pn:p.name,msg:'入居前アセス未実施',tab:'transition',c:'#0e7490',cat:'pre'});
 });
 if(alerts.length){w.appendChild(h('div',{className:'section-label'},'要対応（'+alerts.length+'件）'));
+// フィルタチップ
+if(!S.dashFilter)S.dashFilter='all';
+const filtCfg=[{k:'all',l:'すべて'},{k:'mon',l:'モニタ'},{k:'init',l:'初期アセス'},{k:'over',l:'期限超過'},{k:'pre',l:'入居前'}];
+const cnt=k=>k==='all'?alerts.length:alerts.filter(a=>a.cat===k).length;
+const chips=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'10px'}});
+filtCfg.forEach(f=>{const n=cnt(f.k);if(n===0&&f.k!=='all')return;const isAct=S.dashFilter===f.k;chips.appendChild(h('div',{style:{padding:'5px 12px',borderRadius:'14px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',background:isAct?'var(--accent)':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:isAct?'1px solid var(--accent)':'1px solid #e2e8f0'},onClick:()=>{S.dashFilter=f.k;rr()}},f.l+'('+n+')'))});
+w.appendChild(chips);
+// 1行コンパクトカード
 const al=h('div',{style:{marginBottom:'24px'}});
-alerts.slice(0,10).forEach(a=>{al.appendChild(h('div',{className:'card',style:{marginBottom:'6px',padding:'10px 16px',cursor:'pointer',borderLeft:'3px solid '+a.c},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
-h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
-h('div',null,h('span',{style:{fontWeight:'700',fontSize:'13px'}},a.pn),h('span',{style:{fontSize:'12px',color:'var(--ink-m)',marginLeft:'8px'}},a.msg)),
-h('div',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:'600'}},'対応 →'))))});
+const filtered=S.dashFilter==='all'?alerts:alerts.filter(a=>a.cat===S.dashFilter);
+filtered.forEach(a=>{al.appendChild(h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',borderLeft:'3px solid '+a.c,display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
+h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},a.pn),
+h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.msg),
+h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→')))});
 w.appendChild(al)}
 // Upcoming schedule (next 14 days)
 const soon=[];const in14=new Date();in14.setDate(in14.getDate()+14);const today=new Date().toISOString().slice(0,10);
