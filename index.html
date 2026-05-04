@@ -938,7 +938,15 @@ function toggleNavMenu(force){
 navToggle.addEventListener('click',()=>toggleNavMenu());
 navOverlay.addEventListener('click',()=>toggleNavMenu(false));
 navLinks.querySelectorAll('a').forEach(a=>{
-  a.addEventListener('click',()=>{if(navLinks.classList.contains('open'))toggleNavMenu(false)});
+  a.addEventListener('click',(e)=>{
+    const href=a.getAttribute('href');
+    if(navLinks.classList.contains('open'))toggleNavMenu(false);
+    // 外部URL/別ページは確実に遷移（ドロワー閉じアニメで取りこぼし防止）
+    if(href && !href.startsWith('#')){
+      e.preventDefault();
+      setTimeout(()=>{window.location.href=href;},80);
+    }
+  });
 });
 
 document.querySelectorAll('.faq-q').forEach(q=>{
