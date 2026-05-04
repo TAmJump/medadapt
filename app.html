@@ -190,6 +190,39 @@ function btn(t,cls,fn,dis){return h('button',{className:'btn '+cls,onClick:fn,di
 function fld(lbl,id,val,fn,o={}){const w=h('div',{className:'field'}),lb=h('label',{for:id},lbl);if(o.req)lb.appendChild(h('span',{className:'rq'},' *'));w.appendChild(lb);if(o.opts){const s=h('select',{id,onInput:e=>fn(e.target.value)});s.appendChild(h('option',{value:''},'選択'));o.opts.forEach(x=>{const op=h('option',{value:x.v||x},x.l||x);if(val===(x.v||x))op.selected=true;s.appendChild(op)});w.appendChild(s)}else if(o.ta){const ta=h('textarea',{id,rows:o.rows||'3',placeholder:o.ph||'',onInput:e=>fn(e.target.value)});ta.textContent=val||'';w.appendChild(ta)}else{w.appendChild(h('input',{id,type:o.type||'text',value:val||'',placeholder:o.ph||'',onInput:e=>fn(e.target.value)}))}return w}
 function chk(lbl,val,fn){return h('label',{className:'chk'},h('input',{type:'checkbox',checked:val,onChange:e=>fn(e.target.checked)}),h('span',{style:{fontSize:'13px'}},lbl))}
 function bdg(l,c){const isRed=c==='red'||c==='#dc2626'||c==='var(--red)';return h('span',{className:'badge',style:{background:isRed?'#dc262618':'#0891b218',color:isRed?'#dc2626':'#1e293b'}},l)}
+// コンパクトリスト共通描画（件数切替3/5・もっと見る・上下に閉じるボタン・任意フィルタチップ）
+function compactSection(opts){
+  const w=h('div');
+  const total=opts.items.length;
+  w.appendChild(h('div',{className:'section-label'},opts.title+'（'+total+'件）'));
+  if(total===0){w.appendChild(h('div',{style:{color:'var(--ink-m)',marginBottom:'20px',fontSize:'13px'}},opts.emptyText||'なし'));return w}
+  let filtered=opts.items;
+  // フィルタチップ（任意）
+  if(opts.filters&&opts.filterFn){
+    if(!S[opts.filterKey])S[opts.filterKey]='all';
+    const cnt=k=>k==='all'?total:opts.items.filter(opts.filterFn(k)).length;
+    const chips=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}});
+    opts.filters.forEach(f=>{const n=cnt(f.k);if(n===0&&f.k!=='all')return;const isAct=S[opts.filterKey]===f.k;chips.appendChild(h('div',{style:{padding:'5px 12px',borderRadius:'14px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',background:isAct?'var(--accent)':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:isAct?'1px solid var(--accent)':'1px solid #e2e8f0'},onClick:()=>{S[opts.filterKey]=f.k;S[opts.expandKey]=false;rr()}},f.l+'('+n+')'))});
+    w.appendChild(chips);
+    if(S[opts.filterKey]!=='all')filtered=opts.items.filter(opts.filterFn(S[opts.filterKey]));
+  }
+  const size=S[opts.sizeKey]||5;
+  const expanded=S[opts.expandKey]===true;
+  const visible=expanded?filtered:filtered.slice(0,size);
+  // 上部コントロール: 件数切替（3/5）+ 展開時の閉じるボタン
+  const ctrl=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'8px',justifyContent:'flex-end',flexWrap:'wrap'}});
+  if(filtered.length>3){
+    [3,5].forEach(n=>{const isAct=size===n;ctrl.appendChild(h('div',{style:{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',background:isAct?'#1e293b':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:'1px solid '+(isAct?'#1e293b':'#e2e8f0')},onClick:()=>{S[opts.sizeKey]=n;S[opts.expandKey]=false;rr()}},n+'件'))});
+  }
+  if(expanded&&filtered.length>size){ctrl.appendChild(h('div',{style:{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',color:'var(--accent)',border:'1px solid var(--accent)',background:'#fff'},onClick:()=>{S[opts.expandKey]=false;rr()}},'▲ 閉じる'))}
+  if(ctrl.children.length>0)w.appendChild(ctrl);
+  // リスト本体
+  const list=h('div',{style:{marginBottom:opts.sectionMargin||'24px'}});
+  visible.forEach(item=>list.appendChild(opts.itemRenderer(item)));
+  if(filtered.length>size){list.appendChild(h('div',{style:{textAlign:'center',padding:'8px',marginTop:'4px',cursor:'pointer',color:'var(--accent)',fontSize:'12px',fontWeight:'600',userSelect:'none',border:'1px dashed #cbd5e1',borderRadius:'8px',background:'#f8fafc'},onClick:()=>{S[opts.expandKey]=!expanded;rr()}},expanded?'▲ 閉じる':'▼ もっと見る ('+(filtered.length-size)+'件)'))}
+  w.appendChild(list);
+  return w;
+}
 function toast(m){S.toast=m;if(S.tt)clearTimeout(S.tt);S.tt=setTimeout(()=>{S.toast=null;rr()},1200);rr()}
 // 患者データのオーナーEmail（スタッフは法人adminのemail、管理者は自分のemail）
 function getOwnerEmail(){return S.user?.owner_email||S.user?.email||'';}
@@ -1153,24 +1186,19 @@ if(!allM.some(m=>m.patientId===p.id&&m.date?.startsWith(thisMo)))alerts.push({pi
 prePts.forEach(p=>{
 if(!allA.some(a=>a.patientId===p.id&&a.type==='pre_admission'))alerts.push({pid:p.id,pn:p.name,msg:'入居前アセス未実施',tab:'transition',c:'#0e7490',cat:'pre'});
 });
-if(alerts.length){w.appendChild(h('div',{className:'section-label'},'要対応（'+alerts.length+'件）'));
-// フィルタチップ
-if(!S.dashFilter)S.dashFilter='all';
-const filtCfg=[{k:'all',l:'すべて'},{k:'mon',l:'モニタ'},{k:'init',l:'初期アセス'},{k:'over',l:'期限超過'},{k:'pre',l:'入居前'}];
-const cnt=k=>k==='all'?alerts.length:alerts.filter(a=>a.cat===k).length;
-const chips=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'10px'}});
-filtCfg.forEach(f=>{const n=cnt(f.k);if(n===0&&f.k!=='all')return;const isAct=S.dashFilter===f.k;chips.appendChild(h('div',{style:{padding:'5px 12px',borderRadius:'14px',fontSize:'11px',fontWeight:'600',cursor:'pointer',userSelect:'none',background:isAct?'var(--accent)':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:isAct?'1px solid var(--accent)':'1px solid #e2e8f0'},onClick:()=>{S.dashFilter=f.k;rr()}},f.l+'('+n+')'))});
-w.appendChild(chips);
-// 1行コンパクトカード
-const al=h('div',{style:{marginBottom:'24px'}});
-const filtered=S.dashFilter==='all'?alerts:alerts.filter(a=>a.cat===S.dashFilter);
-const visible=S.dashExpand?filtered:filtered.slice(0,5);
-visible.forEach(a=>{al.appendChild(h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',borderLeft:'3px solid '+a.c,display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
-h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},a.pn),
-h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.msg),
-h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→')))});
-if(filtered.length>5){al.appendChild(h('div',{style:{textAlign:'center',marginTop:'8px',padding:'8px',cursor:'pointer',color:'var(--accent)',fontSize:'12px',fontWeight:'600',userSelect:'none'},onClick:()=>{S.dashExpand=!S.dashExpand;rr()}},S.dashExpand?'▲ 閉じる':'▼ もっと見る ('+(filtered.length-5)+'件)'))}
-w.appendChild(al)}
+if(alerts.length){w.appendChild(compactSection({
+  title:'要対応',
+  items:alerts,
+  sizeKey:'dashAlertSize',
+  expandKey:'dashAlertExpand',
+  filterKey:'dashFilter',
+  filters:[{k:'all',l:'すべて'},{k:'mon',l:'モニタ'},{k:'init',l:'初期アセス'},{k:'over',l:'期限超過'},{k:'pre',l:'入居前'}],
+  filterFn:k=>(a=>a.cat===k),
+  itemRenderer:a=>h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',borderLeft:'3px solid '+a.c,display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
+    h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},a.pn),
+    h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.msg),
+    h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→'))
+}))}
 // Upcoming schedule (next 14 days)
 const soon=[];const in14=new Date();in14.setDate(in14.getDate()+14);const today=new Date().toISOString().slice(0,10);
 allC.filter(c=>c.apt&&c.apt.date>=today&&c.apt.date<=in14.toISOString().slice(0,10)).forEach(c=>{soon.push({date:c.apt.date,time:c.apt.time||'',type:'受入れ・移行',name:c.pn,pid:c.patientId,tab:'transition',cid:c.id})});
@@ -1184,16 +1212,45 @@ h('div',{style:{minWidth:'40px',fontSize:'11px',color:'var(--ink-m)'}},s.time),
 bdg(s.type,s.type==='受入れ・移行'?'#1e293b':'var(--accent)'),
 h('div',{style:{fontSize:'13px',fontWeight:'600'}},s.name)))});
 w.appendChild(sc)}
-// Tables
-w.appendChild(h('div',{className:'section-label'},'受入れ・移行ケース（'+allC.length+'件）'));
-if(!allC.length)w.appendChild(h('div',{style:{color:'var(--ink-m)',marginBottom:'20px',fontSize:'13px'}},'なし'));
-else{const t=h('table',{className:'tbl'});t.appendChild(h('thead',null,h('tr',null,h('th',null,'患者'),h('th',null,'退院予定'),h('th',null,'状態'))));const tb=h('tbody');allC.forEach(c=>{const sl={draft:{l:'下書き',c:'#94a3b8'},scheduling:{l:'調整中',c:'#0e7490'},confirmed:{l:'確定',c:'#0e7490'},in_progress:{l:'実施中',c:'#1e293b'},completed:{l:'完了',c:'var(--accent)'},ng_facility:{l:'受入NG',c:'#dc2626'},ng_patient:{l:'入居者NG',c:'#dc2626'}}[c.st]||{l:'—',c:'#94a3b8'};tb.appendChild(h('tr',{style:{cursor:'pointer'},onClick:()=>{S.ptId=c.patientId;S.page='hub';S.hubTab='transition';S.caseId=c.id;rr()}},h('td',{className:'name'},c.pn),h('td',null,c.dd||'—'),h('td',null,bdg(sl.l,sl.c))))});t.appendChild(tb);w.appendChild(h('div',{className:'card',style:{padding:0,overflow:'hidden',marginBottom:'24px'}},t))}
-w.appendChild(h('div',{className:'section-label'},'サービス担当者会議（'+allCo.length+'件）'));
-if(!allCo.length)w.appendChild(h('div',{style:{color:'var(--ink-m)',marginBottom:'20px',fontSize:'13px'}},'なし'));
-else{const t2=h('table',{className:'tbl'});t2.appendChild(h('thead',null,h('tr',null,h('th',null,'利用者'),h('th',null,'開催日'),h('th',null,'場所'))));const tb2=h('tbody');allCo.forEach(c=>{tb2.appendChild(h('tr',{style:{cursor:'pointer'},onClick:()=>{S.ptId=c.patientId;S.page='hub';S.hubTab='conferences';S.confId=c.id;rr()}},h('td',{className:'name'},c.userName),h('td',null,c.date||'—'),h('td',null,c.place||'—')))});t2.appendChild(tb2);w.appendChild(h('div',{className:'card',style:{padding:0,overflow:'hidden',marginBottom:'24px'}},t2))}
-w.appendChild(h('div',{className:'section-label'},'モニタリング（'+allM.length+'件）'));
-if(!allM.length)w.appendChild(h('div',{style:{color:'var(--ink-m)'},fontSize:'13px'},'なし'));
-else{const t3=h('table',{className:'tbl'});t3.appendChild(h('thead',null,h('tr',null,h('th',null,'利用者'),h('th',null,'日付'),h('th',null,'介護度'))));const tb3=h('tbody');allM.forEach(m2=>{tb3.appendChild(h('tr',{style:{cursor:'pointer'},onClick:()=>{S.ptId=m2.patientId;S.page='hub';S.hubTab='monitors';S.monId=m2.id;rr()}},h('td',{className:'name'},m2.userName),h('td',null,m2.date||'—'),h('td',null,m2.cl||'—')))});t3.appendChild(tb3);w.appendChild(h('div',{className:'card',style:{padding:0,overflow:'hidden'}},t3))}
+// Tables → コンパクトリスト化
+const stLabel={draft:{l:'下書き',c:'#94a3b8'},scheduling:{l:'調整中',c:'#0e7490'},confirmed:{l:'確定',c:'#0e7490'},in_progress:{l:'実施中',c:'#1e293b'},completed:{l:'完了',c:'var(--accent)'},ng_facility:{l:'受入NG',c:'#dc2626'},ng_patient:{l:'入居者NG',c:'#dc2626'}};
+w.appendChild(compactSection({
+  title:'受入れ・移行ケース',
+  items:allC,
+  sizeKey:'dashCSize',
+  expandKey:'dashCExpand',
+  filterKey:'dashCFilter',
+  filters:[{k:'all',l:'すべて'},{k:'draft',l:'下書き'},{k:'scheduling',l:'調整中'},{k:'confirmed',l:'確定'},{k:'in_progress',l:'実施中'},{k:'completed',l:'完了'}],
+  filterFn:k=>(c=>c.st===k),
+  itemRenderer:c=>{const sl=stLabel[c.st]||{l:'—',c:'#94a3b8'};return h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=c.patientId;S.page='hub';S.hubTab='transition';S.caseId=c.id;rr()}},
+    h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},c.pn),
+    h('div',{style:{flex:'0 0 auto',fontSize:'11px',color:'var(--ink-m)',whiteSpace:'nowrap'}},c.dd||'—'),
+    h('div',{style:{flex:'1 1 auto',textAlign:'right'}},bdg(sl.l,sl.c)),
+    h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→'))}
+}));
+w.appendChild(compactSection({
+  title:'サービス担当者会議',
+  items:allCo,
+  sizeKey:'dashCoSize',
+  expandKey:'dashCoExpand',
+  itemRenderer:c=>h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=c.patientId;S.page='hub';S.hubTab='conferences';S.confId=c.id;rr()}},
+    h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},c.userName),
+    h('div',{style:{flex:'0 0 auto',fontSize:'11px',color:'var(--ink-m)',whiteSpace:'nowrap'}},c.date||'—'),
+    h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textAlign:'right'}},c.place||'—'),
+    h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→'))
+}));
+w.appendChild(compactSection({
+  title:'モニタリング',
+  items:allM,
+  sizeKey:'dashMSize',
+  expandKey:'dashMExpand',
+  itemRenderer:m2=>h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=m2.patientId;S.page='hub';S.hubTab='monitors';S.monId=m2.id;rr()}},
+    h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},m2.userName),
+    h('div',{style:{flex:'0 0 auto',fontSize:'11px',color:'var(--ink-m)',whiteSpace:'nowrap'}},m2.date||'—'),
+    h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',whiteSpace:'nowrap',textAlign:'right'}},m2.cl||'—'),
+    h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→')),
+  sectionMargin:'0'
+}));
 return w}
 // === STAFF PAGE ===
 function staffPage(){
