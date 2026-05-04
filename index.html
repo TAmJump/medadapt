@@ -387,11 +387,8 @@ body {
   .hero-actions .btn-primary,
   .hero-actions .btn-secondary { padding:12px 24px; font-size:.85rem; }
   .hero-visual { margin-top:24px; max-width:100%; width:100%; }
-  /* フロート要素を確実に画面内 */
-  .hero-float { font-size:.58rem; padding:5px 10px; }
-  .hero-float-1 { top:14px; right:4px; }
-  .hero-float-2 { bottom:50px; left:4px; }
-  .hero-float-3 { top:110px; left:4px; }
+  /* フロート要素はモバイルでは非表示（はみ出し原因のため） */
+  .hero-float { display:none !important; }
 }
 </style>
 
