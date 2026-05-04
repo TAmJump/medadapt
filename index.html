@@ -447,9 +447,9 @@ body {
       
       <a href="#compare">比較</a>
       <a href="#pricing">料金</a>
-      <a href="https://tamjump.com/contact.html" class="nav-cta">お問い合わせ</a>
-      <a href="app.html" class="nav-cta nav-login">ログイン →</a>
-      <a href="https://tamjump.com" style="font-size:.75rem;color:var(--ink-m)">タムジ.Corp</a>
+      <a href="https://tamjump.com/contact.html" class="nav-cta" onclick="window.location.href=this.href;return false;">お問い合わせ</a>
+      <a href="app.html" class="nav-cta nav-login" onclick="window.location.href=this.href;return false;">ログイン →</a>
+      <a href="https://tamjump.com" style="font-size:.75rem;color:var(--ink-m)" onclick="window.location.href=this.href;return false;">タムジ.Corp</a>
     </div>
   </div>
 </nav>
@@ -938,14 +938,9 @@ function toggleNavMenu(force){
 navToggle.addEventListener('click',()=>toggleNavMenu());
 navOverlay.addEventListener('click',()=>toggleNavMenu(false));
 navLinks.querySelectorAll('a').forEach(a=>{
-  a.addEventListener('click',(e)=>{
-    const href=a.getAttribute('href');
+  a.addEventListener('click',()=>{
+    // ドロワーを閉じるだけ。preventDefault しない＝ブラウザ標準のhref遷移に任せる
     if(navLinks.classList.contains('open'))toggleNavMenu(false);
-    // 外部URL/別ページは確実に遷移（ドロワー閉じアニメで取りこぼし防止）
-    if(href && !href.startsWith('#')){
-      e.preventDefault();
-      setTimeout(()=>{window.location.href=href;},80);
-    }
   });
 });
 
