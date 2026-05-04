@@ -1164,10 +1164,12 @@ w.appendChild(chips);
 // 1行コンパクトカード
 const al=h('div',{style:{marginBottom:'24px'}});
 const filtered=S.dashFilter==='all'?alerts:alerts.filter(a=>a.cat===S.dashFilter);
-filtered.forEach(a=>{al.appendChild(h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',borderLeft:'3px solid '+a.c,display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
+const visible=S.dashExpand?filtered:filtered.slice(0,5);
+visible.forEach(a=>{al.appendChild(h('div',{className:'card',style:{marginBottom:'4px',padding:'8px 12px',cursor:'pointer',borderLeft:'3px solid '+a.c,display:'flex',alignItems:'center',gap:'8px'},onClick:()=>{S.ptId=a.pid;S.page='hub';S.hubTab=a.tab;rr()}},
 h('div',{style:{flex:'0 0 auto',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90px'}},a.pn),
 h('div',{style:{flex:'1 1 auto',fontSize:'11px',color:'var(--ink-m)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.msg),
 h('div',{style:{flex:'0 0 auto',fontSize:'13px',color:'var(--accent)',fontWeight:'700'}},'→')))});
+if(filtered.length>5){al.appendChild(h('div',{style:{textAlign:'center',marginTop:'8px',padding:'8px',cursor:'pointer',color:'var(--accent)',fontSize:'12px',fontWeight:'600',userSelect:'none'},onClick:()=>{S.dashExpand=!S.dashExpand;rr()}},S.dashExpand?'▲ 閉じる':'▼ もっと見る ('+(filtered.length-5)+'件)'))}
 w.appendChild(al)}
 // Upcoming schedule (next 14 days)
 const soon=[];const in14=new Date();in14.setDate(in14.getDate()+14);const today=new Date().toISOString().slice(0,10);
