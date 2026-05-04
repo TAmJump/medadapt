@@ -96,6 +96,8 @@ body {
 }
 .nav-cta:hover { transform:translateY(-1px)!important; box-shadow:var(--shadow-m)!important; }
 .nav-login { background:var(--ink)!important; border-radius:var(--r-pill); }
+.nav-toggle { display:none; background:transparent; border:none; font-size:26px; cursor:pointer; color:var(--ink); padding:6px 12px; line-height:1; font-weight:700; }
+.nav-overlay { display:none; }
 
 /* ─── Hero ─── */
 .hero {
@@ -362,7 +364,13 @@ body {
   
   .pricing-sides { grid-template-columns:1fr; }
   .pricing-grid-2col { grid-template-columns:1fr !important; }
-  .nav-links { flex-wrap:nowrap; overflow-x:auto; gap:14px; }
+  .nav-toggle { display:flex; align-items:center; justify-content:center; position:relative; z-index:1001; }
+  .nav-links { position:fixed; top:0; right:0; width:min(85vw,320px); height:100vh; background:#fff; flex-direction:column; align-items:stretch; padding:72px 28px 28px; box-shadow:-4px 0 24px rgba(0,0,0,.15); transform:translateX(100%); transition:transform .25s ease; z-index:1000; gap:14px; overflow-y:auto; }
+  .nav-links.open { transform:translateX(0); }
+  .nav-links a { padding:12px 4px; font-size:.95rem; text-align:left; border-bottom:1px solid var(--blue-l); }
+  .nav-links a.nav-cta, .nav-links a.nav-login { text-align:center; padding:12px 16px; border-bottom:none; margin-top:4px; }
+  .nav-overlay { display:block; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:999; opacity:0; pointer-events:none; transition:opacity .25s; }
+  .nav-overlay.show { opacity:1; pointer-events:auto; }
 }
 @media (max-width:600px) {
   .sec { padding:64px 0; }
@@ -385,7 +393,8 @@ body {
       
       <span class="nav-logo-text">ｍやるゼ！</span>
     </a>
-    <div class="nav-links">
+    <button class="nav-toggle" id="navToggle" aria-label="メニュー">☰</button>
+    <div class="nav-links" id="navLinks">
       <a href="#problems">課題</a>
       <a href="#pillars">機能</a>
       
@@ -866,6 +875,24 @@ body {
 <script>
 const nav=document.getElementById('nav');
 window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>20)});
+
+// ハンバーガーメニュー
+const navToggle=document.getElementById('navToggle');
+const navLinks=document.getElementById('navLinks');
+const navOverlay=document.createElement('div');
+navOverlay.className='nav-overlay';
+document.body.appendChild(navOverlay);
+function toggleNavMenu(force){
+  const willOpen=force!==undefined?force:!navLinks.classList.contains('open');
+  navLinks.classList.toggle('open',willOpen);
+  navOverlay.classList.toggle('show',willOpen);
+  navToggle.textContent=willOpen?'✕':'☰';
+}
+navToggle.addEventListener('click',()=>toggleNavMenu());
+navOverlay.addEventListener('click',()=>toggleNavMenu(false));
+navLinks.querySelectorAll('a').forEach(a=>{
+  a.addEventListener('click',()=>{if(navLinks.classList.contains('open'))toggleNavMenu(false)});
+});
 
 document.querySelectorAll('.faq-q').forEach(q=>{
   q.addEventListener('click',()=>{
