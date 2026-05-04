@@ -378,19 +378,20 @@ body {
   .hero-phone { width:210px; height:440px; }
 
   /* Hero モバイル横はみ出し修正 */
-  .hero { padding-top:80px; min-height:auto; }
-  .container { padding:0 16px; }
-  .hero-title { font-size:1.45rem; line-height:1.35; margin-bottom:18px; }
-  .hero-desc { font-size:.85rem; line-height:1.85; margin-bottom:24px; }
+  .hero { padding-top:80px; min-height:auto; overflow:hidden; }
+  .container { padding:0 16px; max-width:100vw; overflow-x:clip; }
+  .hero-inner { overflow:hidden; }
+  .hero-title { font-size:1.4rem; line-height:1.35; margin-bottom:18px; word-break:break-word; }
+  .hero-desc { font-size:.82rem; line-height:1.85; margin-bottom:24px; max-width:calc(100vw - 40px); padding:0 4px; word-break:break-word; }
   .hero-badge { font-size:.65rem; padding:5px 14px; margin-bottom:18px; }
   .hero-actions .btn-primary,
   .hero-actions .btn-secondary { padding:12px 24px; font-size:.85rem; }
-  .hero-visual { margin-top:24px; }
-  /* フロート要素を画面内に収める */
-  .hero-float { font-size:.6rem; padding:6px 12px; }
-  .hero-float-1 { top:20px; right:6px; }
-  .hero-float-2 { bottom:60px; left:6px; }
-  .hero-float-3 { top:120px; left:6px; }
+  .hero-visual { margin-top:24px; max-width:100%; width:100%; }
+  /* フロート要素を確実に画面内 */
+  .hero-float { font-size:.58rem; padding:5px 10px; }
+  .hero-float-1 { top:14px; right:4px; }
+  .hero-float-2 { bottom:50px; left:4px; }
+  .hero-float-3 { top:110px; left:4px; }
 }
 </style>
 
