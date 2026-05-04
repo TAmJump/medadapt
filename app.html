@@ -879,7 +879,7 @@ if(latestAss.id){
 const card=h('div',{className:'card',style:{marginBottom:'14px',padding:'18px'}});
 // ─── 基本情報 ───
 card.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'800',color:'var(--accent)',marginBottom:'12px',borderBottom:'2px solid var(--accent)',paddingBottom:'4px'}},'退院時共同指導記録'));
-const g1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px',marginBottom:'14px'}});
+const g1=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',gap:'10px',marginBottom:'14px'}});
 const sf=(label,key,val,disabled,ph,type)=>{
   const wrap=h('div',{className:'field'});
   wrap.appendChild(h('label',{style:{fontSize:'11px'}},label));
@@ -934,7 +934,7 @@ card.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',color:'#374151
 
 // ─── ADL
 card.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',color:'#374151',margin:'14px 0 8px',borderLeft:'3px solid var(--accent)',paddingLeft:'8px'}},'【利用者のADL】'));
-const adlGrid=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px',marginBottom:'12px'}});
+const adlGrid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))',gap:'8px',marginBottom:'12px'}});
 [['食事','eating'],['食事形態','mealType'],['排泄・尿','urination'],['排泄・便','defecation'],['入浴','bathing'],['移動','mobility'],['認知機能','cognition'],['意識レベル(JCS)','consciousness']].forEach(([label,key])=>{
   const wrap=h('div',{className:'field'});
   wrap.appendChild(h('label',{style:{fontSize:'11px'}},label));
@@ -959,7 +959,7 @@ card.appendChild(wishGrid);
 
 // ─── 退院後の診療（特管）
 card.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',color:'#374151',margin:'14px 0 8px',borderLeft:'3px solid var(--accent)',paddingLeft:'8px'}},'【退院後の診療に係る指導（特管の内容）】'));
-const tokGrid=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginBottom:'10px'}});
+const tokGrid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:'6px',marginBottom:'10px'}});
 const chkRow=(label,items)=>{
   const wrap=h('div',{style:{display:'flex',alignItems:'center',flexWrap:'wrap',gap:'8px',padding:'6px 10px',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'11px'}});
   wrap.appendChild(h('span',{style:{fontWeight:'700',minWidth:'90px',color:'#374151'}},label));
@@ -1200,7 +1200,61 @@ function showCallModal(url, onStart){
   document.body.appendChild(ov);
   return null;
 }
-function auditView(audit){const w=h('div');if(!audit||!audit.length){w.appendChild(h('div',{style:{color:'var(--ink-m)'}},'ログなし'));return w}const tl=h('div',{className:'timeline'});audit.slice().sort((a,b)=>(b.t||'').localeCompare(a.t||'')).forEach(a=>{const item=h('div',{className:'timeline-item'});item.appendChild(h('div',{className:'tl-time'},a.t?a.t.slice(0,16).replace('T',' '):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));tl.appendChild(item)});w.appendChild(tl);return w}
+function auditView(audit){
+  const w=h('div');
+  if(!audit||!audit.length){w.appendChild(h('div',{style:{color:'var(--ink-m)',textAlign:'center',padding:'40px'}},'ログなし'));return w}
+  // フィルタ定義
+  const filters=[
+    {k:'all',l:'すべて',m:()=>true},
+    {k:'call',l:'通話',m:a=>/通話|URL|録画|Whereby/.test(a.a||'')},
+    {k:'consent',l:'同意',m:a=>/同意|署名/.test(a.a||'')},
+    {k:'record',l:'記録',m:a=>/記録|PDF|帳票/.test(a.a||'')},
+    {k:'share',l:'共有',m:a=>/共有|NDA|NG|取消/.test(a.a||'')},
+    {k:'create',l:'作成',m:a=>/作成|候補|確定|日程|登録/.test(a.a||'')}
+  ];
+  if(!S.auditFilter)S.auditFilter='all';
+  const sorted=audit.slice().sort((a,b)=>(b.t||'').localeCompare(a.t||''));
+  const cur=filters.find(f=>f.k===S.auditFilter)||filters[0];
+  const filtered=sorted.filter(cur.m);
+  // ヘッダー：フィルタチップ + 件数
+  const head=h('div',{style:{marginBottom:'10px'}});
+  head.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
+    h('span',{style:{fontSize:'13px',fontWeight:'700',color:'#374151'}},'操作履歴'),
+    h('span',{style:{fontSize:'11px',color:'var(--ink-m)'}},filtered.length+' / '+audit.length+' 件')
+  ));
+  const chipWrap=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}});
+  filters.forEach(f=>{
+    const cnt=sorted.filter(f.m).length;
+    if(f.k!=='all'&&cnt===0)return;
+    const isAct=S.auditFilter===f.k;
+    chipWrap.appendChild(h('button',{
+      style:{padding:'4px 10px',background:isAct?'#0891b2':'#fff',color:isAct?'#fff':'#475569',border:'1px solid '+(isAct?'#0891b2':'#cbd5e1'),borderRadius:'14px',fontSize:'11px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'},
+      onClick:()=>{S.auditFilter=f.k;rr()}
+    },f.l+(f.k==='all'?'('+sorted.length+')':'('+cnt+')')));
+  });
+  head.appendChild(chipWrap);
+  w.appendChild(head);
+  // タイムライン（最初の20件＋もっと見る）
+  if(!S.auditShowAll)S.auditShowAll=false;
+  const limit=S.auditShowAll?filtered.length:20;
+  const view=filtered.slice(0,limit);
+  if(!view.length){w.appendChild(h('div',{style:{color:'var(--ink-m)',textAlign:'center',padding:'30px',fontSize:'12px'}},'該当なし'));return w}
+  const tl=h('div',{className:'timeline'});
+  view.forEach(a=>{
+    const item=h('div',{className:'timeline-item'});
+    item.appendChild(h('div',{className:'tl-time'},a.t?a.t.slice(0,16).replace('T',' '):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));
+    item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));
+    tl.appendChild(item);
+  });
+  w.appendChild(tl);
+  if(filtered.length>20){
+    w.appendChild(h('div',{style:{textAlign:'center',marginTop:'12px'}},
+      h('button',{style:{padding:'8px 16px',background:'#fff',color:'#0891b2',border:'1px dashed #0891b2',borderRadius:'8px',fontSize:'12px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'},onClick:()=>{S.auditShowAll=!S.auditShowAll;rr()}},
+        S.auditShowAll?'▲ 折りたたむ':'▼ もっと見る ('+(filtered.length-20)+'件)')
+    ));
+  }
+  return w;
+}
 // --- ADMIN (横断管理) ---
 // === ADMIN PAGE: DASHBOARD ===
 function adminPage(){const w=h('div');const pts=myPatients();const activePts=pts.filter(p=>p.status==='active');const prePts=pts.filter(p=>p.status==='pre_admission');
