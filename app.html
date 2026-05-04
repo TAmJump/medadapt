@@ -190,6 +190,30 @@ function btn(t,cls,fn,dis){return h('button',{className:'btn '+cls,onClick:fn,di
 function fld(lbl,id,val,fn,o={}){const w=h('div',{className:'field'}),lb=h('label',{for:id},lbl);if(o.req)lb.appendChild(h('span',{className:'rq'},' *'));w.appendChild(lb);if(o.opts){const s=h('select',{id,onInput:e=>fn(e.target.value)});s.appendChild(h('option',{value:''},'選択'));o.opts.forEach(x=>{const op=h('option',{value:x.v||x},x.l||x);if(val===(x.v||x))op.selected=true;s.appendChild(op)});w.appendChild(s)}else if(o.ta){const ta=h('textarea',{id,rows:o.rows||'3',placeholder:o.ph||'',onInput:e=>fn(e.target.value)});ta.textContent=val||'';w.appendChild(ta)}else{w.appendChild(h('input',{id,type:o.type||'text',value:val||'',placeholder:o.ph||'',onInput:e=>fn(e.target.value)}))}return w}
 function chk(lbl,val,fn){return h('label',{className:'chk'},h('input',{type:'checkbox',checked:val,onChange:e=>fn(e.target.checked)}),h('span',{style:{fontSize:'13px'}},lbl))}
 function bdg(l,c){const isRed=c==='red'||c==='#dc2626'||c==='var(--red)';return h('span',{className:'badge',style:{background:isRed?'#dc262618':'#0891b218',color:isRed?'#dc2626':'#1e293b'}},l)}
+// 姓の最初の漢字 → ひらがな読み（よくある日本人苗字200個 + 既存デモデータ全カバー）
+const KANJI_FIRST_KANA={
+'田':'た','山':'や','佐':'さ','鈴':'す','高':'た','渡':'わ','伊':'い','中':'な','小':'こ','加':'か','松':'ま','吉':'よ','斎':'さ','齋':'さ','木':'き','前':'ま','石':'い','太':'お','森':'も',
+'青':'あ','赤':'あ','秋':'あ','安':'あ','阿':'あ','足':'あ','朝':'あ','綾':'あ','荒':'あ','有':'あ','天':'あ','新':'あ','池':'い','井':'い','岩':'い','市':'い','飯':'い','今':'い','一':'い','五十嵐':'い','磯':'い','板':'い','市川':'い','上':'う','内':'う','梅':'う','宇':'う','臼':'う','植':'う','上田':'う','江':'え','榎':'え','遠':'え','大':'お','岡':'お','奥':'お','尾':'お','織':'お','落':'お','沖':'お','緒':'お','小田':'お','柿':'か','金':'か','川':'か','神':'か','片':'か','鎌':'か','勝':'か','岸':'き','北':'き','菊':'き','喜':'き','久':'く','工':'く','栗':'く','黒':'く','楠':'く','倉':'く','古':'こ','後':'ご','河':'こ','駒':'こ','近':'こ','坂':'さ','酒':'さ','桜':'さ','沢':'さ','里':'さ','坂本':'さ','志':'し','島':'し','清':'し','下':'し','白':'し','篠':'し','嶋':'し','塩':'し','杉':'す','水':'す','末':'す','須':'す','住':'す','関':'せ','瀬':'せ','千':'せ','園':'そ','曽':'そ','滝':'た','武':'た','立':'た','谷':'た','竹':'た','種':'た','玉':'た','千':'ち','茅':'ち','辻':'つ','土':'つ','津':'つ','塚':'つ','椿':'つ','寺':'て','戸':'と','時':'と','富':'と','遠藤':'え','長':'な','永':'な','名':'な','南':'な','成':'な','西':'に','二':'に','丹':'に','根':'ね','野':'の','畑':'は','服':'は','長谷':'は','花':'は','原':'は','馬場':'ば','早':'は','東':'ひ','広':'ひ','日':'ひ','平':'ひ','樋':'ひ','姫':'ひ','福':'ふ','藤':'ふ','船':'ふ','深':'ふ','古':'ふ','本':'ほ','星':'ほ','細':'ほ','穂':'ほ','保':'ほ','堀':'ほ','北条':'ほ','増':'ま','間':'ま','真':'ま','馬':'ま','牧':'ま','三':'み','宮':'み','光':'み','緑':'み','峰':'み','美':'み','南':'み','村':'む','武':'む','向':'む','目':'め','元':'も','望':'も','百':'も','本田':'ほ','矢':'や','八':'や','柳':'や','屋':'や','弓':'ゆ','湯':'ゆ','由':'ゆ','横':'よ','米':'よ','与':'よ','若':'わ','和':'わ','綿':'わ','輪':'わ'
+};
+function estimateKanaName(name){if(!name)return '';const t=name.trim();const toHira=s=>s.replace(/[\u30A1-\u30F6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));// 2文字姓を先にチェック
+for(const k of Object.keys(KANJI_FIRST_KANA).filter(x=>x.length===2)){if(t.startsWith(k))return KANJI_FIRST_KANA[k]+toHira(t.slice(k.length))}
+// 1文字
+const f=t[0];if(KANJI_FIRST_KANA[f])return KANJI_FIRST_KANA[f]+toHira(t.slice(1));
+// ひらがな・カタカナのまま
+if(/^[\u3040-\u309F\u30A0-\u30FF]/.test(t))return toHira(t);
+return '';}
+function kanaRow(name){const k=estimateKanaName(name);if(!k)return '他';const f=k[0];
+if('あいうえおぁぃぅぇぉ'.includes(f))return 'あ';
+if('かきくけこがぎぐげご'.includes(f))return 'か';
+if('さしすせそざじずぜぞ'.includes(f))return 'さ';
+if('たちつてとだぢづでどっ'.includes(f))return 'た';
+if('なにぬねの'.includes(f))return 'な';
+if('はひふへほばびぶべぼぱぴぷぺぽ'.includes(f))return 'は';
+if('まみむめも'.includes(f))return 'ま';
+if('やゆよゃゅょ'.includes(f))return 'や';
+if('らりるれろ'.includes(f))return 'ら';
+if('わをんゎ'.includes(f))return 'わ';
+return '他';}
 // コンパクトリスト共通描画（件数切替3/5・もっと見る・上下に閉じるボタン・任意フィルタチップ）
 function compactSection(opts){
   const w=h('div');
@@ -626,11 +650,22 @@ return shell}
 function patientsPage(){const w=h('div');w.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},h('div',{className:'page-title'},'患者・利用者'),h('div',{style:{display:'flex',gap:'8px'}},btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()}),btn('CSV取込','btn-out',()=>showImportModal()))));w.appendChild(h('div',{className:'page-sub'},'患者を選んで作業を開始'));
 // 検索ボックス
 if(S.ptSearch===undefined)S.ptSearch='';
-const searchBox=h('div',{style:{position:'relative',marginBottom:'12px'}});
-const searchInput=h('input',{id:'pt_search_input',type:'text',value:S.ptSearch,placeholder:'🔍 患者名で検索（部分一致）',style:{width:'100%',padding:'10px 14px 10px 14px',border:'1px solid var(--border)',borderRadius:'10px',fontSize:'13px',boxSizing:'border-box',background:'var(--surface)'},onInput:e=>{S.ptSearch=e.target.value;if(window._ptSearchTimer)clearTimeout(window._ptSearchTimer);window._ptSearchTimer=setTimeout(()=>{rr();const inp=document.getElementById('pt_search_input');if(inp){inp.focus();const len=inp.value.length;try{inp.setSelectionRange(len,len)}catch(e){}}},180)}});
+const searchBox=h('div',{style:{position:'relative',marginBottom:'10px'}});
+const searchInput=h('input',{id:'pt_search_input',type:'text',value:S.ptSearch,placeholder:'🔍 患者名で検索（漢字・かな両方OK）',style:{width:'100%',padding:'10px 14px 10px 14px',border:'1px solid var(--border)',borderRadius:'10px',fontSize:'13px',boxSizing:'border-box',background:'var(--surface)'},onInput:e=>{S.ptSearch=e.target.value;if(window._ptSearchTimer)clearTimeout(window._ptSearchTimer);window._ptSearchTimer=setTimeout(()=>{rr();const inp=document.getElementById('pt_search_input');if(inp){inp.focus();const len=inp.value.length;try{inp.setSelectionRange(len,len)}catch(e){}}},180)}});
 searchBox.appendChild(searchInput);
 if(S.ptSearch){searchBox.appendChild(h('div',{style:{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',fontSize:'14px',color:'var(--ink-m)',background:'var(--surface)',padding:'2px 8px',borderRadius:'6px',userSelect:'none'},onClick:()=>{S.ptSearch='';rr()}},'✕'))}
 w.appendChild(searchBox);
+// 50音チップ
+if(!S.ptKana)S.ptKana='すべて';
+const allKanaPts=myPatients().filter(p=>!(!S.showArchivedPt&&p.archived));
+const kanaCount=r=>r==='すべて'?allKanaPts.length:allKanaPts.filter(p=>kanaRow(p.name)===r).length;
+const kanaChip=h('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'12px'}});
+['すべて','あ','か','さ','た','な','は','ま','や','ら','わ','他'].forEach(r=>{
+  const n=kanaCount(r);if(n===0&&r!=='すべて')return;
+  const isAct=S.ptKana===r;
+  kanaChip.appendChild(h('div',{style:{padding:'4px 10px',borderRadius:'14px',fontSize:'12px',fontWeight:'700',cursor:'pointer',userSelect:'none',background:isAct?'var(--accent)':'#f1f5f9',color:isAct?'#fff':'var(--ink-m)',border:'1px solid '+(isAct?'var(--accent)':'#e2e8f0'),minWidth:'28px',textAlign:'center'},onClick:()=>{S.ptKana=r;rr()}},r+(r==='すべて'?'':' ('+n+')')));
+});
+w.appendChild(kanaChip);
 // Status filter
 const fb=h('div',{style:{display:'flex',gap:'6px',marginBottom:'16px'}});[{v:'all',l:'全て'},{v:'pre_admission',l:'入居前'},{v:'active',l:'利用中'},{v:'closed',l:'クローズ'}].forEach(f=>{fb.appendChild(h('button',{className:'btn btn-xs '+(S.ptFilter===f.v?'btn-pri':'btn-out'),onClick:()=>{S.ptFilter=f.v;rr()}},f.l))});w.appendChild(fb);
 // 非表示トグル
@@ -646,15 +681,18 @@ const pts=myPatients().filter(p=>{
   if(!S.showArchivedPt && p.archived)return false;
   if(S.ptFilter==='all'){if(p.status==='closed')return false}
   else if(p.status!==S.ptFilter)return false;
-  // 検索フィルタ（名前の部分一致・大文字小文字無視・ひらがな⇔カタカナ同一視）
+  // 検索フィルタ（名前・推定読みの両方で部分一致・ひらがな⇔カタカナ同一視）
   if(S.ptSearch&&S.ptSearch.trim()){
     const q=S.ptSearch.trim().toLowerCase();
     const toHira=s=>s.replace(/[\u30A1-\u30F6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
     const name=(p.name||'').toLowerCase();
     const nameH=toHira(name);
     const qH=toHira(q);
-    if(!name.includes(q)&&!nameH.includes(qH))return false;
+    const est=toHira(estimateKanaName(p.name||'').toLowerCase());
+    if(!name.includes(q)&&!nameH.includes(qH)&&!est.includes(qH))return false;
   }
+  // 50音行フィルタ
+  if(S.ptKana&&S.ptKana!=='すべて'){if(kanaRow(p.name)!==S.ptKana)return false}
   return true;
 });if(!pts.length){w.appendChild(h('div',{className:'card',style:{textAlign:'center',padding:'48px'}},h('div',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},S.ptSearch?('「'+S.ptSearch+'」に一致する患者がありません'):'患者が登録されていません'),S.ptSearch?btn('検索をクリア','btn-out',()=>{S.ptSearch='';rr()}):btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()})))}
 else{pts.forEach(p=>{const sb2=stBdg(p.status);const members=(p.members||[]).filter(m=>m.active!==false);const shared=(p.sharedWith||[]).filter(s=>s.status==='active').length;const card=h('div',{className:'card',style:{marginBottom:'12px',cursor:'pointer',padding:'16px',display:'flex',alignItems:'center',gap:'16px'},onClick:()=>{S.ptId=p.id;S.page='hub';S.hubTab='overview';rr()}});const info=h('div',{style:{flex:1}});info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},p.room?h('span',{style:{fontSize:'12px',fontWeight:'700',color:'var(--accent)',minWidth:'36px'}},p.room):null,h('span',{style:{fontSize:'16px',fontWeight:'700'}},p.name),bdg(sb2.l,sb2.c),p.cl?bdg(p.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(p.age?p.age+'歳 ':'')+(p.managerOrg?'管理：'+p.managerOrg:'')));const counts=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px',flexWrap:'wrap'}});const nc=ptCases(p.id).length,nco=ptConfs(p.id).length,nm=ptMons(p.id).length,na=ptAssess(p.id).length;if(nc)counts.appendChild(bdg('移行'+nc));if(na)counts.appendChild(bdg('アセス'+na));if(nco)counts.appendChild(bdg('担当者会議'+nco));if(nm)counts.appendChild(bdg('モニタ'+nm));if(members.length)counts.appendChild(bdg(members.length+'名関係者'));if(shared)counts.appendChild(bdg(shared+'名共有'));info.appendChild(counts);card.appendChild(info);card.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'20px'}},'→'));w.appendChild(card)})}return w}
