@@ -385,6 +385,10 @@ body {
     margin-bottom: 48px !important;
     max-width: 100% !important;
   }
+  /* screens内 画像コンテナをモバイルでさらに縮小（実機サイズ感） */
+  section[id="screens"] div[style*="border-radius:14px"][style*="box-shadow"] {
+    max-width: 240px !important;
+  }
   /* screens内 inline style h3 を縮小 */
   section[id="screens"] h3[style*="font-size"] {
     font-size: 1.3rem !important;
