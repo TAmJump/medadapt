@@ -173,6 +173,48 @@ async function api(path,opts={}){
 function loadToken(){S.token=localStorage.getItem('medadapt_token')||null;}
 function saveToken(t){S.token=t;if(t)localStorage.setItem('medadapt_token',t);else localStorage.removeItem('medadapt_token');}
 
+// ── Square Web Payments SDK（B-2方式・契約情報＆カード入力） ──
+let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null};
+
+async function loadSquareSdk(){
+  if(SQ.payments)return SQ.payments;
+  if(SQ.loading){
+    return new Promise(resolve=>{const w=()=>SQ.payments?resolve(SQ.payments):setTimeout(w,100);w();});
+  }
+  SQ.loading=true;SQ.error=null;
+  try{
+    const cfg=await api('/billing/sdk-config',{method:'GET'});
+    if(!cfg||!cfg.application_id||!cfg.location_id)throw new Error('SQUARE_APP_ID または SQUARE_LOCATION_ID が未設定');
+    SQ.cfg=cfg;
+    if(!window.Square){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src=cfg.sdk_url;s.onload=res;s.onerror=()=>rej(new Error('Square SDK ロード失敗'));document.head.appendChild(s);});
+    }
+    SQ.payments=window.Square.payments(cfg.application_id,cfg.location_id);
+    SQ.sdk=window.Square;
+  }catch(e){SQ.error=e.message;}
+  SQ.loading=false;
+  return SQ.payments;
+}
+
+async function refreshBillingInfo(){
+  try{const r=await api('/billing/info',{method:'GET'});SQ.info=r;SQ.infoLoaded=true;return r;}catch(e){SQ.infoLoaded=true;return null;}
+}
+
+async function initSquareCard(){
+  try{
+    const ct=document.getElementById('sq-card-container');
+    if(!ct)return;
+    if(SQ.card){try{await SQ.card.destroy();}catch(e){}SQ.card=null;}
+    if(!SQ.payments){await loadSquareSdk();}
+    if(SQ.error){const st=document.getElementById('sq-status');if(st)st.textContent='SDK初期化失敗: '+SQ.error;return;}
+    if(!SQ.payments)return;
+    SQ.card=await SQ.payments.card();
+    await SQ.card.attach('#sq-card-container');
+  }catch(e){
+    const st=document.getElementById('sq-status');if(st)st.textContent='カード入力初期化失敗: '+e.message;
+  }
+}
+
 // ── API-based data loading ──
 async function loadPatients(){
   const d=await api('/patients'+(S.ptFilter&&S.ptFilter!=='all'?'?status='+S.ptFilter:''));
@@ -3164,6 +3206,8 @@ async function loadNotifList(){
 }
 
 function settingsPage(){const w=h('div');const u=S.user;
+// 初回表示時：契約情報未取得なら取得して再描画
+if(!SQ.infoLoaded){SQ.infoLoaded=true;refreshBillingInfo().then(()=>rr());}
 w.appendChild(h('div',{className:'page-title'},'設定'));
 // Account
 const ac=h('div',{className:'card',style:{marginBottom:'20px'}});
@@ -3187,18 +3231,67 @@ nt.appendChild(chk('モニタリング未実施の月次リマインド',u.notif
 nt.appendChild(chk('共有先からのアクセス通知',u.notify_share!==false,v=>{u.notify_share=v;saveUser(u)}));
 nt.appendChild(h('div',{style:{fontSize:'10px',color:'var(--ink-m)',marginTop:'8px'}},'※ 通知機能は本番環境でメール/LINE連携後に有効になります'));
 w.appendChild(nt);
-// Plan info
-if(u.plan==='free'){const pl=h('div',{className:'card',style:{marginBottom:'20px',background:'linear-gradient(135deg,#ecfeff,#fff8e1)'}});
-pl.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},'Proプランへアップグレード'));
-pl.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.8'}},'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。全機能無制限。'));
-pl.appendChild(h('div',{style:{display:'flex',justifyContent:'center',marginTop:'8px',maxWidth:'420px'}},
-  h('a',{href:PAYMENT_URL,style:{display:'block',textAlign:'center',padding:'14px 32px',borderRadius:'14px',background:'linear-gradient(135deg,#0891b2,#06b6d4)',color:'#fff',textDecoration:'none',fontWeight:'700',fontSize:'13px',minWidth:'200px'}},
-    h('div',null,'月額プラン'),
-    h('div',{style:{fontSize:'20px',fontWeight:'800',margin:'2px 0'}},'¥200/ユーザー'),
-    h('div',{style:{fontSize:'10px',opacity:'.8'}},'/月（税込）')
-  )
-));
-w.appendChild(pl)}
+// 契約情報・決済（B-2方式）
+const bil=h('div',{className:'card',style:{marginBottom:'20px'}});
+bil.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'契約情報・決済'));
+const info=SQ.info;
+if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
+  // 読み込み中スケルトン
+  bil.appendChild(h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-m)',fontSize:'13px'}},'契約情報を読み込んでいます...'));
+}else if(info&&info.has_subscription){
+  const statusLbl=info.status==='active'?'有効':info.status==='cancelled'?'解約済み':info.status==='suspended'?'停止中':info.status;
+  const statusColor=info.status==='active'?'#16a34a':info.status==='cancelled'?'#94a3b8':'#dc2626';
+  bil.appendChild(h('div',{style:{padding:'14px',background:'#ecfeff',borderRadius:'10px',marginBottom:'12px'}},
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
+      h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'現在の契約'),
+      h('span',{style:{fontSize:'11px',fontWeight:'700',padding:'2px 10px',borderRadius:'100px',background:statusColor,color:'#fff'}},statusLbl)
+    ),
+    h('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--accent)',margin:'4px 0'}},'¥'+(info.amount_jpy||0).toLocaleString()+' / 月'),
+    h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},(info.member_count||1)+' 名 × ¥200（組織まとめ決済）'),
+    info.pending_member_count?h('div',{style:{fontSize:'11px',color:'#dc2626',marginTop:'6px',padding:'6px 10px',background:'#fef2f2',borderRadius:'6px'}},'⚠ 翌月から '+info.pending_member_count+' 名（¥'+(200*info.pending_member_count).toLocaleString()+'/月）に変更されます'):null,
+    info.last_billed_month?h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'前回請求月: '+info.last_billed_month):null,
+    info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null
+  ));
+  if(info.status==='active'){
+    bil.appendChild(btn('解約する','btn-out',async()=>{
+      if(!confirm('Pro契約を解約します。よろしいですか？\n※ 解約後も当月分の利用は可能です。'))return;
+      const res=await api('/billing/cancel',{method:'DELETE'});
+      if(res&&res.success){toast('解約しました');await refreshBillingInfo();rr();}
+      else toast(res?.error||'解約に失敗しました');
+    }));
+  }
+}else{
+  // サブスク未開始 → カード入力フォーム表示
+  bil.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.8'}},'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。カード情報を登録すると Pro 契約が開始されます。'));
+  bil.appendChild(h('label',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-l)',display:'block',marginBottom:'6px'}},'カード情報'));
+  bil.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
+  bil.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
+  bil.appendChild(btn('Proプランを開始する','btn-pri',async()=>{
+    const st=document.getElementById('sq-status');
+    if(!SQ.card){
+      if(st)st.textContent='カード入力を準備中...';
+      await initSquareCard();
+      if(!SQ.card){if(st)st.textContent=SQ.error||'カード入力の準備ができていません。少し待ってから再度お試しください';return;}
+    }
+    if(st)st.textContent='処理中...';
+    try{
+      const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:{email:u.email||'',givenName:u.name||''}});
+      if(r.status!=='OK'){if(st)st.textContent=(r.errors||[]).map(e=>e.message).join(', ')||'カード入力エラー';return;}
+      const setup=await api('/billing/setup',{method:'POST',body:JSON.stringify({card_source_id:r.token,verification_token:r.verificationToken,billing_email:u.email})});
+      if(setup&&setup.success){
+        u.plan='pro';saveUser(u);
+        if(st)st.textContent='決済設定完了';
+        toast('Pro プランを開始しました（¥'+setup.amount_jpy+'/月・'+setup.member_count+'名）');
+        await refreshBillingInfo();rr();
+      }else{
+        if(st)st.textContent=setup?.error||'決済設定失敗';
+      }
+    }catch(e){if(st)st.textContent='エラー: '+e.message;}
+  }));
+  // SDK 初期化（mount後に実行・rerender 対応）
+  setTimeout(initSquareCard,50);
+}
+w.appendChild(bil);
 // Data management
 const dm=h('div',{className:'card'});
 dm.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'データ管理'));

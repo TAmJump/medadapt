@@ -375,6 +375,19 @@ async function handleRequest(request, env, json, err) {
     return json({ access: true, status: sub.status });
   }
 
+  // ── GET /billing/sdk-config（Web Payments SDK 用 public 値・認証不要）─
+  if (path === '/billing/sdk-config' && method === 'GET') {
+    const isSandbox = (env.SQUARE_API_BASE || '').includes('sandbox');
+    return json({
+      application_id: env.SQUARE_APP_ID || '',
+      location_id: env.SQUARE_LOCATION_ID || '',
+      environment: isSandbox ? 'sandbox' : 'production',
+      sdk_url: isSandbox
+        ? 'https://sandbox.web.squarecdn.com/v1/square.js'
+        : 'https://web.squarecdn.com/v1/square.js',
+    });
+  }
+
   // ── POST /webhook/square（Square Webhook受信・認証不要・HMAC-SHA256検証）─
   if (path === '/webhook/square' && method === 'POST') {
     const rawBody = await request.text();
