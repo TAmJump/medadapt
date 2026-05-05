@@ -1491,12 +1491,22 @@ async function handleRequest(request, env, json, err) {
         has_card_on_file: !!currentUser.square_customer_id,
       });
     }
+    // v23.1: 翌月以降の人数変更予定を時系列で取得
+    const pendingRows = await env.DB.prepare(
+      'SELECT effective_month, member_count, amount_jpy FROM pending_member_changes WHERE org_id=? ORDER BY effective_month ASC'
+    ).bind(orgId).all();
+    const pending_changes = (pendingRows?.results || []).map(r => ({
+      effective_month: r.effective_month,
+      member_count: r.member_count,
+      amount_jpy: r.amount_jpy,
+    }));
     return json({
       has_subscription: true,
       status: sub.status,
       plan_type: sub.plan_type,
       member_count: sub.member_count || 1,
       pending_member_count: sub.pending_member_count,
+      pending_changes,
       amount_jpy: sub.amount_jpy || 200,
       started_at: sub.started_at,
       cancelled_at: sub.cancelled_at,
@@ -1745,9 +1755,15 @@ function endOfDateIso(dateStr) {
   return new Date(nextDayFirstUtc - 1).toISOString();
 }
 
-// メンバー数を再計算して subscriptions.pending_member_count に反映
-// status='active' のユーザー数をカウントし、現在の member_count と異なれば pending に記録
-// 同じなら pending を NULL に戻す
+// 月文字列 'YYYY-MM' に 1ヶ月加算
+function addOneMonth(yyyymm) {
+  const [y, m] = yyyymm.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+// メンバー数を再計算して subscriptions と pending_member_changes に反映（v23.1 ロジック）
+// - active ユーザー数 + 未来日 access_blocked_at を持つ inactive ユーザー数 = 現在の課金対象
+// - 月別に外れる人数を集計し pending_member_changes を時系列再生成
 async function recalcMemberCount(env, orgId) {
   if (!orgId) return;
   try {
@@ -1755,20 +1771,56 @@ async function recalcMemberCount(env, orgId) {
     const sub = await env.DB.prepare(
       'SELECT id, member_count FROM subscriptions WHERE org_id=? AND module_id=? AND status=?'
     ).bind(orgId, moduleId, 'active').first();
-    if (!sub) return; // サブスク未契約なら何もしない
-    const cnt = await env.DB.prepare(
-      "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
+    if (!sub) return; // サブスク未契約 or 非active なら何もしない（既存挙動維持）
+
+    const nowIso = new Date().toISOString();
+
+    // 1) active ユーザー数
+    const activeRow = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM users WHERE org_id=? AND status='active'"
     ).bind(orgId).first();
-    const newCount = Math.max(1, cnt?.n || 1);
-    if (newCount === sub.member_count) {
-      await env.DB.prepare(
-        'UPDATE subscriptions SET pending_member_count=NULL WHERE id=?'
-      ).bind(sub.id).run();
-    } else {
-      await env.DB.prepare(
-        'UPDATE subscriptions SET pending_member_count=? WHERE id=?'
-      ).bind(newCount, sub.id).run();
+    const N_active = activeRow?.n || 0;
+
+    // 2) inactive かつ access_blocked_at が未来（＝当月以降に課金対象から外れる予定）
+    const blockRows = await env.DB.prepare(
+      "SELECT id, access_blocked_at FROM users WHERE org_id=? AND status='inactive' AND access_blocked_at IS NOT NULL AND access_blocked_at > ?"
+    ).bind(orgId, nowIso).all();
+    const block_users = blockRows?.results || [];
+
+    // 3) 現在の課金対象人数（Square API は最低1名要求のため floor 1 で安全側に）
+    const now_count = Math.max(1, N_active + block_users.length);
+
+    // 4) 月別に外れる人数を集計（access_blocked_at 月の翌月から減算）
+    const monthlyDecrements = {};
+    for (const u of block_users) {
+      if (!u.access_blocked_at) continue;
+      const blockMonth = u.access_blocked_at.slice(0, 7); // 'YYYY-MM'
+      const nextMonth = addOneMonth(blockMonth);
+      monthlyDecrements[nextMonth] = (monthlyDecrements[nextMonth] || 0) + 1;
     }
+
+    // 5) pending_member_changes を org 単位で全消し→時系列再生成
+    await env.DB.prepare(
+      'DELETE FROM pending_member_changes WHERE org_id=?'
+    ).bind(orgId).run();
+
+    const months = Object.keys(monthlyDecrements).sort();
+    let runningCount = now_count;
+    let earliestPendingCount = null;
+    for (const m of months) {
+      runningCount -= monthlyDecrements[m];
+      const amount = 200 * runningCount;
+      await env.DB.prepare(
+        'INSERT INTO pending_member_changes (org_id, effective_month, member_count, amount_jpy, source_user_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)'
+      ).bind(orgId, m, runningCount, amount, nowIso).run();
+      if (earliestPendingCount === null) earliestPendingCount = runningCount;
+    }
+
+    // 6) subscriptions の代表値を更新
+    await env.DB.prepare(
+      'UPDATE subscriptions SET member_count=?, amount_jpy=?, pending_member_count=? WHERE id=?'
+    ).bind(now_count, 200 * now_count, earliestPendingCount, sub.id).run();
+
   } catch (e) {
     console.error('recalcMemberCount error:', e);
   }

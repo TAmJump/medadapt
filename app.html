@@ -3578,7 +3578,14 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
     ),
     h('div',{style:{fontSize:'22px',fontWeight:'800',color:isCancelled?'var(--ink-m)':'var(--accent)',margin:'4px 0',textDecoration:isCancelled?'line-through':'none'}},'¥'+(info.amount_jpy||0).toLocaleString()+' / 月'),
     h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},(info.member_count||1)+' 名 × ¥200（組織まとめ決済）'),
-    info.pending_member_count?h('div',{style:{fontSize:'11px',color:'#dc2626',marginTop:'6px',padding:'6px 10px',background:'#fef2f2',borderRadius:'6px'}},'⚠ 翌月から '+info.pending_member_count+' 名（¥'+(200*info.pending_member_count).toLocaleString()+'/月）に変更されます'):null,
+    (info.pending_changes&&info.pending_changes.length)?h('div',{style:{marginTop:'6px',padding:'6px 10px',background:'#fef2f2',borderRadius:'6px'}},
+      info.pending_changes.map((p,i)=>{
+        const [y,m]=p.effective_month.split('-');
+        const prefix=i===0?'⚠ ':'';
+        const label=prefix+parseInt(y,10)+'年'+parseInt(m,10)+'月から '+p.member_count+' 名（¥'+(p.amount_jpy||200*p.member_count).toLocaleString()+'/月）に変更されます';
+        return h('div',{style:{fontSize:'11px',color:'#dc2626',lineHeight:'1.6'}},label);
+      })
+    ):null,
     info.last_billed_month?h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'前回請求月: '+info.last_billed_month):null,
     info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null
   ));
