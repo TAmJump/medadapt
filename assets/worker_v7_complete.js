@@ -414,6 +414,21 @@ async function handleRequest(request, env, json, err) {
           await env.DB.prepare(
             'UPDATE subscriptions SET last_billed_month=? WHERE square_subscription_id=?'
           ).bind(yyyymm, subscriptionId).run();
+          // 解約予約チェック：scheduled_cancel_month <= 当月 なら Square Cancel 実行
+          const sub = await env.DB.prepare(
+            'SELECT * FROM subscriptions WHERE square_subscription_id=?'
+          ).bind(subscriptionId).first();
+          if (sub && sub.scheduled_cancel_month && sub.scheduled_cancel_month <= yyyymm && sub.status === 'active') {
+            try {
+              await squareCancelSubscription(env, subscriptionId);
+              await env.DB.prepare(
+                "UPDATE subscriptions SET status='cancelled', cancelled_at=? WHERE square_subscription_id=?"
+              ).bind(now, subscriptionId).run();
+              console.log('Auto-cancelled by schedule:', subscriptionId, sub.scheduled_cancel_month);
+            } catch (e) {
+              console.error('Auto-cancel failed:', e);
+            }
+          }
         }
       } else if (eventType === 'subscription.canceled' || eventType === 'subscription.cancelled') {
         const sub = eventData?.subscription || {};
@@ -1289,7 +1304,8 @@ async function handleRequest(request, env, json, err) {
         await env.DB.prepare(
           `UPDATE subscriptions SET
              status='active', square_customer_id=?, square_subscription_id=?,
-             member_count=?, amount_jpy=?, billing_email=?, started_at=?, cancelled_at=NULL
+             member_count=?, amount_jpy=?, billing_email=?, started_at=?, cancelled_at=NULL,
+             scheduled_cancel_month=NULL
            WHERE org_id=? AND module_id=?`
         ).bind(squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now, orgId, moduleId).run();
       } else {
@@ -1351,7 +1367,7 @@ async function handleRequest(request, env, json, err) {
     });
   }
 
-  // ── DELETE /billing/cancel（解約）──
+  // ── DELETE /billing/cancel（即時解約・通常はwebhook経由でしか呼ばれない）──
   if (path === '/billing/cancel' && method === 'DELETE') {
     if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
     const orgId = currentUser.org_id || currentUser.id;
@@ -1372,6 +1388,38 @@ async function handleRequest(request, env, json, err) {
       console.error('billing/cancel error:', e);
       return err('解約処理に失敗しました: ' + e.message, 500);
     }
+  }
+
+  // ── POST /billing/schedule-cancel（解約予約・YYYY-MM指定）──
+  if (path === '/billing/schedule-cancel' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const { month } = await request.json().catch(() => ({}));
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) return err('month は YYYY-MM 形式で指定してください');
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub) return err('サブスクリプションが見つかりません', 404);
+    if (sub.status !== 'active') return err('有効なサブスクリプションのみ予約できます', 409);
+    // 過去月は受け付けない
+    const nowMonth = new Date().toISOString().slice(0, 7);
+    if (month < nowMonth) return err('過去の月は指定できません');
+    await env.DB.prepare(
+      'UPDATE subscriptions SET scheduled_cancel_month=? WHERE org_id=? AND module_id=?'
+    ).bind(month, orgId, moduleId).run();
+    return json({ success: true, scheduled_cancel_month: month });
+  }
+
+  // ── POST /billing/unschedule-cancel（解約予約の取消）──
+  if (path === '/billing/unschedule-cancel' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    await env.DB.prepare(
+      'UPDATE subscriptions SET scheduled_cancel_month=NULL WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).run();
+    return json({ success: true });
   }
 
   // ── GET /billing/info（マイページ用情報取得）──
@@ -1397,8 +1445,10 @@ async function handleRequest(request, env, json, err) {
       started_at: sub.started_at,
       cancelled_at: sub.cancelled_at,
       last_billed_month: sub.last_billed_month,
+      scheduled_cancel_month: sub.scheduled_cancel_month,
       has_card_on_file: !!currentUser.square_customer_id,
       square_subscription_id: sub.square_subscription_id,
+      can_reactivate: sub.status === 'cancelled' && !!currentUser.square_customer_id,
     });
   }
 

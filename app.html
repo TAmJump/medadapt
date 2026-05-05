@@ -215,6 +215,39 @@ async function initSquareCard(){
   }
 }
 
+// 解約予約モーダル
+function showScheduleCancelModal(){
+  const m=h('div',{className:'modal',style:{maxWidth:'440px'}});
+  const now=new Date();
+  // 来月から12ヶ月先までを選択肢に（当月を含めるか議論あるが、今月締めで予約=今月末退職に対応するため当月も含める）
+  const opts=[];
+  for(let i=0;i<13;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const lbl=d.getFullYear()+'年'+(d.getMonth()+1)+'月末で解約'+(i===0?'（今月末）':i===1?'（翌月末）':'');
+    opts.push({v:ym,l:lbl});
+  }
+  let selected=opts[1].v; // 翌月末をデフォルトに
+  m.appendChild(h('h3',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'12px'}},'解約日を予約'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.7'}},'指定した月の末日まで通常通りご利用いただけます。指定月の請求が確定した時点で自動的に解約されます。予約はいつでも取消可能です。'));
+  m.appendChild(fld('解約予定月','sc_month',selected,v=>{selected=v},{opts:opts}));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px',justifyContent:'flex-end'}},
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr();}),
+    btn('この日程で予約する','btn-pri',async()=>{
+      const month=document.getElementById('sc_month')?.value||selected;
+      const res=await api('/billing/schedule-cancel',{method:'POST',body:JSON.stringify({month})});
+      if(res&&res.success){
+        toast('解約予約を登録しました');
+        S.modal=null;
+        await refreshBillingInfo();rr();
+      }else{
+        toast(res?.error||'予約に失敗しました');
+      }
+    })
+  ));
+  S.modal=m;rr();
+}
+
 // ── API-based data loading ──
 async function loadPatients(){
   const d=await api('/patients'+(S.ptFilter&&S.ptFilter!=='all'?'?status='+S.ptFilter:''));
@@ -3239,26 +3272,47 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
   // 読み込み中スケルトン
   bil.appendChild(h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-m)',fontSize:'13px'}},'契約情報を読み込んでいます...'));
 }else if(info&&info.has_subscription){
-  const statusLbl=info.status==='active'?'有効':info.status==='cancelled'?'解約済み':info.status==='suspended'?'停止中':info.status;
-  const statusColor=info.status==='active'?'#16a34a':info.status==='cancelled'?'#94a3b8':'#dc2626';
+  const isCancelled=info.status==='cancelled';
+  const statusLbl=info.status==='active'?(info.scheduled_cancel_month?'解約予約あり':'有効'):info.status==='cancelled'?'解約済み':info.status==='suspended'?'停止中':info.status;
+  const statusColor=info.status==='active'?(info.scheduled_cancel_month?'#f59e0b':'#16a34a'):info.status==='cancelled'?'#94a3b8':'#dc2626';
   bil.appendChild(h('div',{style:{padding:'14px',background:'#ecfeff',borderRadius:'10px',marginBottom:'12px'}},
     h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
       h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'現在の契約'),
       h('span',{style:{fontSize:'11px',fontWeight:'700',padding:'2px 10px',borderRadius:'100px',background:statusColor,color:'#fff'}},statusLbl)
     ),
-    h('div',{style:{fontSize:'22px',fontWeight:'800',color:'var(--accent)',margin:'4px 0'}},'¥'+(info.amount_jpy||0).toLocaleString()+' / 月'),
+    h('div',{style:{fontSize:'22px',fontWeight:'800',color:isCancelled?'var(--ink-m)':'var(--accent)',margin:'4px 0',textDecoration:isCancelled?'line-through':'none'}},'¥'+(info.amount_jpy||0).toLocaleString()+' / 月'),
     h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},(info.member_count||1)+' 名 × ¥200（組織まとめ決済）'),
     info.pending_member_count?h('div',{style:{fontSize:'11px',color:'#dc2626',marginTop:'6px',padding:'6px 10px',background:'#fef2f2',borderRadius:'6px'}},'⚠ 翌月から '+info.pending_member_count+' 名（¥'+(200*info.pending_member_count).toLocaleString()+'/月）に変更されます'):null,
     info.last_billed_month?h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'前回請求月: '+info.last_billed_month):null,
     info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null
   ));
-  if(info.status==='active'){
-    bil.appendChild(btn('解約する','btn-out',async()=>{
-      if(!confirm('Pro契約を解約します。よろしいですか？\n※ 解約後も当月分の利用は可能です。'))return;
-      const res=await api('/billing/cancel',{method:'DELETE'});
-      if(res&&res.success){toast('解約しました');await refreshBillingInfo();rr();}
-      else toast(res?.error||'解約に失敗しました');
+  // 解約予約バナー
+  if(info.status==='active'&&info.scheduled_cancel_month){
+    const m=info.scheduled_cancel_month;const ymLabel=m.replace('-','年')+'月';
+    bil.appendChild(h('div',{style:{padding:'12px 14px',background:'#fff7ed',borderLeft:'3px solid #f59e0b',borderRadius:'8px',marginBottom:'12px',fontSize:'12px',color:'#92400e',lineHeight:'1.7'}},
+      h('div',{style:{fontWeight:'700',marginBottom:'4px'}},'⏰ '+ymLabel+'末で解約予定'),
+      h('div',null,ymLabel+'までは通常通りご利用いただけます。'+ymLabel+'分の請求が確定した時点で自動解約されます。')
+    ));
+    bil.appendChild(btn('解約予約を取消す','btn-out',async()=>{
+      if(!confirm('解約予約を取り消し、契約を継続します。よろしいですか？'))return;
+      const res=await api('/billing/unschedule-cancel',{method:'POST',body:JSON.stringify({})});
+      if(res&&res.success){toast('解約予約を取消しました');await refreshBillingInfo();rr();}
+      else toast(res?.error||'失敗しました');
     }));
+  }else if(info.status==='active'){
+    // 解約予約UI
+    bil.appendChild(btn('解約日を予約する','btn-out',()=>{showScheduleCancelModal();}));
+  }else if(isCancelled&&info.can_reactivate){
+    // 再契約UI
+    bil.appendChild(h('div',{style:{padding:'12px 14px',background:'#eff6ff',borderLeft:'3px solid #0891b2',borderRadius:'8px',marginBottom:'12px',fontSize:'12px',color:'#0c4a6e',lineHeight:'1.7'}},
+      '解約済みです。新しいカード情報で再契約できます。'
+    ));
+    bil.appendChild(btn('再契約する（カード情報を入力）','btn-pri',()=>{
+      // 再契約UIに切替（カード入力フォームを表示）
+      info.has_subscription=false;rr();
+    }));
+  }else if(isCancelled){
+    bil.appendChild(h('div',{style:{padding:'12px 14px',background:'#f3f4f6',borderRadius:'8px',fontSize:'12px',color:'var(--ink-m)'}},'解約済みです。'));
   }
 }else{
   // サブスク未開始 → カード入力フォーム表示
