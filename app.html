@@ -1461,67 +1461,108 @@ function staffPage(){
     // v22: 3値ステータス（active/suspended/inactive）対応・後方互換維持
     const getStatus=s=>s.status||(s.suspended?'suspended':'active');
     res.staff=S.showSuspendedStaff?res.staff:res.staff.filter(s=>getStatus(s)==='active');
-    const table=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}});
-    table.appendChild(h('tr',{style:{borderBottom:'2px solid var(--border)'}},h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'ログインID'),h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'名前'),h('th',{style:{padding:'8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)'}},'メール'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'状態'),h('th',{style:{padding:'8px',textAlign:'center',fontWeight:'600',color:'var(--ink-m)'}},'操作')));
-    res.staff.forEach(st=>{
-      const sStatus=getStatus(st);
-      const isActive=sStatus==='active';
+    // v22→: モバイル幅でカード、PC幅でテーブル分岐
+    const isMobile=window.innerWidth<768;
+    // 共通：actionBtns 構築関数
+    const buildActionBtns=(st,sStatus,align)=>{
       const isSuspended=sStatus==='suspended';
       const isInactive=sStatus==='inactive';
-      // 状態バッジ
-      const badgeBg=isInactive?'#e5e7eb':isSuspended?'#fee2e2':st.email_verified?'#dcfce7':'#fef9c3';
-      const badgeFg=isInactive?'#6b7280':isSuspended?'#dc2626':st.email_verified?'#16a34a':'#ca8a04';
-      const badgeLabel=isInactive?'退職済み':isSuspended?'停止中':st.email_verified?'有効':'未認証';
-      const rowOpacity=isInactive?'0.4':isSuspended?'0.6':'1';
-      // 操作ボタン群
-      const actionBtns=h('div',{style:{display:'flex',gap:'6px',justifyContent:'center',flexWrap:'wrap'}});
+      const wrap=h('div',{style:{display:'flex',gap:'6px',justifyContent:align||'center',flexWrap:'wrap'}});
       if(isInactive){
-        // 退職済み：履歴のみ表示・操作不可
-        actionBtns.appendChild(h('span',{style:{fontSize:'11px',color:'#9ca3af',padding:'6px 10px'}},'履歴のみ'));
-      } else {
-        // active or suspended：状態切替＋削除＋PW再発行＋QR
-        actionBtns.appendChild(btn(isSuspended?'復帰':'停止',isSuspended?'btn-sm btn-out':'btn-sm',async()=>{
-          const newStatus=isSuspended?'active':'suspended';
-          const confirmMsg=isSuspended?st.name+' を復帰させますか？':st.name+' を停止しますか？\n（ログイン不可・翌月分から課金停止）';
-          if(!confirm(confirmMsg))return;
-          const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify({staff_id:st.id,status:newStatus})});
-          if(r2&&r2.success){S.inviteResult=null;toast(isSuspended?'復帰しました':'停止しました');rr();}else toast(r2?.error||'エラー');
-        }));
-        actionBtns.appendChild(btn('削除','btn-sm btn-danger',()=>showDeleteStaffModalM(st,rr)));
-        actionBtns.appendChild(btn('PW再発行','btn-sm btn-out',async()=>{
-          if(!confirm(st.name+'のパスワードを再発行しますか？'))return;
-          const r2=await api('/staff/reset-password',{method:'POST',body:JSON.stringify({staff_id:st.id})});
-          if(r2&&r2.success){
-            const ov=document.createElement('div');
-            ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
-            const box=document.createElement('div');box.style.cssText='background:#fff;padding:28px;border-radius:16px;text-align:center;max-width:340px;width:90%';
-            const t=document.createElement('div');t.style.cssText='font-size:15px;font-weight:800;color:#0891b2;margin-bottom:12px';t.textContent=r2.name+' のパスワードを再発行しました';box.appendChild(t);
-            const idRow=document.createElement('div');idRow.style.cssText='background:#f0fdfa;border-radius:8px;padding:12px;margin-bottom:8px;font-size:12px;color:#64748b';
-            idRow.textContent='ログインID: '+r2.login_id;box.appendChild(idRow);
-            const pwRow=document.createElement('div');pwRow.style.cssText='background:#f0fdf4;border:2px solid #0891b2;border-radius:8px;padding:12px;margin-bottom:16px;text-align:center';
-            const pwLabel=document.createElement('div');pwLabel.style.cssText='font-size:11px;color:#64748b;margin-bottom:4px';pwLabel.textContent='新しいパスワード';pwRow.appendChild(pwLabel);
-            const pwVal=document.createElement('div');pwVal.style.cssText='font-size:24px;font-weight:900;color:#0891b2;letter-spacing:2px';pwVal.textContent=r2.new_password;pwRow.appendChild(pwVal);
-            box.appendChild(pwRow);
-            const note=document.createElement('div');note.style.cssText='font-size:11px;color:#94a3b8;margin-bottom:16px';note.textContent='スタッフに伝えてください。次回ログイン時に変更を推奨します。';box.appendChild(note);
-            const btnCopy=document.createElement('button');btnCopy.textContent='コピー';btnCopy.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;margin-right:8px';
-            btnCopy.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(r2.new_password);};box.appendChild(btnCopy);
-            const btnClose=document.createElement('button');btnClose.textContent='閉じる';btnClose.style.cssText='padding:8px 16px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
-            btnClose.onclick=function(){ov.remove();};box.appendChild(btnClose);
-            ov.appendChild(box);document.body.appendChild(ov);
-          }else toast(r2?.error||'エラー');
-        }));
-        actionBtns.appendChild(btn('QR','btn-sm btn-out',async()=>{const r2=await api('/staff/qr',{method:'POST',body:JSON.stringify({staff_id:st.id})});if(r2&&r2.qr_url){S.qrModal={name:st.name,url:r2.qr_url,token:r2.qr_token};showQRModal(S.qrModal);}else toast(r2?.error||'エラー');}));
+        wrap.appendChild(h('span',{style:{fontSize:'11px',color:'#9ca3af',padding:'6px 10px'}},'履歴のみ'));
+        return wrap;
       }
-      const tr=h('tr',{style:{borderBottom:'1px solid var(--border)',opacity:rowOpacity}},
-        h('td',{style:{padding:'10px 8px',fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',letterSpacing:'1px'}},st.login_id||'—'),
-        h('td',{style:{padding:'10px 8px',fontWeight:'600'}},st.name),
-        h('td',{style:{padding:'10px 8px',color:'var(--ink-m)'}},st.email||'—'),
-        h('td',{style:{padding:'10px 8px',textAlign:'center'}},h('span',{style:{display:'inline-block',padding:'2px 10px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:badgeBg,color:badgeFg}},badgeLabel)),
-        h('td',{style:{padding:'10px 8px',textAlign:'center'}},actionBtns)
-      );
-      table.appendChild(tr);
-    });
-    listContent.appendChild(table);
+      wrap.appendChild(btn(isSuspended?'復帰':'停止',isSuspended?'btn-sm btn-out':'btn-sm',async()=>{
+        const newStatus=isSuspended?'active':'suspended';
+        const confirmMsg=isSuspended?st.name+' を復帰させますか？':st.name+' を停止しますか？\n（ログイン不可・翌月分から課金停止）';
+        if(!confirm(confirmMsg))return;
+        const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify({staff_id:st.id,status:newStatus})});
+        if(r2&&r2.success){S.inviteResult=null;toast(isSuspended?'復帰しました':'停止しました');rr();}else toast(r2?.error||'エラー');
+      }));
+      wrap.appendChild(btn('削除','btn-sm btn-danger',()=>showDeleteStaffModalM(st,rr)));
+      wrap.appendChild(btn('PW再発行','btn-sm btn-out',async()=>{
+        if(!confirm(st.name+'のパスワードを再発行しますか？'))return;
+        const r2=await api('/staff/reset-password',{method:'POST',body:JSON.stringify({staff_id:st.id})});
+        if(r2&&r2.success){
+          const ov=document.createElement('div');
+          ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
+          const box=document.createElement('div');box.style.cssText='background:#fff;padding:28px;border-radius:16px;text-align:center;max-width:340px;width:90%';
+          const t=document.createElement('div');t.style.cssText='font-size:15px;font-weight:800;color:#0891b2;margin-bottom:12px';t.textContent=r2.name+' のパスワードを再発行しました';box.appendChild(t);
+          const idRow=document.createElement('div');idRow.style.cssText='background:#f0fdfa;border-radius:8px;padding:12px;margin-bottom:8px;font-size:12px;color:#64748b';
+          idRow.textContent='ログインID: '+r2.login_id;box.appendChild(idRow);
+          const pwRow=document.createElement('div');pwRow.style.cssText='background:#f0fdf4;border:2px solid #0891b2;border-radius:8px;padding:12px;margin-bottom:16px;text-align:center';
+          const pwLabel=document.createElement('div');pwLabel.style.cssText='font-size:11px;color:#64748b;margin-bottom:4px';pwLabel.textContent='新しいパスワード';pwRow.appendChild(pwLabel);
+          const pwVal=document.createElement('div');pwVal.style.cssText='font-size:24px;font-weight:900;color:#0891b2;letter-spacing:2px';pwVal.textContent=r2.new_password;pwRow.appendChild(pwVal);
+          box.appendChild(pwRow);
+          const noteEl=document.createElement('div');noteEl.style.cssText='font-size:11px;color:#94a3b8;margin-bottom:16px';noteEl.textContent='スタッフに伝えてください。次回ログイン時に変更を推奨します。';box.appendChild(noteEl);
+          const btnCopy=document.createElement('button');btnCopy.textContent='コピー';btnCopy.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;margin-right:8px';
+          btnCopy.onclick=function(){navigator.clipboard&&navigator.clipboard.writeText(r2.new_password);};box.appendChild(btnCopy);
+          const btnClose=document.createElement('button');btnClose.textContent='閉じる';btnClose.style.cssText='padding:8px 16px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
+          btnClose.onclick=function(){ov.remove();};box.appendChild(btnClose);
+          ov.appendChild(box);document.body.appendChild(ov);
+        }else toast(r2?.error||'エラー');
+      }));
+      wrap.appendChild(btn('QR','btn-sm btn-out',async()=>{const r2=await api('/staff/qr',{method:'POST',body:JSON.stringify({staff_id:st.id})});if(r2&&r2.qr_url){S.qrModal={name:st.name,url:r2.qr_url,token:r2.qr_token};showQRModal(S.qrModal);}else toast(r2?.error||'エラー');}));
+      return wrap;
+    };
+    // 状態バッジ生成
+    const buildBadge=(st,sStatus)=>{
+      const isSuspended=sStatus==='suspended';
+      const isInactive=sStatus==='inactive';
+      const bg=isInactive?'#e5e7eb':isSuspended?'#fee2e2':st.email_verified?'#dcfce7':'#fef9c3';
+      const fg=isInactive?'#6b7280':isSuspended?'#dc2626':st.email_verified?'#16a34a':'#ca8a04';
+      const lab=isInactive?'退職済み':isSuspended?'停止中':st.email_verified?'有効':'未認証';
+      return h('span',{style:{display:'inline-block',padding:'3px 12px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:bg,color:fg,whiteSpace:'nowrap'}},lab);
+    };
+    if(isMobile){
+      // === モバイル：カードレイアウト ===
+      const cardList=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
+      res.staff.forEach(st=>{
+        const sStatus=getStatus(st);
+        const opacity=sStatus==='inactive'?'0.5':sStatus==='suspended'?'0.7':'1';
+        const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'14px',background:'#fff',opacity}});
+        // 上段：ID + バッジ
+        const top=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'8px'}});
+        top.appendChild(h('div',{style:{fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',fontSize:'13px',letterSpacing:'1px',wordBreak:'break-all'}},st.login_id||'—'));
+        top.appendChild(buildBadge(st,sStatus));
+        card.appendChild(top);
+        // 名前
+        card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'4px'}},st.name));
+        // メール
+        card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px',wordBreak:'break-all'}},st.email||'—'));
+        // ボタン群（左寄せ・横並び・折返し可）
+        card.appendChild(buildActionBtns(st,sStatus,'flex-start'));
+        cardList.appendChild(card);
+      });
+      listContent.appendChild(cardList);
+    } else {
+      // === PC：テーブル（列幅最適化＋nowrap） ===
+      const tableWrap=h('div',{style:{overflowX:'auto'}});
+      const table=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px',tableLayout:'auto'}});
+      const thStyle={padding:'10px 8px',textAlign:'left',fontWeight:'600',color:'var(--ink-m)',whiteSpace:'nowrap'};
+      const thCenter=Object.assign({},thStyle,{textAlign:'center'});
+      table.appendChild(h('tr',{style:{borderBottom:'2px solid var(--border)'}},
+        h('th',{style:thStyle},'ログインID'),
+        h('th',{style:thStyle},'名前'),
+        h('th',{style:thStyle},'メール'),
+        h('th',{style:thCenter},'状態'),
+        h('th',{style:thCenter},'操作')
+      ));
+      res.staff.forEach(st=>{
+        const sStatus=getStatus(st);
+        const rowOpacity=sStatus==='inactive'?'0.4':sStatus==='suspended'?'0.6':'1';
+        const tr=h('tr',{style:{borderBottom:'1px solid var(--border)',opacity:rowOpacity}},
+          h('td',{style:{padding:'12px 8px',fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',letterSpacing:'1px',whiteSpace:'nowrap'}},st.login_id||'—'),
+          h('td',{style:{padding:'12px 8px',fontWeight:'600',whiteSpace:'nowrap'}},st.name),
+          h('td',{style:{padding:'12px 8px',color:'var(--ink-m)',wordBreak:'break-all',minWidth:'160px'}},st.email||'—'),
+          h('td',{style:{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}},buildBadge(st,sStatus)),
+          h('td',{style:{padding:'12px 8px',textAlign:'center',whiteSpace:'nowrap'}},buildActionBtns(st,sStatus,'center'))
+        );
+        table.appendChild(tr);
+      });
+      tableWrap.appendChild(table);
+      listContent.appendChild(tableWrap);
+    }
     // v22: アクティブ人数（status='active' のみ）でカウント
     const activeCnt=res.staff.filter(s=>getStatus(s)==='active').length;
     listContent.appendChild(h('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--ink-m)'}},res.staff.length+'名のスタッフ ／ 月額 ¥'+(activeCnt*200).toLocaleString()+'（アクティブ '+activeCnt+'名×¥200）'));
