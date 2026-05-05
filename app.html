@@ -1515,23 +1515,29 @@ function staffPage(){
       return h('span',{style:{display:'inline-block',padding:'3px 12px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',background:bg,color:fg,whiteSpace:'nowrap'}},lab);
     };
     if(isMobile){
-      // === モバイル：カードレイアウト ===
+      // === モバイル：カードレイアウト＋アクションシート（⋮メニュー） ===
       const cardList=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
       res.staff.forEach(st=>{
         const sStatus=getStatus(st);
-        const opacity=sStatus==='inactive'?'0.5':sStatus==='suspended'?'0.7':'1';
-        const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'14px',background:'#fff',opacity}});
-        // 上段：ID + バッジ
-        const top=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'8px'}});
-        top.appendChild(h('div',{style:{fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',fontSize:'13px',letterSpacing:'1px',wordBreak:'break-all'}},st.login_id||'—'));
+        const isInactive=sStatus==='inactive';
+        const opacity=isInactive?'0.5':sStatus==='suspended'?'0.75':'1';
+        const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'12px',padding:'14px 14px 12px',background:'#fff',opacity,boxShadow:'0 1px 2px rgba(0,0,0,0.04)'}});
+        // 上段：ID + バッジ + ⋮メニュー
+        const top=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'6px'}});
+        top.appendChild(h('div',{style:{fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',fontSize:'13px',letterSpacing:'1px',wordBreak:'break-all',flex:'1'}},st.login_id||'—'));
         top.appendChild(buildBadge(st,sStatus));
+        // ⋮メニューボタン（inactiveなら無効化）
+        const menuBtn=h('button',{style:{border:'none',background:'transparent',cursor:isInactive?'default':'pointer',padding:'4px 8px',fontSize:'20px',color:isInactive?'#d1d5db':'#64748b',lineHeight:'1',borderRadius:'6px'},onClick:isInactive?null:()=>showStaffActionSheet(st,sStatus,buildActionBtns)},'⋮');
+        top.appendChild(menuBtn);
         card.appendChild(top);
         // 名前
-        card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'4px'}},st.name));
+        card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'2px'}},st.name));
         // メール
-        card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px',wordBreak:'break-all'}},st.email||'—'));
-        // ボタン群（左寄せ・横並び・折返し可）
-        card.appendChild(buildActionBtns(st,sStatus,'flex-start'));
+        card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',wordBreak:'break-all'}},st.email||'—'));
+        // 退職済みのみ「履歴のみ」表示
+        if(isInactive){
+          card.appendChild(h('div',{style:{fontSize:'11px',color:'#9ca3af',marginTop:'8px',fontStyle:'italic'}},'履歴のみ・操作不可'));
+        }
         cardList.appendChild(card);
       });
       listContent.appendChild(cardList);
@@ -1568,6 +1574,64 @@ function staffPage(){
     listContent.appendChild(h('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--ink-m)'}},res.staff.length+'名のスタッフ ／ 月額 ¥'+(activeCnt*200).toLocaleString()+'（アクティブ '+activeCnt+'名×¥200）'));
   });
   return w;
+}
+
+// v22→: モバイル用アクションシート（⋮メニュー → ボトムシート風モーダル）
+function showStaffActionSheet(st,sStatus,buildActionBtns){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999;animation:fadeIn .15s ease-out';
+  // 背景クリックで閉じる
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  const sheet=document.createElement('div');
+  sheet.style.cssText='background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:8px 0 24px;box-shadow:0 -4px 20px rgba(0,0,0,0.15);animation:slideUp .2s ease-out';
+  // ハンドル
+  const handle=document.createElement('div');handle.style.cssText='width:40px;height:4px;background:#d1d5db;border-radius:2px;margin:8px auto 12px';sheet.appendChild(handle);
+  // ヘッダ：氏名
+  const head=document.createElement('div');head.style.cssText='padding:4px 20px 14px;border-bottom:1px solid #f1f5f9';
+  const headName=document.createElement('div');headName.style.cssText='font-size:16px;font-weight:800;color:#111';headName.textContent=st.name;head.appendChild(headName);
+  const headSub=document.createElement('div');headSub.style.cssText='font-size:12px;color:#64748b;margin-top:2px;font-family:monospace';headSub.textContent=st.login_id||'—';head.appendChild(headSub);
+  sheet.appendChild(head);
+  // アクション項目（buildActionBtnsから取り出してリスト化）
+  const isSuspended=sStatus==='suspended';
+  const items=[
+    {label:isSuspended?'復帰させる':'停止する',icon:isSuspended?'▶':'⏸',color:'#0891b2',idx:0},
+    {label:'削除（退職処理）',icon:'🗑',color:'#dc2626',idx:1},
+    {label:'パスワード再発行',icon:'🔑',color:'#0891b2',idx:2},
+    {label:'QRコード表示',icon:'📱',color:'#0891b2',idx:3}
+  ];
+  // 内部buildActionBtnsから本来のボタン群を取り出してclickをハイジャック
+  const sourceBtns=buildActionBtns(st,sStatus,'center');
+  const realBtns=Array.from(sourceBtns.querySelectorAll('button'));
+  items.forEach(it=>{
+    const row=document.createElement('div');
+    row.style.cssText='padding:16px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .15s';
+    row.addEventListener('touchstart',()=>{row.style.background='#f8fafc'});
+    row.addEventListener('touchend',()=>{row.style.background='#fff'});
+    row.addEventListener('mouseenter',()=>{row.style.background='#f8fafc'});
+    row.addEventListener('mouseleave',()=>{row.style.background='#fff'});
+    const iconEl=document.createElement('div');iconEl.style.cssText='font-size:20px;width:32px;text-align:center;color:'+it.color;iconEl.textContent=it.icon;row.appendChild(iconEl);
+    const labelEl=document.createElement('div');labelEl.style.cssText='font-size:15px;font-weight:600;color:'+(it.idx===1?'#dc2626':'#111');labelEl.textContent=it.label;row.appendChild(labelEl);
+    row.onclick=()=>{
+      ov.remove();
+      // 元のボタンクリックを実行
+      if(realBtns[it.idx])realBtns[it.idx].click();
+    };
+    sheet.appendChild(row);
+  });
+  // キャンセル
+  const cancel=document.createElement('div');
+  cancel.style.cssText='padding:16px 20px;text-align:center;font-size:14px;color:#64748b;cursor:pointer;font-weight:600;margin-top:6px';
+  cancel.textContent='キャンセル';
+  cancel.onclick=()=>ov.remove();
+  sheet.appendChild(cancel);
+  ov.appendChild(sheet);
+  document.body.appendChild(ov);
+  // アニメーションキーフレーム（初回のみ）
+  if(!document.getElementById('staff-sheet-anim')){
+    const styleEl=document.createElement('style');styleEl.id='staff-sheet-anim';
+    styleEl.textContent='@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}';
+    document.head.appendChild(styleEl);
+  }
 }
 
 // v22: 削除モーダル（ｍやるゼ！）— 3択：当月末まで利用可 / 今すぐ利用停止 / 利用停止日指定
