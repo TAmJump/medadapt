@@ -1456,7 +1456,13 @@ function staffPage(){
     listContent.innerHTML='';
     if(!res||!res.staff||res.staff.length===0){listContent.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'13px',padding:'12px 0'}},'まだスタッフが登録されていません。招待リンクを発行してスタッフを追加してください。'));return;}
     if(S.showSuspendedStaff===undefined)S.showSuspendedStaff=false;
-    const suspToggle=h('div',{style:{marginBottom:'10px'}},h('label',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:'var(--ink-m)'}},h('input',{type:'checkbox',checked:S.showSuspendedStaff,onChange:e=>{S.showSuspendedStaff=e.target.checked;rr()},style:{width:'14px',height:'14px'}}),'停止中・退職者を含む'));
+    // v23: h関数のchecked属性バグ回避のため直接DOM作成
+    const suspToggle=document.createElement('div');suspToggle.style.cssText='margin-bottom:10px';
+    const suspLabel=document.createElement('label');suspLabel.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ink-m)';
+    const suspChk=document.createElement('input');suspChk.type='checkbox';suspChk.checked=!!S.showSuspendedStaff;suspChk.style.cssText='width:14px;height:14px;cursor:pointer';
+    suspChk.addEventListener('change',e=>{S.showSuspendedStaff=e.target.checked;rr();});
+    suspLabel.appendChild(suspChk);suspLabel.appendChild(document.createTextNode('停止中・退職者を含む'));
+    suspToggle.appendChild(suspLabel);
     listContent.appendChild(suspToggle);
     // v22: 3値ステータス（active/suspended/inactive）対応・後方互換維持
     const getStatus=s=>s.status||(s.suspended?'suspended':'active');
