@@ -3290,7 +3290,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
   if(info.status==='active'&&info.scheduled_cancel_month){
     const m=info.scheduled_cancel_month;const ymLabel=m.replace('-','年')+'月';
     bil.appendChild(h('div',{style:{padding:'12px 14px',background:'#fff7ed',borderLeft:'3px solid #f59e0b',borderRadius:'8px',marginBottom:'12px',fontSize:'12px',color:'#92400e',lineHeight:'1.7'}},
-      h('div',{style:{fontWeight:'700',marginBottom:'4px'}},'⏰ '+ymLabel+'末で解約予定'),
+      h('div',{style:{fontWeight:'700',marginBottom:'4px'}},ymLabel+'末で解約予定'),
       h('div',null,ymLabel+'までは通常通りご利用いただけます。'+ymLabel+'分の請求が確定した時点で自動解約されます。')
     ));
     bil.appendChild(btn('解約予約を取消す','btn-out',async()=>{
