@@ -375,6 +375,50 @@ async function handleRequest(request, env, json, err) {
     return json({ access: true, status: sub.status });
   }
 
+  // ── POST /webhook/square（Square Webhook受信・認証不要・HMAC-SHA256検証）─
+  if (path === '/webhook/square' && method === 'POST') {
+    const rawBody = await request.text();
+    const sig = request.headers.get('X-Square-HmacSha256-Signature')
+             || request.headers.get('x-square-hmacsha256-signature')
+             || '';
+    const notificationUrl = request.url;
+    const verifyResult = await verifySquareWebhookSignature(env, notificationUrl, rawBody, sig);
+    if (!verifyResult.ok) {
+      console.error('Square webhook signature verify failed:', verifyResult.reason);
+      return err('署名検証失敗', 401);
+    }
+    let payload = {};
+    try { payload = JSON.parse(rawBody); } catch { return err('JSON parse error', 400); }
+    const eventType = payload?.type || payload?.event_type || '';
+    const eventData = payload?.data?.object || {};
+    const now = new Date().toISOString();
+    try {
+      if (eventType === 'invoice.payment_made') {
+        const invoice = eventData?.invoice || {};
+        const subscriptionId = invoice?.subscription_id;
+        if (subscriptionId) {
+          const yyyymm = now.slice(0, 7);
+          await env.DB.prepare(
+            'UPDATE subscriptions SET last_billed_month=? WHERE square_subscription_id=?'
+          ).bind(yyyymm, subscriptionId).run();
+        }
+      } else if (eventType === 'subscription.canceled' || eventType === 'subscription.cancelled') {
+        const sub = eventData?.subscription || {};
+        if (sub?.id) {
+          await env.DB.prepare(
+            "UPDATE subscriptions SET status='cancelled', cancelled_at=? WHERE square_subscription_id=?"
+          ).bind(now, sub.id).run();
+        }
+      } else if (eventType === 'subscription.updated') {
+        // 現状はログのみ（version不一致対策）
+        console.log('subscription.updated received:', eventData?.subscription?.id);
+      }
+    } catch (e) {
+      console.error('webhook handler error:', e);
+    }
+    return json({ ok: true });
+  }
+
   // ── Token認証 ─────────────────────────────────────────────
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();
@@ -1154,6 +1198,197 @@ async function handleRequest(request, env, json, err) {
     return json({ success: true, message: '面談URLを設定しました' });
   }
 
+  // ────────────────────────────────────────────────────────
+  // /billing/* — Square Subscriptions B-2方式（v8追加）
+  // ────────────────────────────────────────────────────────
+
+  // ── POST /billing/test/ping（Sandbox疎通確認）──
+  if (path === '/billing/test/ping' && method === 'POST') {
+    try {
+      const data = await squareFetch(env, '/v2/locations', 'GET', null);
+      const locations = data?.locations || [];
+      const expected = env.SQUARE_LOCATION_ID || '';
+      const match = locations.some(l => l.id === expected);
+      const isSandbox = (env.SQUARE_API_BASE || '').includes('sandbox');
+      return json({
+        ok: true,
+        env: isSandbox ? 'sandbox' : 'production',
+        square_version: env.SQUARE_VERSION || null,
+        expected_location_id: expected,
+        location_match: match,
+        location_count: locations.length,
+      });
+    } catch (e) {
+      return err('Square API疎通失敗: ' + e.message, 500);
+    }
+  }
+
+  // ── POST /billing/setup（初回サブスク作成）──
+  if (path === '/billing/setup' && method === 'POST') {
+    const { card_source_id, verification_token, billing_email } = await request.json().catch(() => ({}));
+    if (!card_source_id) return err('card_source_id が必要です');
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+
+    const orgId = currentUser.org_id || currentUser.id;
+    const billEmail = billing_email || currentUser.billing_email || currentUser.email || '';
+    const moduleId = 'medical-adapt';
+
+    // 既存サブスクの確認
+    const existing = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (existing && existing.square_subscription_id && existing.status === 'active') {
+      return err('既に有効なサブスクリプションがあります', 409);
+    }
+
+    try {
+      // 1. Square Customer 作成 or 既存使用
+      let squareCustomerId = currentUser.square_customer_id;
+      if (!squareCustomerId) {
+        const custRes = await squareCreateCustomer(env, billEmail, currentUser.name);
+        squareCustomerId = custRes?.customer?.id;
+        if (!squareCustomerId) throw new Error('Customer作成失敗');
+        await env.DB.prepare(
+          'UPDATE users SET square_customer_id=?, billing_email=? WHERE id=?'
+        ).bind(squareCustomerId, billEmail, currentUser.id).run();
+      }
+
+      // 2. カード保存
+      const cardRes = await squareCreateCard(env, squareCustomerId, card_source_id, verification_token);
+      const cardId = cardRes?.card?.id;
+      if (!cardId) throw new Error('カード保存失敗');
+
+      // 3. member_count 集計（停止中ユーザーは除外）
+      const cnt = await env.DB.prepare(
+        'SELECT COUNT(*) as n FROM users WHERE org_id=? AND suspended=0'
+      ).bind(orgId).first();
+      const memberCount = Math.max(1, cnt?.n || 1);
+      const amountJpy = 200 * memberCount;
+
+      // 4. CreateSubscription（price_override_money で動的金額）
+      const subRes = await squareCreateSubscription(env, squareCustomerId, cardId, memberCount);
+      const squareSubId = subRes?.subscription?.id;
+      if (!squareSubId) throw new Error('Subscription作成失敗');
+
+      // 5. D1更新（既存があればUPDATE、なければINSERT）
+      const now = new Date().toISOString();
+      if (existing) {
+        await env.DB.prepare(
+          `UPDATE subscriptions SET
+             status='active', square_customer_id=?, square_subscription_id=?,
+             member_count=?, amount_jpy=?, billing_email=?, started_at=?, cancelled_at=NULL
+           WHERE org_id=? AND module_id=?`
+        ).bind(squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now, orgId, moduleId).run();
+      } else {
+        const newId = 'sub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        await env.DB.prepare(
+          `INSERT INTO subscriptions
+             (id, org_id, module_id, status, plan_type, started_at, auto_renew,
+              square_customer_id, square_subscription_id, member_count, amount_jpy, billing_email, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        ).bind(newId, orgId, moduleId, 'active', 'monthly', now, 1,
+               squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now).run();
+      }
+      return json({
+        success: true,
+        subscription_id: squareSubId,
+        amount_jpy: amountJpy,
+        member_count: memberCount,
+      });
+    } catch (e) {
+      console.error('billing/setup error:', e);
+      return err('サブスク作成に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── PUT /billing/update-members（人数変更を pending に記録・即課金変更しない）──
+  if (path === '/billing/update-members' && method === 'PUT') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub) return err('サブスクリプションが見つかりません', 404);
+    const cnt = await env.DB.prepare(
+      'SELECT COUNT(*) as n FROM users WHERE org_id=? AND suspended=0'
+    ).bind(orgId).first();
+    const newCount = Math.max(1, cnt?.n || 1);
+    if (newCount === sub.member_count) {
+      // 変更なし → pending クリア
+      await env.DB.prepare(
+        'UPDATE subscriptions SET pending_member_count=NULL WHERE org_id=? AND module_id=?'
+      ).bind(orgId, moduleId).run();
+      return json({
+        success: true,
+        current_member_count: sub.member_count,
+        pending_member_count: null,
+        changed: false
+      });
+    }
+    await env.DB.prepare(
+      'UPDATE subscriptions SET pending_member_count=? WHERE org_id=? AND module_id=?'
+    ).bind(newCount, orgId, moduleId).run();
+    return json({
+      success: true,
+      current_member_count: sub.member_count,
+      pending_member_count: newCount,
+      changed: true,
+      will_apply_at: '次回請求月'
+    });
+  }
+
+  // ── DELETE /billing/cancel（解約）──
+  if (path === '/billing/cancel' && method === 'DELETE') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub || !sub.square_subscription_id) return err('サブスクリプションが見つかりません', 404);
+    if (sub.status === 'cancelled') return err('既に解約済みです', 409);
+    try {
+      await squareCancelSubscription(env, sub.square_subscription_id);
+      const now = new Date().toISOString();
+      await env.DB.prepare(
+        "UPDATE subscriptions SET status='cancelled', cancelled_at=? WHERE org_id=? AND module_id=?"
+      ).bind(now, orgId, moduleId).run();
+      return json({ success: true, cancelled_at: now });
+    } catch (e) {
+      console.error('billing/cancel error:', e);
+      return err('解約処理に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── GET /billing/info（マイページ用情報取得）──
+  if (path === '/billing/info' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub) {
+      return json({
+        has_subscription: false,
+        has_card_on_file: !!currentUser.square_customer_id,
+      });
+    }
+    return json({
+      has_subscription: true,
+      status: sub.status,
+      plan_type: sub.plan_type,
+      member_count: sub.member_count || 1,
+      pending_member_count: sub.pending_member_count,
+      amount_jpy: sub.amount_jpy || 200,
+      started_at: sub.started_at,
+      cancelled_at: sub.cancelled_at,
+      last_billed_month: sub.last_billed_month,
+      has_card_on_file: !!currentUser.square_customer_id,
+      square_subscription_id: sub.square_subscription_id,
+    });
+  }
+
   return err('Not found', 404);
 }
 
@@ -1257,4 +1492,114 @@ async function sendEmail(env, { to, subject, html }) {
 
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
+}
+
+// ────────────────────────────────────────────────────────
+// Square Subscriptions API ヘルパー（v8 / B-2方式）
+// 1組織1サブスク・price_override_money で動的金額（200円 × member_count）
+// ────────────────────────────────────────────────────────
+
+function genUuid() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+}
+
+async function squareFetch(env, path, method, body) {
+  const base = env.SQUARE_API_BASE || 'https://connect.squareupsandbox.com';
+  const version = env.SQUARE_VERSION || '2026-01-22';
+  const token = env.SQUARE_ACCESS_TOKEN;
+  if (!token) throw new Error('SQUARE_ACCESS_TOKEN 未設定');
+  const res = await fetch(base + path, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Square-Version': version,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!res.ok) {
+    const detail = data?.errors?.[0]?.detail || data?.errors?.[0]?.code || `HTTP ${res.status}`;
+    const e = new Error(`Square API error: ${detail}`);
+    e.squareStatus = res.status;
+    e.squareBody = data;
+    throw e;
+  }
+  return data;
+}
+
+async function squareCreateCustomer(env, email, name) {
+  return squareFetch(env, '/v2/customers', 'POST', {
+    idempotency_key: genUuid(),
+    email_address: email || undefined,
+    given_name: name || undefined,
+  });
+}
+
+async function squareCreateCard(env, customerId, sourceId, verificationToken) {
+  // sourceId: Web Payments SDK tokenize() 戻り値の token、Sandbox 用は 'cnon:card-nonce-ok'
+  return squareFetch(env, '/v2/cards', 'POST', {
+    idempotency_key: genUuid(),
+    source_id: sourceId,
+    verification_token: verificationToken || undefined,
+    card: { customer_id: customerId },
+  });
+}
+
+async function squareCreateSubscription(env, customerId, cardId, memberCount) {
+  const amount = 200 * Math.max(1, memberCount || 1);
+  return squareFetch(env, '/v2/subscriptions', 'POST', {
+    idempotency_key: genUuid(),
+    location_id: env.SQUARE_LOCATION_ID,
+    plan_variation_id: env.SQUARE_PLAN_VARIATION_ID,
+    customer_id: customerId,
+    card_id: cardId,
+    price_override_money: { amount, currency: 'JPY' },
+    timezone: 'Asia/Tokyo',
+    source: { name: 'やるゼ！' },
+  });
+}
+
+async function squareUpdateSubscription(env, subscriptionId, memberCount, version) {
+  const amount = 200 * Math.max(1, memberCount || 1);
+  return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId), 'PUT', {
+    subscription: {
+      price_override_money: { amount, currency: 'JPY' },
+      version: version,
+    },
+  });
+}
+
+async function squareCancelSubscription(env, subscriptionId) {
+  return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel', 'POST', {});
+}
+
+// Square Webhook 署名検証
+// Squareは notification_url + raw_body を WEBHOOK_SIGNATURE_KEY で HMAC-SHA256 → Base64 して送る
+async function verifySquareWebhookSignature(env, notificationUrl, rawBody, signatureHeader) {
+  const key = env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+  if (!key) return { ok: false, reason: 'no_key' };
+  if (!signatureHeader) return { ok: false, reason: 'no_signature' };
+  const enc = new TextEncoder();
+  const ck = await crypto.subtle.importKey(
+    'raw', enc.encode(key),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', ck, enc.encode(notificationUrl + rawBody));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+  // timing-safe compare
+  if (expected.length !== signatureHeader.length) return { ok: false, reason: 'length_mismatch' };
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ signatureHeader.charCodeAt(i);
+  }
+  return { ok: diff === 0, reason: diff === 0 ? null : 'mismatch' };
 }
