@@ -1594,23 +1594,22 @@ function showStaffActionSheet(st,sStatus,buildActionBtns){
   // アクション項目（buildActionBtnsから取り出してリスト化）
   const isSuspended=sStatus==='suspended';
   const items=[
-    {label:isSuspended?'復帰させる':'停止する',icon:isSuspended?'▶':'⏸',color:'#0891b2',idx:0},
-    {label:'削除（退職処理）',icon:'🗑',color:'#dc2626',idx:1},
-    {label:'パスワード再発行',icon:'🔑',color:'#0891b2',idx:2},
-    {label:'QRコード表示',icon:'📱',color:'#0891b2',idx:3}
+    {label:isSuspended?'復帰させる':'停止する',idx:0},
+    {label:'削除（退職処理）',idx:1,danger:true},
+    {label:'パスワード再発行',idx:2},
+    {label:'QRコード表示',idx:3}
   ];
   // 内部buildActionBtnsから本来のボタン群を取り出してclickをハイジャック
   const sourceBtns=buildActionBtns(st,sStatus,'center');
   const realBtns=Array.from(sourceBtns.querySelectorAll('button'));
   items.forEach(it=>{
     const row=document.createElement('div');
-    row.style.cssText='padding:16px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .15s';
+    row.style.cssText='padding:16px 20px;display:flex;align-items:center;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .15s';
     row.addEventListener('touchstart',()=>{row.style.background='#f8fafc'});
     row.addEventListener('touchend',()=>{row.style.background='#fff'});
     row.addEventListener('mouseenter',()=>{row.style.background='#f8fafc'});
     row.addEventListener('mouseleave',()=>{row.style.background='#fff'});
-    const iconEl=document.createElement('div');iconEl.style.cssText='font-size:20px;width:32px;text-align:center;color:'+it.color;iconEl.textContent=it.icon;row.appendChild(iconEl);
-    const labelEl=document.createElement('div');labelEl.style.cssText='font-size:15px;font-weight:600;color:'+(it.idx===1?'#dc2626':'#111');labelEl.textContent=it.label;row.appendChild(labelEl);
+    const labelEl=document.createElement('div');labelEl.style.cssText='font-size:15px;font-weight:600;color:'+(it.danger?'#dc2626':'#111');labelEl.textContent=it.label;row.appendChild(labelEl);
     row.onclick=()=>{
       ov.remove();
       // 元のボタンクリックを実行
