@@ -2256,7 +2256,7 @@ function dischargePage(){
             h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
             h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'\u3000送信先: '+n.recipient_count+'件\u3000参加表明: '+n.joined_count+'件')
           ),
-          h('span',{style:{fontSize:'11px',background:n.status==='active'?'#dcfce7':'#f1f5f9',color:n.status==='active'?'#15803d':'#64748b',padding:'2px 8px',borderRadius:'100px'}},n.status==='active'?'進行中':'終了')
+          h('span',{style:{fontSize:'11px',background:n.status==='active'?'#dcfce7':'#f1f5f9',color:n.status==='active'?'#15803d':'#64748b',padding:'2px 8px',borderRadius:'100px',whiteSpace:'nowrap',flexShrink:0,marginLeft:'8px'}},n.status==='active'?'進行中':'終了')
         )
       ));
     }
@@ -2278,7 +2278,7 @@ function dischargePage(){
             h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},n.title),
             h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},'受信日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))
           ),
-          h('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'100px',
+          h('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'100px',whiteSpace:'nowrap',flexShrink:0,marginLeft:'8px',
             background:isDeclined?'#f1f5f9':isJoined?'#dbeafe':'#fef9c3',
             color:isDeclined?'#64748b':isJoined?'#1d4ed8':'#854d0e'}},
             isDeclined?'辞退済み':isJoined?'面談参加':'未回答')
@@ -2602,7 +2602,7 @@ function sharedChartPage(){
     h('h2',{style:{fontSize:'18px',fontWeight:'800',margin:'0 0 8px 0'}},n.title),
     h('div',{style:{fontSize:'12px',color:'var(--ink-l)'}},
       '発行日: '+new Date(n.created_at).toLocaleString('ja-JP',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}),
-      !isIssuer?h('span',{style:{marginLeft:'12px',background:stage>=2?'#dbeafe':'#fef9c3',color:stage>=2?'#1d4ed8':'#854d0e',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700'}},stage>=2?'面談参加済み':'未回答'):null
+      !isIssuer?h('span',{style:{marginLeft:'12px',background:stage>=2?'#dbeafe':'#fef9c3',color:stage>=2?'#1d4ed8':'#854d0e',padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap',display:'inline-block'}},stage>=2?'面談参加済み':'未回答'):null
     )
   ));
 
@@ -2732,7 +2732,7 @@ function sharedChartPage(){
         ...(n.recipients.map(r=>h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 12px',fontSize:'12px'}},
           h('span',null,r.org||r.login_id||r.recipient_org_id),
           h('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'4px'}},
-            h('span',{style:{padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',
+            h('span',{style:{padding:'2px 8px',borderRadius:'100px',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap',
               background:r.declined_at?'#f1f5f9':r.joined_at?'#dbeafe':'#fef9c3',
               color:r.declined_at?'#64748b':r.joined_at?'#1d4ed8':'#854d0e'}},
               r.declined_at?'辞退':r.joined_at?'面談参加':'未回答'),
