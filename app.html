@@ -1530,9 +1530,11 @@ function staffPage(){
       const top=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'6px'}});
       top.appendChild(h('div',{style:{fontFamily:'monospace',fontWeight:'700',color:'var(--accent)',fontSize:'13px',letterSpacing:'1px',wordBreak:'break-all',flex:'1'}},st.login_id||'—'));
       top.appendChild(buildBadge(st,sStatus));
-      // ⋮メニューボタン（inactiveなら無効化）
-      const menuBtn=h('button',{style:{border:'none',background:'transparent',cursor:isInactive?'default':'pointer',padding:'4px 8px',fontSize:'20px',color:isInactive?'#d1d5db':'#64748b',lineHeight:'1',borderRadius:'6px'},onClick:isInactive?null:()=>showStaffActionSheet(st,sStatus,buildActionBtns)},'⋮');
-      top.appendChild(menuBtn);
+      // ⋮メニュー → 編集ボタン（ｔと同等仕様：編集モーダル集約）
+      const editBtn=isInactive
+        ? h('button',{style:{border:'1px solid var(--border)',background:'#fff',color:'#64748b',cursor:'pointer',padding:'6px 14px',fontSize:'12px',fontWeight:'600',borderRadius:'6px'},onClick:()=>showStaffEditModal(st,sStatus,buildActionBtns,rr)},'編集')
+        : h('button',{style:{border:'1px solid var(--accent)',background:'#fff',color:'var(--accent)',cursor:'pointer',padding:'6px 14px',fontSize:'12px',fontWeight:'700',borderRadius:'6px'},onClick:()=>showStaffEditModal(st,sStatus,buildActionBtns,rr)},'編集');
+      top.appendChild(editBtn);
       card.appendChild(top);
       // 名前
       card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'15px',marginBottom:'2px'}},st.name));
@@ -1550,6 +1552,108 @@ function staffPage(){
     listContent.appendChild(h('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--ink-m)'}},res.staff.length+'名のスタッフ ／ 月額 ¥'+(activeCnt*200).toLocaleString()+'（アクティブ '+activeCnt+'名×¥200）'));
   });
   return w;
+}
+
+// v23: 編集モーダル（ｔやるゼ！と同等仕様：在籍状況切替・退職処理・PW再発行・QRを集約）
+function showStaffEditModal(st,sStatus,buildActionBtns,refresh){
+  const isInactive=sStatus==='inactive';
+  const isSuspended=sStatus==='suspended';
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.2)';
+  // ヘッダ
+  const header=document.createElement('div');header.style.cssText='padding:20px 22px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center';
+  const title=document.createElement('div');title.style.cssText='font-size:17px;font-weight:800;color:#111';title.textContent='スタッフ編集';header.appendChild(title);
+  const closeBtn=document.createElement('button');closeBtn.textContent='×';closeBtn.style.cssText='border:none;background:transparent;font-size:24px;cursor:pointer;color:#64748b;padding:0 4px;line-height:1';closeBtn.onclick=()=>ov.remove();header.appendChild(closeBtn);
+  box.appendChild(header);
+  // 本体
+  const body=document.createElement('div');body.style.cssText='padding:18px 22px';
+  // 基本情報（読み取り専用）
+  const infoLabel=(label,val)=>{
+    const w=document.createElement('div');w.style.cssText='margin-bottom:14px';
+    const l=document.createElement('div');l.style.cssText='font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px';l.textContent=label;w.appendChild(l);
+    const v=document.createElement('div');v.style.cssText='font-size:14px;color:#111;font-weight:500;word-break:break-all';v.textContent=val||'—';w.appendChild(v);
+    return w;
+  };
+  body.appendChild(infoLabel('ログインID',st.login_id));
+  body.appendChild(infoLabel('名前',st.name));
+  body.appendChild(infoLabel('メール',st.email));
+  // 退職バナー（inactive のみ）
+  if(isInactive){
+    const banner=document.createElement('div');banner.style.cssText='padding:14px 16px;background:#f9fafb;border:1px solid #d1d5db;border-radius:8px;margin-bottom:16px';
+    const bTitle=document.createElement('div');bTitle.style.cssText='font-size:13px;font-weight:700;color:#6b7280;margin-bottom:4px';bTitle.textContent='⚠ このスタッフは退職処理済みです';banner.appendChild(bTitle);
+    const bDetail=document.createElement('div');bDetail.style.cssText='font-size:12px;color:#6b7280;line-height:1.6';
+    const blockedAt=st.access_blocked_at?new Date(st.access_blocked_at).toLocaleString('ja-JP'):'—';
+    bDetail.textContent='利用停止日時: '+blockedAt;banner.appendChild(bDetail);
+    const reactBtn=document.createElement('button');reactBtn.textContent='在籍中に戻す（再雇用）';reactBtn.style.cssText='margin-top:10px;padding:8px 16px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600';
+    reactBtn.onclick=async()=>{
+      if(!confirm(st.name+' を在籍中に戻しますか？'))return;
+      reactBtn.disabled=true;reactBtn.textContent='処理中...';
+      const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify({staff_id:st.id,status:'active'})});
+      if(r2&&r2.success){toast('在籍中に戻しました');ov.remove();if(refresh)refresh();}
+      else{reactBtn.disabled=false;reactBtn.textContent='在籍中に戻す（再雇用）';toast(r2?.error||'エラー');}
+    };
+    banner.appendChild(reactBtn);
+    body.appendChild(banner);
+  } else {
+    // 在籍状況2択ラジオ（active のみで操作可）
+    const statusGroup=document.createElement('div');statusGroup.style.cssText='margin-bottom:16px';
+    const sLabel=document.createElement('div');sLabel.style.cssText='font-size:13px;font-weight:700;color:#111;margin-bottom:8px';sLabel.textContent='在籍状況';statusGroup.appendChild(sLabel);
+    const radioWrap=document.createElement('div');radioWrap.style.cssText='display:flex;gap:8px';
+    const mkRadio=(value,label,checked)=>{
+      const lab=document.createElement('label');lab.style.cssText='flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:2px solid '+(checked?'#0891b2':'#e5e7eb')+';border-radius:8px;cursor:pointer;background:'+(checked?'#f0fdfa':'#fff')+';font-size:13px;font-weight:600';
+      const r=document.createElement('input');r.type='radio';r.name='edit_status';r.value=value;if(checked)r.checked=true;
+      r.addEventListener('change',()=>{
+        Array.from(radioWrap.querySelectorAll('label')).forEach(l=>{l.style.borderColor='#e5e7eb';l.style.background='#fff'});
+        lab.style.borderColor='#0891b2';lab.style.background='#f0fdfa';
+        suspendedHint.style.display=value==='suspended'?'block':'none';
+      });
+      lab.appendChild(r);lab.appendChild(document.createTextNode(label));
+      return lab;
+    };
+    radioWrap.appendChild(mkRadio('active','在籍中',!isSuspended));
+    radioWrap.appendChild(mkRadio('suspended','停止中（休職）',isSuspended));
+    statusGroup.appendChild(radioWrap);
+    const suspendedHint=document.createElement('div');suspendedHint.style.cssText='display:'+(isSuspended?'block':'none')+';margin-top:8px;padding:8px 12px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:4px;font-size:12px;color:#991b1b';suspendedHint.textContent='※ 即時ログイン不可になります。翌月分から課金対象外。「在籍中」に戻せば復帰可能です。';statusGroup.appendChild(suspendedHint);
+    body.appendChild(statusGroup);
+    // 削除（退職処理）ボタン
+    const delWrap=document.createElement('div');delWrap.style.cssText='margin-bottom:16px';
+    const delBtn=document.createElement('button');delBtn.textContent='🗑 削除（退職処理）';delBtn.style.cssText='width:100%;padding:12px 16px;background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600';
+    delBtn.onclick=()=>{ov.remove();showDeleteStaffModalM(st,refresh);};
+    delWrap.appendChild(delBtn);
+    const delNote=document.createElement('div');delNote.style.cssText='color:#6b7280;font-size:11px;margin-top:6px';delNote.textContent='※退職時の処理。アクセス制御は次の画面で選択します。';delWrap.appendChild(delNote);
+    body.appendChild(delWrap);
+    // PW再発行・QR（横並び）
+    const auxWrap=document.createElement('div');auxWrap.style.cssText='display:flex;gap:8px;margin-bottom:8px';
+    const sourceBtns=buildActionBtns(st,sStatus,'center');
+    const realBtns=Array.from(sourceBtns.querySelectorAll('button'));
+    // realBtns: [0]停止/復帰, [1]削除, [2]PW再発行, [3]QR
+    const pwBtn=document.createElement('button');pwBtn.textContent='パスワード再発行';pwBtn.style.cssText='flex:1;padding:10px;background:#fff;color:#0891b2;border:1px solid #0891b2;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600';pwBtn.onclick=()=>{if(realBtns[2])realBtns[2].click();};
+    const qrBtn=document.createElement('button');qrBtn.textContent='QRコード表示';qrBtn.style.cssText='flex:1;padding:10px;background:#fff;color:#0891b2;border:1px solid #0891b2;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600';qrBtn.onclick=()=>{if(realBtns[3])realBtns[3].click();};
+    auxWrap.appendChild(pwBtn);auxWrap.appendChild(qrBtn);
+    body.appendChild(auxWrap);
+  }
+  box.appendChild(body);
+  // フッター（保存・キャンセル）
+  const footer=document.createElement('div');footer.style.cssText='padding:14px 22px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end';
+  const cancelBtn=document.createElement('button');cancelBtn.textContent=isInactive?'閉じる':'キャンセル';cancelBtn.style.cssText='padding:10px 18px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;font-weight:600';cancelBtn.onclick=()=>ov.remove();
+  footer.appendChild(cancelBtn);
+  if(!isInactive){
+    const saveBtn=document.createElement('button');saveBtn.textContent='保存';saveBtn.style.cssText='padding:10px 22px;border:none;border-radius:8px;background:#0891b2;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
+    saveBtn.onclick=async()=>{
+      const newStatus=box.querySelector('input[name=edit_status]:checked')?.value||'active';
+      if(newStatus===sStatus){ov.remove();return;}
+      saveBtn.disabled=true;saveBtn.textContent='保存中...';
+      const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify({staff_id:st.id,status:newStatus})});
+      if(r2&&r2.success){toast(newStatus==='suspended'?'停止しました':'在籍中に戻しました');ov.remove();if(refresh)refresh();}
+      else{saveBtn.disabled=false;saveBtn.textContent='保存';toast(r2?.error||'エラー');}
+    };
+    footer.appendChild(saveBtn);
+  }
+  box.appendChild(footer);
+  ov.appendChild(box);document.body.appendChild(ov);
 }
 
 // v22→: モバイル用アクションシート（⋮メニュー → ボトムシート風モーダル）
