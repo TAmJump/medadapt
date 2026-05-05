@@ -170,7 +170,9 @@ async function handleRequest(request, env, json, err) {
     }
     if (!pwOk) return err('ログインIDまたはパスワードが違います', 401);
     if (!user.email_verified) return err('メールアドレスが未確認です。届いた確認メールのリンクをクリックしてください。', 403);
-    if (user.suspended) return err('このアカウントは停止されています。管理者にお問い合わせください。', 403);
+    // v22: 3値ステータス + access_blocked_at で判定
+    const blockReason = checkUserAccessBlocked(user);
+    if (blockReason) return err(blockReason, 403);
 
     const token = crypto.randomUUID();
     const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -295,10 +297,13 @@ async function handleRequest(request, env, json, err) {
     const hasEmail = !!(email && email.trim());
 
     await env.DB.prepare(
-      'INSERT INTO users (id,login_id,email,pw,pw_hash,org,type,name,plan,usage,email_verified,role,org_id,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-    ).bind(id, loginId, email||'', '', pwHash, adminUser.org, adminUser.type||'', name, 'staff', '{}', 1, 'staff', invite.org_id, now).run();
+      'INSERT INTO users (id,login_id,email,pw,pw_hash,org,type,name,plan,usage,email_verified,role,org_id,status,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind(id, loginId, email||'', '', pwHash, adminUser.org, adminUser.type||'', name, 'staff', '{}', 1, 'staff', invite.org_id, 'active', now).run();
 
     await env.DB.prepare('UPDATE invites SET used=1 WHERE token=?').bind(invite_token).run();
+
+    // v22: 翌月分課金人数を再計算（pending_member_count に反映）
+    try { await recalcMemberCount(env, invite.org_id); } catch (e) { console.error('recalcMemberCount error:', e); }
 
     if (hasEmail) {
       try {
@@ -330,7 +335,9 @@ async function handleRequest(request, env, json, err) {
     if (!qr_token) return err('qr_tokenが必要です');
     const user = await env.DB.prepare('SELECT * FROM users WHERE qr_token=?').bind(qr_token).first();
     if (!user) return err('無効なQRコードです', 401);
-    if (user.suspended) return err('このアカウントは停止されています', 403);
+    // v22: 3値ステータス + access_blocked_at で判定
+    const qrBlockReason = checkUserAccessBlocked(user);
+    if (qrBlockReason) return err(qrBlockReason, 403);
     const token = crypto.randomUUID();
     const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
     await env.DB.prepare('INSERT OR REPLACE INTO sessions (token,email,user_login_id,created,expires) VALUES (?,?,?,?,?)')
@@ -569,7 +576,7 @@ async function handleRequest(request, env, json, err) {
     if (currentUser.role !== 'admin') return err('管理者のみ実行できます', 403);
     const orgId = currentUser.org_id || currentUser.id;
     const staff = await env.DB.prepare(
-      "SELECT id,login_id,email,name,role,plan,email_verified,suspended,created FROM users WHERE org_id=? AND role='staff' ORDER BY created ASC"
+      "SELECT id,login_id,email,name,role,plan,email_verified,suspended,status,access_blocked_at,created FROM users WHERE org_id=? AND role='staff' ORDER BY created ASC"
     ).bind(orgId).all();
     return json({ staff: staff.results });
   }
@@ -614,20 +621,66 @@ async function handleRequest(request, env, json, err) {
     const orgId = currentUser.org_id || currentUser.id;
     const target = await env.DB.prepare('SELECT * FROM users WHERE id=? AND org_id=?').bind(staff_id, orgId).first();
     if (!target) return err('対象スタッフが見つかりません');
-    await env.DB.prepare('UPDATE users SET suspended=? WHERE id=?').bind(suspend ? 1 : 0, staff_id).run();
+    // v22: 3値モデルへ変換（後方互換維持）
+    const newStatus = suspend ? 'suspended' : 'active';
+    const now = new Date().toISOString();
+    const blockedAt = suspend ? now : null;
+    await env.DB.prepare('UPDATE users SET status=?, access_blocked_at=?, suspended=? WHERE id=?')
+      .bind(newStatus, blockedAt, suspend ? 1 : 0, staff_id).run();
     if (suspend) await env.DB.prepare('DELETE FROM sessions WHERE email=?').bind(target.id).run();
+    // 翌月分課金人数を再計算（pending_member_count に反映）
+    await recalcMemberCount(env, orgId);
     return json({ success: true });
   }
 
+  // ── v22: POST /staff/set-status（3値ステータス変更・最頻出エンドポイント）──
+  // body: { staff_id, status: 'active'|'suspended'|'inactive', immediate?: boolean }
+  // immediate=true で「今すぐ利用停止」、false（既定）で「決済済み月末まで利用可能」
+  if (path === '/staff/set-status' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('管理者のみ実行できます', 403);
+    const { staff_id, status: newStatus, immediate } = await request.json().catch(() => ({}));
+    if (!staff_id) return err('staff_idが必要です');
+    if (!['active', 'suspended', 'inactive'].includes(newStatus)) return err('statusはactive/suspended/inactiveのいずれかです');
+    const orgId = currentUser.org_id || currentUser.id;
+    const target = await env.DB.prepare('SELECT * FROM users WHERE id=? AND org_id=?').bind(staff_id, orgId).first();
+    if (!target) return err('対象スタッフが見つかりません');
+    const now = new Date().toISOString();
+    let blockedAt = null;
+    if (newStatus === 'suspended') {
+      // 停止（休職）：即時ログイン不可
+      blockedAt = now;
+    } else if (newStatus === 'inactive') {
+      // 削除（退職）：即時 or 当月末まで
+      blockedAt = immediate ? now : endOfCurrentMonthIso();
+    } // 'active' は blockedAt=null
+    // 旧 suspended カラムも互換維持（status='active' のときのみ 0）
+    const legacySuspended = newStatus === 'active' ? 0 : 1;
+    await env.DB.prepare('UPDATE users SET status=?, access_blocked_at=?, suspended=? WHERE id=?')
+      .bind(newStatus, blockedAt, legacySuspended, staff_id).run();
+    // 即時アクセス停止が発生する場合はセッション破棄
+    if (newStatus === 'suspended' || (newStatus === 'inactive' && immediate)) {
+      await env.DB.prepare('DELETE FROM sessions WHERE email=?').bind(target.id).run();
+    }
+    // 翌月分課金人数を再計算
+    await recalcMemberCount(env, orgId);
+    return json({ success: true, status: newStatus, access_blocked_at: blockedAt });
+  }
+
   // ── DELETE /staff/:id ─────────────────────────────────────
+  // v22: 物理削除を廃止。論理削除（status='inactive', immediate=true）に変更。
+  // 履歴・参照整合性保護のため。物理削除したい場合は別途管理コマンドで対応。
   if (path.startsWith('/staff/') && method === 'DELETE') {
     if (currentUser.role !== 'admin') return err('管理者のみ実行できます', 403);
     const staffId = path.replace('/staff/', '');
     const orgId = currentUser.org_id || currentUser.id;
     const target = await env.DB.prepare('SELECT * FROM users WHERE id=? AND org_id=?').bind(staffId, orgId).first();
     if (!target) return err('対象スタッフが見つかりません');
+    // 論理削除：status='inactive' + 即時アクセス停止
+    const now = new Date().toISOString();
+    await env.DB.prepare("UPDATE users SET status='inactive', access_blocked_at=?, suspended=1 WHERE id=?")
+      .bind(now, staffId).run();
     await env.DB.prepare('DELETE FROM sessions WHERE email=?').bind(target.id).run();
-    await env.DB.prepare('DELETE FROM users WHERE id=?').bind(staffId).run();
+    await recalcMemberCount(env, orgId);
     return json({ success: true });
   }
 
@@ -1286,9 +1339,9 @@ async function handleRequest(request, env, json, err) {
       const cardId = cardRes?.card?.id;
       if (!cardId) throw new Error('カード保存失敗');
 
-      // 3. member_count 集計（停止中ユーザーは除外）
+      // 3. member_count 集計（v22: status='active' のみカウント）
       const cnt = await env.DB.prepare(
-        'SELECT COUNT(*) as n FROM users WHERE org_id=? AND suspended=0'
+        "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
       ).bind(orgId).first();
       const memberCount = Math.max(1, cnt?.n || 1);
       const amountJpy = 200 * memberCount;
@@ -1340,7 +1393,7 @@ async function handleRequest(request, env, json, err) {
     ).bind(orgId, moduleId).first();
     if (!sub) return err('サブスクリプションが見つかりません', 404);
     const cnt = await env.DB.prepare(
-      'SELECT COUNT(*) as n FROM users WHERE org_id=? AND suspended=0'
+      "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
     ).bind(orgId).first();
     const newCount = Math.max(1, cnt?.n || 1);
     if (newCount === sub.member_count) {
@@ -1466,7 +1519,7 @@ function genLoginId(prefix) {
 // ── DB初期化 ──────────────────────────────────────────────
 async function initDB(db) {
   const stmts = [
-    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, pw TEXT, pw_hash TEXT, org TEXT DEFAULT '', type TEXT DEFAULT '', name TEXT DEFAULT '', plan TEXT DEFAULT 'free', usage TEXT DEFAULT '{}', email_verified INTEGER DEFAULT 0, verify_token TEXT, reset_token TEXT, reset_expires TEXT, role TEXT DEFAULT 'admin', org_id TEXT, suspended INTEGER DEFAULT 0, qr_token TEXT, created TEXT)`,
+    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, pw TEXT, pw_hash TEXT, org TEXT DEFAULT '', type TEXT DEFAULT '', name TEXT DEFAULT '', plan TEXT DEFAULT 'free', usage TEXT DEFAULT '{}', email_verified INTEGER DEFAULT 0, verify_token TEXT, reset_token TEXT, reset_expires TEXT, role TEXT DEFAULT 'admin', org_id TEXT, suspended INTEGER DEFAULT 0, status TEXT DEFAULT 'active', access_blocked_at TEXT, qr_token TEXT, created TEXT)`,
     `CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT NOT NULL, user_login_id TEXT, created TEXT, expires TEXT)`,
     `CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
@@ -1643,6 +1696,69 @@ async function squareUpdateSubscription(env, subscriptionId, memberCount, versio
 
 async function squareCancelSubscription(env, subscriptionId) {
   return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel', 'POST', {});
+}
+
+// ============================================================
+// v22: 3値ステータス（active/suspended/inactive）+ access_blocked_at 関連ヘルパー
+// ============================================================
+
+// ログイン拒否判定。null 返却なら通過、文字列返却ならその理由でログイン拒否。
+function checkUserAccessBlocked(user, now = new Date()) {
+  // 後方互換：status カラムが NULL の古いレコードは suspended カラムを参照
+  const status = user.status || (user.suspended ? 'suspended' : 'active');
+  if (status === 'active') return null;
+  if (status === 'suspended') return 'このアカウントは停止中です。管理者にお問い合わせください。';
+  if (status === 'inactive') {
+    // 「決済済み月末まで利用可能」を尊重する判定
+    if (user.access_blocked_at) {
+      const blockedAt = new Date(user.access_blocked_at);
+      if (now >= blockedAt) return 'このアカウントは利用終了しています。';
+      return null; // 期限まではアクセス可
+    }
+    return 'このアカウントは利用終了しています。';
+  }
+  return null;
+}
+
+// 当月末 23:59:59.999 (JST) の ISO 8601 文字列を返す
+// JST固定で当月末を計算（タイムゾーン依存を排除）
+function endOfCurrentMonthIso(now = new Date()) {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const y = jst.getUTCFullYear();
+  const m = jst.getUTCMonth(); // 0-11
+  // 翌月1日 00:00:00 JST = 当月末 24:00:00 JST = UTC で前日 15:00
+  const nextMonthFirstUtc = Date.UTC(y, m + 1, 1, 0, 0, 0) - 9 * 60 * 60 * 1000;
+  // 当月末 23:59:59.999 JST = 翌月1日 0:00 JST の 1ms 前
+  return new Date(nextMonthFirstUtc - 1).toISOString();
+}
+
+// メンバー数を再計算して subscriptions.pending_member_count に反映
+// status='active' のユーザー数をカウントし、現在の member_count と異なれば pending に記録
+// 同じなら pending を NULL に戻す
+async function recalcMemberCount(env, orgId) {
+  if (!orgId) return;
+  try {
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT id, member_count FROM subscriptions WHERE org_id=? AND module_id=? AND status=?'
+    ).bind(orgId, moduleId, 'active').first();
+    if (!sub) return; // サブスク未契約なら何もしない
+    const cnt = await env.DB.prepare(
+      "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
+    ).bind(orgId).first();
+    const newCount = Math.max(1, cnt?.n || 1);
+    if (newCount === sub.member_count) {
+      await env.DB.prepare(
+        'UPDATE subscriptions SET pending_member_count=NULL WHERE id=?'
+      ).bind(sub.id).run();
+    } else {
+      await env.DB.prepare(
+        'UPDATE subscriptions SET pending_member_count=? WHERE id=?'
+      ).bind(newCount, sub.id).run();
+    }
+  } catch (e) {
+    console.error('recalcMemberCount error:', e);
+  }
 }
 
 // Square Webhook 署名検証
