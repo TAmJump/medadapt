@@ -634,11 +634,11 @@ async function handleRequest(request, env, json, err) {
   }
 
   // ── v22: POST /staff/set-status（3値ステータス変更・最頻出エンドポイント）──
-  // body: { staff_id, status: 'active'|'suspended'|'inactive', immediate?: boolean }
-  // immediate=true で「今すぐ利用停止」、false（既定）で「決済済み月末まで利用可能」
+  // body: { staff_id, status: 'active'|'suspended'|'inactive', immediate?: boolean, block_until?: 'YYYY-MM-DD' }
+  // inactive 時の優先順位: block_until > immediate > 当月末（grace・既定）
   if (path === '/staff/set-status' && method === 'POST') {
     if (currentUser.role !== 'admin') return err('管理者のみ実行できます', 403);
-    const { staff_id, status: newStatus, immediate } = await request.json().catch(() => ({}));
+    const { staff_id, status: newStatus, immediate, block_until } = await request.json().catch(() => ({}));
     if (!staff_id) return err('staff_idが必要です');
     if (!['active', 'suspended', 'inactive'].includes(newStatus)) return err('statusはactive/suspended/inactiveのいずれかです');
     const orgId = currentUser.org_id || currentUser.id;
@@ -650,15 +650,18 @@ async function handleRequest(request, env, json, err) {
       // 停止（休職）：即時ログイン不可
       blockedAt = now;
     } else if (newStatus === 'inactive') {
-      // 削除（退職）：即時 or 当月末まで
-      blockedAt = immediate ? now : endOfCurrentMonthIso();
+      // 削除（退職）：block_until > immediate > 当月末
+      if (block_until) blockedAt = endOfDateIso(block_until);
+      else if (immediate) blockedAt = now;
+      else blockedAt = endOfCurrentMonthIso();
     } // 'active' は blockedAt=null
     // 旧 suspended カラムも互換維持（status='active' のときのみ 0）
     const legacySuspended = newStatus === 'active' ? 0 : 1;
     await env.DB.prepare('UPDATE users SET status=?, access_blocked_at=?, suspended=? WHERE id=?')
       .bind(newStatus, blockedAt, legacySuspended, staff_id).run();
-    // 即時アクセス停止が発生する場合はセッション破棄
-    if (newStatus === 'suspended' || (newStatus === 'inactive' && immediate)) {
+    // 即時アクセス停止が発生する場合のみセッション破棄（block_until は未来日付なのでセッション維持）
+    const isBlockedNow = blockedAt && new Date(blockedAt) <= new Date();
+    if (newStatus === 'suspended' || (newStatus === 'inactive' && isBlockedNow)) {
       await env.DB.prepare('DELETE FROM sessions WHERE email=?').bind(target.id).run();
     }
     // 翌月分課金人数を再計算
@@ -1730,6 +1733,16 @@ function endOfCurrentMonthIso(now = new Date()) {
   const nextMonthFirstUtc = Date.UTC(y, m + 1, 1, 0, 0, 0) - 9 * 60 * 60 * 1000;
   // 当月末 23:59:59.999 JST = 翌月1日 0:00 JST の 1ms 前
   return new Date(nextMonthFirstUtc - 1).toISOString();
+}
+
+// 'YYYY-MM-DD' を JST のその日 23:59:59.999 の ISO 8601 文字列に変換
+// 例: '2026-08-15' → JST 2026-08-15 23:59:59.999 = UTC 2026-08-15 14:59:59.999Z
+function endOfDateIso(dateStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  // 翌日 0:00 JST = UTC 前日 15:00 → -1ms で当日 23:59:59.999 JST
+  const nextDayFirstUtc = Date.UTC(y, m - 1, d + 1, 0, 0, 0) - 9 * 60 * 60 * 1000;
+  return new Date(nextDayFirstUtc - 1).toISOString();
 }
 
 // メンバー数を再計算して subscriptions.pending_member_count に反映

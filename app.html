@@ -1529,21 +1529,44 @@ function staffPage(){
   return w;
 }
 
-// v22: 削除モーダル（ｍやるゼ！）— 2択：当月末まで利用可 / 今すぐ利用停止
+// v22: 削除モーダル（ｍやるゼ！）— 3択：当月末まで利用可 / 今すぐ利用停止 / 利用停止日指定
 function showDeleteStaffModalM(st,refresh){
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
   const box=document.createElement('div');
-  box.style.cssText='background:#fff;padding:28px;border-radius:16px;max-width:400px;width:92%';
+  box.style.cssText='background:#fff;padding:28px;border-radius:16px;max-width:420px;width:92%;max-height:90vh;overflow-y:auto';
   const title=document.createElement('div');title.style.cssText='font-size:16px;font-weight:800;color:#dc2626;margin-bottom:8px';title.textContent='スタッフを削除（退職）';box.appendChild(title);
   const sub=document.createElement('div');sub.style.cssText='font-size:13px;color:#374151;margin-bottom:16px';sub.innerHTML=st.name+' さんを退職処理します。<br>翌月分から課金対象外となります（返金なし）。';box.appendChild(sub);
-  const note=document.createElement('div');note.style.cssText='font-size:12px;color:#6b7280;margin-bottom:14px';note.textContent='決済済み月の月末までのアクセス可否を選択してください：';box.appendChild(note);
+  const note=document.createElement('div');note.style.cssText='font-size:12px;color:#6b7280;margin-bottom:14px';note.textContent='アクセス制御を選択してください：';box.appendChild(note);
   // ラジオ
-  const radioWrap=document.createElement('div');radioWrap.style.cssText='display:flex;flex-direction:column;gap:10px;margin-bottom:20px';
+  const radioWrap=document.createElement('div');radioWrap.style.cssText='display:flex;flex-direction:column;gap:10px;margin-bottom:16px';
+  // 日付ピッカー（block_until 選択時のみ表示）
+  const dateWrap=document.createElement('div');dateWrap.id='delete_date_wrap';dateWrap.style.cssText='display:none;margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px';
+  const dateLabel=document.createElement('div');dateLabel.style.cssText='font-size:12px;font-weight:600;color:#374151;margin-bottom:6px';dateLabel.textContent='利用停止日';dateWrap.appendChild(dateLabel);
+  const dateRow=document.createElement('div');dateRow.style.cssText='display:grid;grid-template-columns:2fr 1.5fr 1.5fr;gap:6px';
+  const ySel=document.createElement('select');ySel.id='delete_y';ySel.style.cssText='padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px';
+  ySel.innerHTML='<option value="">年</option>';
+  const thisYear=new Date().getFullYear();
+  for(let y=thisYear;y<=thisYear+5;y++){const o=document.createElement('option');o.value=String(y);o.textContent=y;ySel.appendChild(o)}
+  const mSel=document.createElement('select');mSel.id='delete_m';mSel.style.cssText='padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px';
+  mSel.innerHTML='<option value="">月</option>';
+  for(let m=1;m<=12;m++){const mm=String(m).padStart(2,'0');const o=document.createElement('option');o.value=mm;o.textContent=m+'月';mSel.appendChild(o)}
+  const dSel=document.createElement('select');dSel.id='delete_d';dSel.style.cssText='padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px';
+  dSel.innerHTML='<option value="">日</option>';
+  for(let d=1;d<=31;d++){const dd=String(d).padStart(2,'0');const o=document.createElement('option');o.value=dd;o.textContent=d+'日';dSel.appendChild(o)}
+  dateRow.appendChild(ySel);dateRow.appendChild(mSel);dateRow.appendChild(dSel);
+  dateWrap.appendChild(dateRow);
+  const dateNote=document.createElement('div');dateNote.style.cssText='font-size:11px;color:#6b7280;margin-top:6px';dateNote.textContent='※指定日の23:59まで利用可能。有給消化期間や勤務最終日などに合わせて。';dateWrap.appendChild(dateNote);
+  // ラジオオプション生成関数
   const opt=(value,label,desc,checked)=>{
     const lab=document.createElement('label');lab.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:2px solid '+(checked?'#0891b2':'#e5e7eb')+';border-radius:8px;cursor:pointer;background:'+(checked?'#f0fdfa':'#fff');
     const r=document.createElement('input');r.type='radio';r.name='delete_mode';r.value=value;if(checked)r.checked=true;r.style.cssText='margin-top:2px';
-    r.addEventListener('change',()=>{Array.from(radioWrap.querySelectorAll('label')).forEach(l=>{l.style.borderColor='#e5e7eb';l.style.background='#fff'});lab.style.borderColor='#0891b2';lab.style.background='#f0fdfa';});
+    r.addEventListener('change',()=>{
+      Array.from(radioWrap.querySelectorAll('label')).forEach(l=>{l.style.borderColor='#e5e7eb';l.style.background='#fff'});
+      lab.style.borderColor='#0891b2';lab.style.background='#f0fdfa';
+      // block_until 選択時だけ日付ピッカーを表示
+      dateWrap.style.display=(value==='block_until')?'block':'none';
+    });
     const txt=document.createElement('div');
     const t1=document.createElement('div');t1.style.cssText='font-size:13px;font-weight:700;color:#111';t1.textContent=label;
     const t2=document.createElement('div');t2.style.cssText='font-size:11px;color:#6b7280;margin-top:2px';t2.textContent=desc;
@@ -1552,7 +1575,9 @@ function showDeleteStaffModalM(st,refresh){
   };
   radioWrap.appendChild(opt('grace','当月末まで利用可能','決済済み月の末日までログイン可。翌月から課金停止。',true));
   radioWrap.appendChild(opt('immediate','今すぐ利用停止','即ログイン不可。翌月から課金停止。',false));
+  radioWrap.appendChild(opt('block_until','利用停止日を指定（有給消化等）','指定日の23:59まで利用可能。',false));
   box.appendChild(radioWrap);
+  box.appendChild(dateWrap);
   // ボタン
   const btnWrap=document.createElement('div');btnWrap.style.cssText='display:flex;gap:8px;justify-content:flex-end';
   const btnCancel=document.createElement('button');btnCancel.textContent='キャンセル';btnCancel.style.cssText='padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;font-size:13px';
@@ -1560,11 +1585,21 @@ function showDeleteStaffModalM(st,refresh){
   const btnExec=document.createElement('button');btnExec.textContent='削除する';btnExec.style.cssText='padding:10px 16px;border:none;border-radius:8px;background:#dc2626;color:#fff;cursor:pointer;font-weight:700;font-size:13px';
   btnExec.onclick=async()=>{
     const mode=radioWrap.querySelector('input[name=delete_mode]:checked')?.value||'grace';
-    const immediate=mode==='immediate';
+    const body={staff_id:st.id,status:'inactive'};
+    if(mode==='immediate'){body.immediate=true}
+    else if(mode==='block_until'){
+      const y=ySel.value,m=mSel.value,d=dSel.value;
+      if(!y||!m||!d){toast('利用停止日（年月日）を選択してください');return}
+      body.block_until=y+'-'+m+'-'+d;
+    }
     btnExec.disabled=true;btnExec.textContent='処理中...';
-    const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify({staff_id:st.id,status:'inactive',immediate})});
-    if(r2&&r2.success){toast(immediate?'即時削除しました':'当月末で削除予定としました');ov.remove();if(refresh)refresh();}
-    else{btnExec.disabled=false;btnExec.textContent='削除する';toast(r2?.error||'エラー');}
+    const r2=await api('/staff/set-status',{method:'POST',body:JSON.stringify(body)});
+    if(r2&&r2.success){
+      const msg=mode==='immediate'?'即時削除しました':mode==='block_until'?(body.block_until+' まで利用可能で削除予定としました'):'当月末で削除予定としました';
+      toast(msg);ov.remove();if(refresh)refresh();
+    } else {
+      btnExec.disabled=false;btnExec.textContent='削除する';toast(r2?.error||'エラー');
+    }
   };
   btnWrap.appendChild(btnCancel);btnWrap.appendChild(btnExec);box.appendChild(btnWrap);
   ov.appendChild(box);document.body.appendChild(ov);
