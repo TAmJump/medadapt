@@ -176,7 +176,7 @@ function saveToken(t){S.token=t;if(t)localStorage.setItem('medadapt_token',t);el
 // ── Square Web Payments SDK（B-2方式・契約情報＆カード入力） ──
 // v26: カードブランド表示用ラベル変換
 function brandToLabel(b){const m={'VISA':'VISA','MASTERCARD':'Mastercard','AMERICAN_EXPRESS':'AMEX','JCB':'JCB','DISCOVER':'Discover','DISCOVER_DINERS':'Diners','CHINA_UNIONPAY':'銀聯'};return m[String(b||'').toUpperCase()]||String(b||'カード');}
-let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null};
+let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null,changeCardMode:false};
 
 async function loadSquareSdk(){
   if(SQ.payments)return SQ.payments;
@@ -3589,8 +3589,56 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
       })
     ):null,
     info.last_billed_month?h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'前回請求月: '+info.last_billed_month):null,
-    (info.card&&info.card.last_4)?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ '+brandToLabel(info.card.brand)+' •••• '+info.card.last_4+((info.card.exp_month&&info.card.exp_year)?'（'+String(info.card.exp_month).padStart(2,'0')+'/'+String(info.card.exp_year).slice(-2)+'）':'')):(info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null)
+    (info.card&&info.card.last_4)?h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginTop:'4px',flexWrap:'wrap'}},
+      h('span',{style:{fontSize:'11px',color:'#16a34a'}},'✓ '+brandToLabel(info.card.brand)+' •••• '+info.card.last_4+((info.card.exp_month&&info.card.exp_year)?'（'+String(info.card.exp_month).padStart(2,'0')+'/'+String(info.card.exp_year).slice(-2)+'）':'')),
+      info.status==='active'?h('button',{type:'button',style:{padding:'2px 10px',fontSize:'11px',border:'1px solid #0891b2',background:'#fff',color:'#0891b2',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'},onClick:()=>{SQ.changeCardMode=true;rr();}},'変更'):null
+    ):(info.has_card_on_file?h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginTop:'4px',flexWrap:'wrap'}},
+      h('span',{style:{fontSize:'11px',color:'#16a34a'}},'✓ カード登録済み'),
+      info.status==='active'?h('button',{type:'button',style:{padding:'2px 10px',fontSize:'11px',border:'1px solid #0891b2',background:'#fff',color:'#0891b2',borderRadius:'6px',cursor:'pointer',fontFamily:'inherit'},onClick:()=>{SQ.changeCardMode=true;rr();}},'変更'):null
+    ):null)
   ));
+  // v26: カード変更フォーム（changeCardMode 時のみ）
+  if(SQ.changeCardMode&&info.status==='active'){
+    const cb=h('div',{style:{margin:'14px 0 4px 0',padding:'14px',border:'1px solid var(--border)',borderRadius:'10px',background:'#f8fafc'}});
+    cb.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px'}},'新しいカード情報を入力'));
+    cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',lineHeight:'1.7',marginBottom:'10px'}},'登録すると、次回請求から新しいカードに切り替わります。旧カードは無効化されます。'));
+    cb.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
+    cb.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
+    const btnRow=h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}});
+    btnRow.appendChild(btn('カードを変更する','btn-pri',async()=>{
+      const st=document.getElementById('sq-status');
+      if(!SQ.card){
+        if(st)st.textContent='カード入力を準備中...';
+        await initSquareCard();
+        if(!SQ.card){if(st)st.textContent=SQ.error||'カード入力の準備ができていません';return;}
+      }
+      if(st)st.textContent='処理中...';
+      try{
+        const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:{email:u.email||'',givenName:u.name||''}});
+        if(r.status!=='OK'){if(st)st.textContent=(r.errors||[]).map(e=>e.message).join(', ')||'カード入力エラー';return;}
+        const res=await api('/billing/card/update',{method:'POST',body:JSON.stringify({card_source_id:r.token,verification_token:r.verificationToken})});
+        if(res&&res.success){
+          if(st)st.textContent='カードを変更しました';
+          const c=res.card||{};
+          toast('カードを変更しました（'+brandToLabel(c.brand)+' •••• '+(c.last_4||'****')+'）');
+          SQ.changeCardMode=false;
+          if(SQ.card){try{await SQ.card.destroy();}catch(e){}SQ.card=null;}
+          await refreshBillingInfo();rr();
+        }else{
+          if(st)st.textContent=res?.error||'カード変更失敗';
+        }
+      }catch(e){if(st)st.textContent='エラー: '+e.message;}
+    }));
+    btnRow.appendChild(btn('キャンセル','btn-sec',async()=>{
+      SQ.changeCardMode=false;
+      if(SQ.card){try{await SQ.card.destroy();}catch(e){}SQ.card=null;}
+      rr();
+    }));
+    cb.appendChild(btnRow);
+    bil.appendChild(cb);
+    // SDK 初期化（mount後・rerender対応）
+    setTimeout(initSquareCard,50);
+  }
   // 解約予約バナー
   if(info.status==='active'&&info.scheduled_cancel_month){
     const m=info.scheduled_cancel_month;const ymLabel=m.replace('-','年')+'月';

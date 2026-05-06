@@ -1582,6 +1582,77 @@ async function handleRequest(request, env, json, err) {
     return json({ success: true });
   }
 
+  // ── POST /billing/card/update（v26: カード変更・既存サブスクのカードを差し替え）──
+  if (path === '/billing/card/update' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const { card_source_id, verification_token } = await request.json().catch(() => ({}));
+    if (!card_source_id) return err('card_source_id が必要です');
+
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub) return err('サブスクリプションが見つかりません', 404);
+    if (sub.status !== 'active') return err('解約済み・停止中のサブスクではカード変更できません', 400);
+    if (!sub.square_subscription_id) return err('Square サブスク ID がありません', 400);
+    if (!sub.square_customer_id) return err('Square Customer ID がありません', 400);
+
+    let newCardId = null;
+    try {
+      // 1. 新カード保存
+      const cardRes = await squareCreateCard(env, sub.square_customer_id, card_source_id, verification_token);
+      const cardObj = cardRes?.card || {};
+      newCardId = cardObj.id;
+      if (!newCardId) throw new Error('新カード保存失敗');
+      const newLast4 = cardObj.last_4 || null;
+      const newBrand = cardObj.card_brand || null;
+      const newExpMonth = cardObj.exp_month || null;
+      const newExpYear = cardObj.exp_year || null;
+
+      // 2. subscription の version 取得
+      const subRes = await squareRetrieveSubscription(env, sub.square_subscription_id);
+      const version = subRes?.subscription?.version;
+      if (version === undefined || version === null) throw new Error('subscription version 取得失敗');
+
+      // 3. subscription のカードを切替
+      await squareUpdateSubscriptionCard(env, sub.square_subscription_id, newCardId, version);
+
+      // 4. 旧カード論理削除（失敗しても続行）
+      const oldCardId = sub.card_id;
+      if (oldCardId && oldCardId !== newCardId) {
+        try { await squareDisableCard(env, oldCardId); } catch (e) {
+          console.error('squareDisableCard (old) failed (ignored):', e?.message || e);
+        }
+      }
+
+      // 5. D1 更新
+      await env.DB.prepare(
+        `UPDATE subscriptions SET
+           card_id=?, card_last_4=?, card_brand=?, card_exp_month=?, card_exp_year=?
+         WHERE org_id=? AND module_id=?`
+      ).bind(newCardId, newLast4, newBrand, newExpMonth, newExpYear, orgId, moduleId).run();
+
+      return json({
+        success: true,
+        card: {
+          id: newCardId,
+          last_4: newLast4,
+          brand: newBrand,
+          exp_month: newExpMonth,
+          exp_year: newExpYear,
+        },
+      });
+    } catch (e) {
+      console.error('billing/card/update error:', e);
+      // ロールバック：新カードが作成済みなら disable
+      if (newCardId) {
+        try { await squareDisableCard(env, newCardId); } catch (_) {}
+      }
+      return err('カード変更に失敗しました: ' + e.message, 500);
+    }
+  }
+
   // ── GET /billing/info（マイページ用情報取得）──
   if (path === '/billing/info' && method === 'GET') {
     const orgId = currentUser.org_id || currentUser.id;
@@ -1820,6 +1891,21 @@ async function squareUpdateSubscription(env, subscriptionId, memberCount, versio
 
 async function squareCancelSubscription(env, subscriptionId) {
   return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel', 'POST', {});
+}
+
+// v26: subscription のカードを変更（PUT /v2/subscriptions/:id with card_id）
+async function squareUpdateSubscriptionCard(env, subscriptionId, cardId, version) {
+  return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId), 'PUT', {
+    subscription: {
+      card_id: cardId,
+      version: version,
+    },
+  });
+}
+
+// v26: カード論理削除（POST /v2/cards/:id/disable）
+async function squareDisableCard(env, cardId) {
+  return squareFetch(env, '/v2/cards/' + encodeURIComponent(cardId) + '/disable', 'POST', {});
 }
 
 // v26: カード詳細取得（GET /v2/cards/:id）
