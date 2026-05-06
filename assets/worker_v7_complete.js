@@ -1812,7 +1812,9 @@ async function squareCancelSubscription(env, subscriptionId) {
 // ============================================================
 // タスク3: 子→親 subscription 同期パイプ（設計書 v2 §22 / 引継書 v25 §5-5）
 // ============================================================
-// 親 adapt-api に通常 fetch で同期する（medadapt-api-v2 は ADAPT_SVC Service Binding 未設定）
+// 親 adapt-api に Service Binding ADAPT_SVC 経由で同期する（同一Cloudflareアカウント間
+// の通常 fetch は Error 1042 で遮断されるため Service Binding 必須）
+// ADAPT_SVC 未設定時は通常 fetch にフォールバック（外部Workerから呼ばれた場合の保険）
 // 失敗してもメイン処理（子側の課金成立）は影響を受けない（try/catch で完結）
 async function syncToParent(env, loginId, subData) {
   try {
@@ -1820,12 +1822,18 @@ async function syncToParent(env, loginId, subData) {
       console.error('syncToParent: INTERNAL_API_KEY not set');
       return;
     }
-    const baseUrl = 'https://adapt-api.animalb001.workers.dev';
     const authHeader = 'Bearer ' + env.INTERNAL_API_KEY;
 
+    const adaptFetch = (path, init) => {
+      if (env.ADAPT_SVC) {
+        return env.ADAPT_SVC.fetch('https://internal' + path, init);
+      }
+      return fetch('https://adapt-api.animalb001.workers.dev' + path, init);
+    };
+
     // STEP 1: child_login_id から master_company_id を逆引き
-    const lookupRes = await fetch(
-      baseUrl + '/api/internal/master-company-by-child-login' +
+    const lookupRes = await adaptFetch(
+      '/api/internal/master-company-by-child-login' +
       '?app_name=medadapt&child_login_id=' + encodeURIComponent(loginId),
       { headers: { 'Authorization': authHeader } }
     );
@@ -1840,8 +1848,8 @@ async function syncToParent(env, loginId, subData) {
     }
 
     // STEP 2: 親に subscription-sync を投げる
-    const syncRes = await fetch(
-      baseUrl + '/api/internal/subscription-sync',
+    const syncRes = await adaptFetch(
+      '/api/internal/subscription-sync',
       {
         method: 'POST',
         headers: {
