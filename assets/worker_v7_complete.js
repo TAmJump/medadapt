@@ -1424,8 +1424,13 @@ async function handleRequest(request, env, json, err) {
 
       // 2. カード保存
       const cardRes = await squareCreateCard(env, squareCustomerId, card_source_id, verification_token);
-      const cardId = cardRes?.card?.id;
+      const cardObj = cardRes?.card || {};
+      const cardId = cardObj.id;
       if (!cardId) throw new Error('カード保存失敗');
+      const cardLast4 = cardObj.last_4 || null;
+      const cardBrand = cardObj.card_brand || null;
+      const cardExpMonth = cardObj.exp_month || null;
+      const cardExpYear = cardObj.exp_year || null;
 
       // 3. member_count 集計（v22: status='active' のみカウント）
       const cnt = await env.DB.prepare(
@@ -1446,18 +1451,23 @@ async function handleRequest(request, env, json, err) {
           `UPDATE subscriptions SET
              status='active', square_customer_id=?, square_subscription_id=?,
              member_count=?, amount_jpy=?, billing_email=?, started_at=?, cancelled_at=NULL,
-             scheduled_cancel_month=NULL
+             scheduled_cancel_month=NULL,
+             card_id=?, card_last_4=?, card_brand=?, card_exp_month=?, card_exp_year=?
            WHERE org_id=? AND module_id=?`
-        ).bind(squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now, orgId, moduleId).run();
+        ).bind(squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now,
+               cardId, cardLast4, cardBrand, cardExpMonth, cardExpYear,
+               orgId, moduleId).run();
       } else {
         const newId = 'sub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
         await env.DB.prepare(
           `INSERT INTO subscriptions
              (id, org_id, module_id, status, plan_type, started_at, auto_renew,
-              square_customer_id, square_subscription_id, member_count, amount_jpy, billing_email, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+              square_customer_id, square_subscription_id, member_count, amount_jpy, billing_email, created_at,
+              card_id, card_last_4, card_brand, card_exp_month, card_exp_year)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         ).bind(newId, orgId, moduleId, 'active', 'monthly', now, 1,
-               squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now).run();
+               squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now,
+               cardId, cardLast4, cardBrand, cardExpMonth, cardExpYear).run();
       }
 
       // 6. 親 adapt-api に同期（タスク3 / 設計書 v2 §22）
@@ -1594,6 +1604,8 @@ async function handleRequest(request, env, json, err) {
       member_count: r.member_count,
       amount_jpy: r.amount_jpy,
     }));
+    // v26: カード情報取得（DB に無ければ Square API でバックフィル）
+    const cardInfo = await ensureCardInfo(env, sub, orgId, moduleId);
     return json({
       has_subscription: true,
       status: sub.status,
@@ -1608,6 +1620,7 @@ async function handleRequest(request, env, json, err) {
       scheduled_cancel_month: sub.scheduled_cancel_month,
       has_card_on_file: !!currentUser.square_customer_id,
       square_subscription_id: sub.square_subscription_id,
+      card: cardInfo,
       can_reactivate: sub.status === 'cancelled' && !!currentUser.square_customer_id,
     });
   }
@@ -1807,6 +1820,61 @@ async function squareUpdateSubscription(env, subscriptionId, memberCount, versio
 
 async function squareCancelSubscription(env, subscriptionId) {
   return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel', 'POST', {});
+}
+
+// v26: カード詳細取得（GET /v2/cards/:id）
+async function squareGetCard(env, cardId) {
+  return squareFetch(env, '/v2/cards/' + encodeURIComponent(cardId), 'GET', null);
+}
+
+// v26: カード情報取得＋バックフィル
+// 1. D1 にカード詳細があればそれを返す
+// 2. card_id が D1 にあれば Square API で取得 → D1 にバックフィル
+// 3. card_id すら無い既存サブスクは subscription から card_id 取得 → 同上
+async function ensureCardInfo(env, sub, orgId, moduleId) {
+  if (!sub) return null;
+  if (sub.card_last_4) {
+    return {
+      id: sub.card_id || null,
+      last_4: sub.card_last_4,
+      brand: sub.card_brand || null,
+      exp_month: sub.card_exp_month || null,
+      exp_year: sub.card_exp_year || null,
+    };
+  }
+  let cardId = sub.card_id || null;
+  if (!cardId && sub.square_subscription_id) {
+    try {
+      const subRes = await squareRetrieveSubscription(env, sub.square_subscription_id);
+      cardId = subRes?.subscription?.card_id || null;
+    } catch (e) {
+      console.error('ensureCardInfo squareRetrieveSubscription failed:', e?.message || e);
+    }
+  }
+  if (!cardId) return null;
+  try {
+    const cardRes = await squareGetCard(env, cardId);
+    const c = cardRes?.card || {};
+    if (!c.id) return null;
+    const info = {
+      id: c.id,
+      last_4: c.last_4 || null,
+      brand: c.card_brand || null,
+      exp_month: c.exp_month || null,
+      exp_year: c.exp_year || null,
+    };
+    try {
+      await env.DB.prepare(
+        'UPDATE subscriptions SET card_id=?, card_last_4=?, card_brand=?, card_exp_month=?, card_exp_year=? WHERE org_id=? AND module_id=?'
+      ).bind(info.id, info.last_4, info.brand, info.exp_month, info.exp_year, orgId, moduleId).run();
+    } catch (e) {
+      console.error('ensureCardInfo backfill failed:', e?.message || e);
+    }
+    return info;
+  } catch (e) {
+    console.error('ensureCardInfo squareGetCard failed:', e?.message || e);
+    return null;
+  }
 }
 
 // ============================================================
