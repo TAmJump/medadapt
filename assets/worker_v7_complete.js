@@ -1478,6 +1478,13 @@ async function handleRequest(request, env, json, err) {
         started_at: now,
       });
 
+      // 7. 課金履歴イベント記録（Phase 2.5）
+      await recordBillingEvent(env, 'subscription_started', {
+        member_count: memberCount,
+        amount_jpy: amountJpy,
+        square_subscription_id: squareSubId,
+      }, currentUser);
+
       return json({
         success: true,
         subscription_id: squareSubId,
@@ -1543,6 +1550,14 @@ async function handleRequest(request, env, json, err) {
       await env.DB.prepare(
         "UPDATE subscriptions SET status='cancelled', cancelled_at=? WHERE org_id=? AND module_id=?"
       ).bind(now, orgId, moduleId).run();
+
+      // Phase 2.5: 履歴記録
+      await recordBillingEvent(env, 'cancelled', {
+        cancelled_at: now,
+        reason: 'manual',
+        square_subscription_id: sub.square_subscription_id,
+      }, currentUser);
+
       return json({ success: true, cancelled_at: now });
     } catch (e) {
       console.error('billing/cancel error:', e);
@@ -1568,6 +1583,13 @@ async function handleRequest(request, env, json, err) {
     await env.DB.prepare(
       'UPDATE subscriptions SET scheduled_cancel_month=? WHERE org_id=? AND module_id=?'
     ).bind(month, orgId, moduleId).run();
+
+    // Phase 2.5: 履歴記録
+    await recordBillingEvent(env, 'cancel_scheduled', {
+      scheduled_cancel_month: month,
+      prev_scheduled_cancel_month: sub.scheduled_cancel_month || null,
+    }, currentUser);
+
     return json({ success: true, scheduled_cancel_month: month });
   }
 
@@ -1576,9 +1598,19 @@ async function handleRequest(request, env, json, err) {
     if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
     const orgId = currentUser.org_id || currentUser.id;
     const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT scheduled_cancel_month FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    const prevMonth = sub?.scheduled_cancel_month || null;
     await env.DB.prepare(
       'UPDATE subscriptions SET scheduled_cancel_month=NULL WHERE org_id=? AND module_id=?'
     ).bind(orgId, moduleId).run();
+
+    // Phase 2.5: 履歴記録
+    await recordBillingEvent(env, 'unschedule_cancel', {
+      prev_scheduled_cancel_month: prevMonth,
+    }, currentUser);
+
     return json({ success: true });
   }
 
@@ -1632,6 +1664,24 @@ async function handleRequest(request, env, json, err) {
            card_id=?, card_last_4=?, card_brand=?, card_exp_month=?, card_exp_year=?
          WHERE org_id=? AND module_id=?`
       ).bind(newCardId, newLast4, newBrand, newExpMonth, newExpYear, orgId, moduleId).run();
+
+      // 6. Phase 2.5: 履歴記録
+      await recordBillingEvent(env, 'card_changed', {
+        old_card: sub.card_id ? {
+          card_id: sub.card_id,
+          last_4: sub.card_last_4 || null,
+          brand: sub.card_brand || null,
+          exp_month: sub.card_exp_month || null,
+          exp_year: sub.card_exp_year || null,
+        } : null,
+        new_card: {
+          card_id: newCardId,
+          last_4: newLast4,
+          brand: newBrand,
+          exp_month: newExpMonth,
+          exp_year: newExpYear,
+        },
+      }, currentUser);
 
       return json({
         success: true,
@@ -2026,6 +2076,81 @@ async function syncToParent(env, loginId, subData) {
     console.log('syncToParent result:', syncResult);
   } catch (e) {
     console.error('syncToParent error (non-fatal):', e);
+  }
+}
+
+// ============================================================
+// Phase 2.5: 課金履歴 billing_events 記録ヘルパー（設計書 v4 §24 予定）
+// ============================================================
+// ローカル DB の billing_events に INSERT し、続けて親 adapt-api の
+// /api/internal/billing-event-sync を Service Binding 経由で叩いて同期する。
+// ローカル INSERT が失敗した場合は親同期もスキップする。
+// 親同期失敗時はメイン処理に影響を与えない（呼び出し側の課金成立は止めない）。
+async function recordBillingEvent(env, eventType, eventData, currentUser) {
+  const orgId = currentUser?.org_id || currentUser?.id || null;
+  const eventId = 'BE-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const now = new Date().toISOString();
+
+  // 1. ローカル DB に記録
+  try {
+    await env.DB.prepare(
+      "INSERT INTO billing_events " +
+      "  (id, org_id, company_code, event_type, actor_login_id, actor_name, event_data, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      eventId,
+      orgId,
+      null,
+      eventType,
+      currentUser?.login_id || null,
+      currentUser?.name || null,
+      JSON.stringify(eventData || {}),
+      now
+    ).run();
+  } catch (e) {
+    console.error('recordBillingEvent local insert failed:', e);
+    return;
+  }
+
+  // 2. 親 adapt-api に同期（失敗してもメイン処理は止めない）
+  try {
+    if (!env.INTERNAL_API_KEY) {
+      console.log('recordBillingEvent: INTERNAL_API_KEY not set, skip parent sync');
+      return;
+    }
+    if (!currentUser?.login_id) {
+      console.log('recordBillingEvent: no login_id, skip parent sync');
+      return;
+    }
+    const adaptFetch = (path, init) => {
+      if (env.ADAPT_SVC) {
+        return env.ADAPT_SVC.fetch('https://internal' + path, init);
+      }
+      return fetch('https://adapt-api.animalb001.workers.dev' + path, init);
+    };
+    const syncRes = await adaptFetch(
+      '/api/internal/billing-event-sync',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + env.INTERNAL_API_KEY,
+        },
+        body: JSON.stringify({
+          app_name: 'medadapt',
+          child_login_id: currentUser.login_id,
+          event_type: eventType,
+          actor_login_id: currentUser.login_id,
+          actor_name: currentUser.name || null,
+          event_data: eventData || {},
+          occurred_at: now,
+        }),
+      }
+    );
+    const result = await syncRes.json();
+    console.log('recordBillingEvent sync result:', result);
+  } catch (e) {
+    console.error('recordBillingEvent parent sync error (non-fatal):', e);
   }
 }
 
