@@ -1459,6 +1459,15 @@ async function handleRequest(request, env, json, err) {
         ).bind(newId, orgId, moduleId, 'active', 'monthly', now, 1,
                squareCustomerId, squareSubId, memberCount, amountJpy, billEmail, now).run();
       }
+
+      // 6. 親 adapt-api に同期（タスク3 / 設計書 v2 §22）
+      // 失敗してもメイン処理は止めない（syncToParent 内で try/catch 済）
+      await syncToParent(env, currentUser.login_id, {
+        member_count: memberCount,
+        square_subscription_id: squareSubId,
+        started_at: now,
+      });
+
       return json({
         success: true,
         subscription_id: squareSubId,
@@ -1798,6 +1807,64 @@ async function squareUpdateSubscription(env, subscriptionId, memberCount, versio
 
 async function squareCancelSubscription(env, subscriptionId) {
   return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel', 'POST', {});
+}
+
+// ============================================================
+// タスク3: 子→親 subscription 同期パイプ（設計書 v2 §22 / 引継書 v25 §5-5）
+// ============================================================
+// 親 adapt-api に通常 fetch で同期する（medadapt-api-v2 は ADAPT_SVC Service Binding 未設定）
+// 失敗してもメイン処理（子側の課金成立）は影響を受けない（try/catch で完結）
+async function syncToParent(env, loginId, subData) {
+  try {
+    if (!env.INTERNAL_API_KEY) {
+      console.error('syncToParent: INTERNAL_API_KEY not set');
+      return;
+    }
+    const baseUrl = 'https://adapt-api.animalb001.workers.dev';
+    const authHeader = 'Bearer ' + env.INTERNAL_API_KEY;
+
+    // STEP 1: child_login_id から master_company_id を逆引き
+    const lookupRes = await fetch(
+      baseUrl + '/api/internal/master-company-by-child-login' +
+      '?app_name=medadapt&child_login_id=' + encodeURIComponent(loginId),
+      { headers: { 'Authorization': authHeader } }
+    );
+    const lookup = await lookupRes.json();
+    if (!lookup.ok) {
+      console.error('syncToParent lookup failed:', lookup);
+      return;
+    }
+    if (!lookup.master_company_id) {
+      console.log('syncToParent: not_linked, skip', { loginId, reason: lookup.reason });
+      return;
+    }
+
+    // STEP 2: 親に subscription-sync を投げる
+    const syncRes = await fetch(
+      baseUrl + '/api/internal/subscription-sync',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: JSON.stringify({
+          master_company_id: lookup.master_company_id,
+          app_name: 'medadapt',
+          plan: 'pro',
+          seat_count: subData.member_count,
+          unit_price: 200,
+          square_subscription_id: subData.square_subscription_id,
+          started_at: subData.started_at,
+          status: 'active',
+        }),
+      }
+    );
+    const syncResult = await syncRes.json();
+    console.log('syncToParent result:', syncResult);
+  } catch (e) {
+    console.error('syncToParent error (non-fatal):', e);
+  }
 }
 
 // ============================================================
