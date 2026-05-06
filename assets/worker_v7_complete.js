@@ -1340,6 +1340,8 @@ async function handleRequest(request, env, json, err) {
 
   // ── POST /billing/debug/apply-pending（admin限定・タスク2動作テスト用）──
   // invoice.payment_made を発火させずに、当月分の price_override 反映を手動実行
+  // クエリ ?billing_month=YYYY-MM を指定すると、その月+1 の pending を反映（テスト用）
+  // 未指定なら今日の月+1
   if (path === '/billing/debug/apply-pending' && method === 'POST') {
     if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
     const orgId = currentUser.org_id || currentUser.id;
@@ -1349,14 +1351,15 @@ async function handleRequest(request, env, json, err) {
     ).bind(orgId, moduleId, 'active').first();
     if (!sub) return err('有効なサブスクリプションが見つかりません', 404);
     if (!sub.square_subscription_id) return err('Square Subscription ID 未設定', 400);
-    // 翌月の pending_member_changes を検索
-    const yyyymm = new Date().toISOString().slice(0, 7);
-    const nextMonth = addOneMonth(yyyymm);
+    // クエリで billing_month を受け取り（YYYY-MM 形式）。未指定なら今月。
+    const billingMonth = url.searchParams.get('billing_month') || new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(billingMonth)) return err('billing_month は YYYY-MM 形式で指定してください', 400);
+    const nextMonth = addOneMonth(billingMonth);
     const pendingChange = await env.DB.prepare(
       'SELECT * FROM pending_member_changes WHERE org_id=? AND effective_month=?'
     ).bind(orgId, nextMonth).first();
     if (!pendingChange) {
-      return json({ ok: true, applied: false, reason: 'no_pending_for_next_month', next_month: nextMonth });
+      return json({ ok: true, applied: false, reason: 'no_pending_for_next_month', billing_month: billingMonth, next_month: nextMonth });
     }
     try {
       const retrieved = await squareRetrieveSubscription(env, sub.square_subscription_id);
@@ -1377,6 +1380,7 @@ async function handleRequest(request, env, json, err) {
       return json({
         ok: true,
         applied: true,
+        billing_month: billingMonth,
         applied_month: nextMonth,
         new_member_count: pendingChange.member_count,
         new_amount_jpy: pendingChange.amount_jpy,
