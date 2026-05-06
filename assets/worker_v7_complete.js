@@ -1338,6 +1338,56 @@ async function handleRequest(request, env, json, err) {
     }
   }
 
+  // ── POST /billing/debug/apply-pending（admin限定・タスク2動作テスト用）──
+  // invoice.payment_made を発火させずに、当月分の price_override 反映を手動実行
+  if (path === '/billing/debug/apply-pending' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=? AND status=?'
+    ).bind(orgId, moduleId, 'active').first();
+    if (!sub) return err('有効なサブスクリプションが見つかりません', 404);
+    if (!sub.square_subscription_id) return err('Square Subscription ID 未設定', 400);
+    // 翌月の pending_member_changes を検索
+    const yyyymm = new Date().toISOString().slice(0, 7);
+    const nextMonth = addOneMonth(yyyymm);
+    const pendingChange = await env.DB.prepare(
+      'SELECT * FROM pending_member_changes WHERE org_id=? AND effective_month=?'
+    ).bind(orgId, nextMonth).first();
+    if (!pendingChange) {
+      return json({ ok: true, applied: false, reason: 'no_pending_for_next_month', next_month: nextMonth });
+    }
+    try {
+      const retrieved = await squareRetrieveSubscription(env, sub.square_subscription_id);
+      const version = retrieved?.subscription?.version;
+      await squareUpdateSubscription(env, sub.square_subscription_id, pendingChange.member_count, version);
+      await env.DB.prepare(
+        'UPDATE subscriptions SET member_count=?, amount_jpy=? WHERE square_subscription_id=?'
+      ).bind(pendingChange.member_count, pendingChange.amount_jpy, sub.square_subscription_id).run();
+      await env.DB.prepare(
+        'DELETE FROM pending_member_changes WHERE org_id=? AND effective_month=?'
+      ).bind(orgId, nextMonth).run();
+      const nextPending = await env.DB.prepare(
+        'SELECT member_count FROM pending_member_changes WHERE org_id=? ORDER BY effective_month ASC LIMIT 1'
+      ).bind(orgId).first();
+      await env.DB.prepare(
+        'UPDATE subscriptions SET pending_member_count=? WHERE square_subscription_id=?'
+      ).bind(nextPending?.member_count ?? null, sub.square_subscription_id).run();
+      return json({
+        ok: true,
+        applied: true,
+        applied_month: nextMonth,
+        new_member_count: pendingChange.member_count,
+        new_amount_jpy: pendingChange.amount_jpy,
+        next_pending_member_count: nextPending?.member_count ?? null,
+        square_version_before: version,
+      });
+    } catch (e) {
+      return err('apply-pending failed: ' + e.message, 500);
+    }
+  }
+
   // ── POST /billing/setup（初回サブスク作成）──
   if (path === '/billing/setup' && method === 'POST') {
     const { card_source_id, verification_token, billing_email } = await request.json().catch(() => ({}));
