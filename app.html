@@ -174,6 +174,8 @@ function loadToken(){S.token=localStorage.getItem('medadapt_token')||null;}
 function saveToken(t){S.token=t;if(t)localStorage.setItem('medadapt_token',t);else localStorage.removeItem('medadapt_token');}
 
 // ── Square Web Payments SDK（B-2方式・契約情報＆カード入力） ──
+// v26: カードブランド表示用ラベル変換
+function brandToLabel(b){const m={'VISA':'VISA','MASTERCARD':'Mastercard','AMERICAN_EXPRESS':'AMEX','JCB':'JCB','DISCOVER':'Discover','DISCOVER_DINERS':'Diners','CHINA_UNIONPAY':'銀聯'};return m[String(b||'').toUpperCase()]||String(b||'カード');}
 let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null};
 
 async function loadSquareSdk(){
@@ -3587,7 +3589,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
       })
     ):null,
     info.last_billed_month?h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'前回請求月: '+info.last_billed_month):null,
-    info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null
+    (info.card&&info.card.last_4)?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ '+brandToLabel(info.card.brand)+' •••• '+info.card.last_4+((info.card.exp_month&&info.card.exp_year)?'（'+String(info.card.exp_month).padStart(2,'0')+'/'+String(info.card.exp_year).slice(-2)+'）':'')):(info.has_card_on_file?h('div',{style:{fontSize:'11px',color:'#16a34a',marginTop:'4px'}},'✓ カード登録済み'):null)
   ));
   // 解約予約バナー
   if(info.status==='active'&&info.scheduled_cancel_month){
