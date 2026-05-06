@@ -425,6 +425,7 @@ async function handleRequest(request, env, json, err) {
           const sub = await env.DB.prepare(
             'SELECT * FROM subscriptions WHERE square_subscription_id=?'
           ).bind(subscriptionId).first();
+          let cancelled = false;
           if (sub && sub.scheduled_cancel_month && sub.scheduled_cancel_month <= yyyymm && sub.status === 'active') {
             try {
               await squareCancelSubscription(env, subscriptionId);
@@ -432,8 +433,38 @@ async function handleRequest(request, env, json, err) {
                 "UPDATE subscriptions SET status='cancelled', cancelled_at=? WHERE square_subscription_id=?"
               ).bind(now, subscriptionId).run();
               console.log('Auto-cancelled by schedule:', subscriptionId, sub.scheduled_cancel_month);
+              cancelled = true;
             } catch (e) {
               console.error('Auto-cancel failed:', e);
+            }
+          }
+          // v23.1: 翌月分の人数変更を反映（pending_member_changes 連動）
+          if (sub && !cancelled && sub.org_id) {
+            const nextMonth = addOneMonth(yyyymm);
+            const pendingChange = await env.DB.prepare(
+              'SELECT * FROM pending_member_changes WHERE org_id=? AND effective_month=?'
+            ).bind(sub.org_id, nextMonth).first();
+            if (pendingChange) {
+              try {
+                const retrieved = await squareRetrieveSubscription(env, subscriptionId);
+                const version = retrieved?.subscription?.version;
+                await squareUpdateSubscription(env, subscriptionId, pendingChange.member_count, version);
+                await env.DB.prepare(
+                  'UPDATE subscriptions SET member_count=?, amount_jpy=? WHERE square_subscription_id=?'
+                ).bind(pendingChange.member_count, pendingChange.amount_jpy, subscriptionId).run();
+                await env.DB.prepare(
+                  'DELETE FROM pending_member_changes WHERE org_id=? AND effective_month=?'
+                ).bind(sub.org_id, nextMonth).run();
+                const nextPending = await env.DB.prepare(
+                  'SELECT member_count FROM pending_member_changes WHERE org_id=? ORDER BY effective_month ASC LIMIT 1'
+                ).bind(sub.org_id).first();
+                await env.DB.prepare(
+                  'UPDATE subscriptions SET pending_member_count=? WHERE square_subscription_id=?'
+                ).bind(nextPending?.member_count ?? null, subscriptionId).run();
+                console.log('Applied pending_member_change:', subscriptionId, nextMonth, pendingChange.member_count);
+              } catch (e) {
+                console.error('Apply pending_member_change failed:', e);
+              }
             }
           }
         }
@@ -1695,6 +1726,10 @@ async function squareCreateSubscription(env, customerId, cardId, memberCount) {
     timezone: 'Asia/Tokyo',
     source: { name: 'やるゼ！' },
   });
+}
+
+async function squareRetrieveSubscription(env, subscriptionId) {
+  return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId), 'GET', null);
 }
 
 async function squareUpdateSubscription(env, subscriptionId, memberCount, version) {
