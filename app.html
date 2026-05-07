@@ -238,6 +238,68 @@ async function refreshBillingInfo(){
   try{const r=await api('/billing/info',{method:'GET'});SQ.info=r;SQ.infoLoaded=true;return r;}catch(e){SQ.infoLoaded=true;return null;}
 }
 
+// v29 Phase 4: zipcloud で郵便番号→住所自動補完
+async function fetchAddressByZip(zip){
+  const cleaned=String(zip||'').replace(/[^\d]/g,'');
+  if(cleaned.length!==7)return null;
+  try{
+    const r=await fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode='+cleaned);
+    const d=await r.json();
+    if(d.status!==200||!d.results||!d.results.length)return null;
+    const a=d.results[0];
+    return{pref:a.address1||'',city:a.address2||'',town:a.address3||'',full:(a.address1||'')+(a.address2||'')+(a.address3||'')};
+  }catch(e){return null;}
+}
+
+// v29 Phase 4: カードブランドにより独自 ZIP 欄の表示制御
+// AVS 対象国（VISA/MC/AMEX/Discover）→ SDK 側 ZIP 欄が出るので独自欄を隠す
+// JCB/銀聯/不明 → 独自欄を表示し、tokenize 時に postalCode を渡す
+function applyZipBlockVisibility(brand){
+  const block=document.getElementById('app-zip-block');
+  if(!block)return;
+  const b=String(brand||'').toUpperCase();
+  const sdkShowsZip=['VISA','MASTERCARD','AMERICAN_EXPRESS','AMEX','DISCOVER','DISCOVER_DINERS'].includes(b);
+  block.style.display=sdkShowsZip?'none':'';
+}
+
+// v29 Phase 4: 独自 ZIP 欄の検索ボタンと入力欄の動作を bind（独自 ZIP 欄が DOM 配置された後に呼ぶ）
+function bindZipBlock(){
+  const inp=document.getElementById('app-zip-input');
+  const btn=document.getElementById('app-zip-search');
+  const disp=document.getElementById('app-addr-display');
+  if(!inp||!btn||!disp)return;
+  const run=async()=>{
+    const zip=inp.value.trim();
+    if(!/^\d{7}$/.test(zip)){disp.textContent='郵便番号は7桁の数字で入力してください';disp.style.color='#dc2626';return;}
+    disp.textContent='検索中...';disp.style.color='var(--ink-m)';
+    const addr=await fetchAddressByZip(zip);
+    if(!addr){disp.textContent='該当する住所が見つかりません';disp.style.color='#dc2626';return;}
+    disp.textContent='✓ '+addr.full;disp.style.color='#0c4a6e';
+  };
+  btn.onclick=run;
+  inp.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();run();}};
+}
+
+// v29 Phase 4: tokenize 用 billingContact.postalCode を独自 ZIP 欄から取得
+function getZipForTokenize(){
+  const inp=document.getElementById('app-zip-input');
+  const v=inp&&inp.value?inp.value.trim():'';
+  return /^\d{7}$/.test(v)?v:'';
+}
+
+// v29 Phase 4: 独自 ZIP 入力ブロックを生成（カード変更/再契約フォームで appendChild する）
+function createZipBlock(){
+  const d=h('div',{id:'app-zip-block',style:{marginTop:'10px',padding:'10px 12px',background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'6px'}});
+  d.innerHTML='<div style="font-size:11px;color:#64748b;margin-bottom:6px;line-height:1.6;">※カードブランドによってはこちらの郵便番号入力は不要です（カード入力欄内に「ZIP/郵便番号」が表示された場合はそちらに入力）</div>'+
+'<div style="display:flex;gap:6px;align-items:flex-end;">'+
+'<div style="flex:1;"><label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">郵便番号（ハイフンなし7桁）</label>'+
+'<input id="app-zip-input" type="text" inputmode="numeric" maxlength="7" placeholder="1000001" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box;" /></div>'+
+'<button id="app-zip-search" type="button" style="padding:8px 14px;border:1px solid #0891b2;color:#0891b2;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">住所を検索</button>'+
+'</div>'+
+'<div id="app-addr-display" style="font-size:12px;color:#0c4a6e;margin-top:6px;min-height:14px;"></div>';
+  return d;
+}
+
 async function initSquareCard(){
   try{
     const ct=document.getElementById('sq-card-container');
@@ -248,6 +310,10 @@ async function initSquareCard(){
     if(!SQ.payments)return;
     SQ.card=await SQ.payments.card();
     await SQ.card.attach('#sq-card-container');
+    // v29 Phase 4: ブランド変化で独自 ZIP 欄の表示切替
+    try{SQ.card.addEventListener('cardBrandChanged',(ev)=>{const b=ev&&ev.detail&&ev.detail.cardBrand;applyZipBlockVisibility(b);});}catch(e){}
+    // 独自 ZIP 欄のバインド（DOM 配置済の場合のみ機能）
+    bindZipBlock();
   }catch(e){
     const st=document.getElementById('sq-status');if(st)st.textContent='カード入力初期化失敗: '+e.message;
   }
@@ -3639,7 +3705,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
     cb.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px'}},'新しいカード情報を入力'));
     cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',lineHeight:'1.7',marginBottom:'10px'}},'登録すると、次回請求から新しいカードに切り替わります。旧カードは無効化されます。'));
     cb.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
-    cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'6px',padding:'8px 10px',background:'#f8fafc',borderLeft:'2px solid #0891b2',borderRadius:'4px',lineHeight:'1.6'}},'※「ZIP」または「郵便番号」入力欄が表示された場合は、カード請求先住所の郵便番号を入力してください（日本：7桁、米国：5桁）。JCB など一部のカードでは表示されません。'));
+    cb.appendChild(createZipBlock());
     cb.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
     const btnRow=h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}});
     btnRow.appendChild(btn('カードを変更する','btn-pri',async()=>{
@@ -3651,7 +3717,10 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
       }
       if(st)st.textContent='処理中...';
       try{
-        const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:{email:u.email||'',givenName:u.name||''}});
+        const _zip=getZipForTokenize();
+        const _bc={email:u.email||'',givenName:u.name||''};
+        if(_zip)_bc.postalCode=_zip;
+        const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:_bc});
         if(r.status!=='OK'){if(st)st.textContent=(r.errors||[]).map(e=>e.message).join(', ')||'カード入力エラー';return;}
         const res=await api('/billing/card/update',{method:'POST',body:JSON.stringify({card_source_id:r.token,verification_token:r.verificationToken})});
         if(res&&res.success){
@@ -3712,7 +3781,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
            :'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。カード情報を登録すると Pro 契約が開始されます。'));
   bil.appendChild(h('label',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-l)',display:'block',marginBottom:'6px'}},'カード情報'));
   bil.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
-  bil.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'6px',padding:'8px 10px',background:'#f8fafc',borderLeft:'2px solid #0891b2',borderRadius:'4px',lineHeight:'1.6'}},'※「ZIP」または「郵便番号」入力欄が表示された場合は、カード請求先住所の郵便番号を入力してください（日本：7桁、米国：5桁）。JCB など一部のカードでは表示されません。'));
+  bil.appendChild(createZipBlock());
   bil.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
   bil.appendChild(btn(isReact?'再契約する':'Proプランを開始する','btn-pri',async()=>{
     const st=document.getElementById('sq-status');
@@ -3723,7 +3792,10 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
     }
     if(st)st.textContent='処理中...';
     try{
-      const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:{email:u.email||'',givenName:u.name||''}});
+      const _zip=getZipForTokenize();
+      const _bc={email:u.email||'',givenName:u.name||''};
+      if(_zip)_bc.postalCode=_zip;
+      const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:_bc});
       if(r.status!=='OK'){if(st)st.textContent=(r.errors||[]).map(e=>e.message).join(', ')||'カード入力エラー';return;}
       const apiPath=isReact?'/billing/reactivate':'/billing/setup';
       const reqBody=isReact
