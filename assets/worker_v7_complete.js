@@ -1746,6 +1746,32 @@ async function handleRequest(request, env, json, err) {
     });
   }
 
+  // ── GET /billing/history（v27 Phase 2.5: 課金履歴取得・admin/staff 双方可）──
+  if (path === '/billing/history' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200);
+    const rows = await env.DB.prepare(
+      "SELECT id, event_type, actor_login_id, actor_name, event_data, created_at " +
+      "  FROM billing_events " +
+      " WHERE org_id = ? " +
+      " ORDER BY created_at DESC " +
+      " LIMIT ?"
+    ).bind(orgId, limit).all();
+    const events = (rows?.results || []).map(r => {
+      let parsed = null;
+      try { parsed = r.event_data ? JSON.parse(r.event_data) : null; } catch (_) { parsed = null; }
+      return {
+        id: r.id,
+        event_type: r.event_type,
+        actor_login_id: r.actor_login_id,
+        actor_name: r.actor_name,
+        event_data: parsed,
+        created_at: r.created_at,
+      };
+    });
+    return json({ ok: true, events });
+  }
+
   return err('Not found', 404);
 }
 

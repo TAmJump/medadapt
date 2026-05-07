@@ -176,7 +176,40 @@ function saveToken(t){S.token=t;if(t)localStorage.setItem('medadapt_token',t);el
 // ── Square Web Payments SDK（B-2方式・契約情報＆カード入力） ──
 // v26: カードブランド表示用ラベル変換
 function brandToLabel(b){const m={'VISA':'VISA','MASTERCARD':'Mastercard','AMERICAN_EXPRESS':'AMEX','JCB':'JCB','DISCOVER':'Discover','DISCOVER_DINERS':'Diners','CHINA_UNIONPAY':'銀聯'};return m[String(b||'').toUpperCase()]||String(b||'カード');}
-let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null,changeCardMode:false};
+let SQ={sdk:null,payments:null,card:null,info:null,infoLoaded:false,cfg:null,loading:false,error:null,changeCardMode:false,history:[],historyLoaded:false,historyOpen:false,historyError:null};
+
+// v27 Phase 2.5: 課金イベント1件を日本語要約してDOM要素として返す
+function renderBillingEvent(ev){
+  const dt=new Date(ev.created_at);
+  const yyyy=dt.getFullYear(),mm=String(dt.getMonth()+1).padStart(2,'0'),dd=String(dt.getDate()).padStart(2,'0');
+  const hh=String(dt.getHours()).padStart(2,'0'),mi=String(dt.getMinutes()).padStart(2,'0');
+  const tsLabel=yyyy+'-'+mm+'-'+dd+' '+hh+':'+mi;
+  const d=ev.event_data||{};
+  let summary='';
+  if(ev.event_type==='subscription_started'){
+    const mc=d.member_count||1;const amt=d.amount_jpy||(200*mc);
+    summary='契約開始（'+mc+'名・¥'+amt.toLocaleString()+'/月）';
+  }else if(ev.event_type==='card_changed'){
+    const oc=d.old_card,nc=d.new_card||{};
+    const ncStr=brandToLabel(nc.brand)+' •••• '+(nc.last_4||'****');
+    if(oc&&oc.last_4){summary='カード変更：'+brandToLabel(oc.brand)+' •••• '+oc.last_4+' → '+ncStr;}
+    else{summary='カード登録：'+ncStr;}
+  }else if(ev.event_type==='cancelled'){
+    summary='解約（即時）';
+  }else if(ev.event_type==='cancel_scheduled'){
+    const m=d.scheduled_cancel_month||'';const ymLabel=m?(m.split('-')[0]+'年'+parseInt(m.split('-')[1]||'0',10)+'月'):'';
+    summary='解約予約：'+ymLabel+'末';
+  }else if(ev.event_type==='unschedule_cancel'){
+    summary='解約予約 取消';
+  }else{
+    summary=ev.event_type;
+  }
+  const actor=ev.actor_name?(ev.actor_name+'（'+(ev.actor_login_id||'')+'）'):(ev.actor_login_id||'-');
+  return h('div',{style:{padding:'8px 10px',background:'#f8fafc',border:'1px solid var(--border)',borderRadius:'6px',fontSize:'12px',lineHeight:'1.6'}},
+    h('div',{style:{fontWeight:'600',color:'var(--ink)'}},summary),
+    h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'2px'}},tsLabel+' ・ '+actor)
+  );
+}
 
 async function loadSquareSdk(){
   if(SQ.payments)return SQ.payments;
@@ -3697,6 +3730,32 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
   }));
   // SDK 初期化（mount後に実行・rerender 対応）
   setTimeout(initSquareCard,50);
+}
+// v27 Phase 2.5: 契約履歴セクション（折り畳み）
+if(info&&info.has_subscription){
+  const histWrap=h('div',{style:{marginTop:'14px',paddingTop:'12px',borderTop:'1px solid var(--border)'}});
+  const toggleBtn=h('button',{type:'button',style:{background:'none',border:'none',color:'#0891b2',fontSize:'12px',cursor:'pointer',padding:'4px 0',fontFamily:'inherit',fontWeight:'600'},onClick:async()=>{
+    SQ.historyOpen=!SQ.historyOpen;
+    if(SQ.historyOpen&&!SQ.historyLoaded){
+      try{const r=await api('/billing/history',{method:'GET'});if(r&&r.ok){SQ.history=r.events||[];SQ.historyLoaded=true;}else{SQ.historyError=r?.error||'履歴の取得に失敗しました';}}catch(e){SQ.historyError='履歴の取得に失敗しました';}
+    }
+    rr();
+  }},(SQ.historyOpen?'▼ ':'▶ ')+'契約履歴を表示');
+  histWrap.appendChild(toggleBtn);
+  if(SQ.historyOpen){
+    if(!SQ.historyLoaded&&!SQ.historyError){
+      histWrap.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'8px 0'}},'読み込み中...'));
+    }else if(SQ.historyError){
+      histWrap.appendChild(h('div',{style:{fontSize:'12px',color:'#dc2626',padding:'8px 0'}},SQ.historyError));
+    }else if(!SQ.history||SQ.history.length===0){
+      histWrap.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'8px 0'}},'履歴はまだありません'));
+    }else{
+      const list=h('div',{style:{marginTop:'8px',display:'flex',flexDirection:'column',gap:'6px'}});
+      SQ.history.forEach(ev=>{list.appendChild(renderBillingEvent(ev));});
+      histWrap.appendChild(list);
+    }
+  }
+  bil.appendChild(histWrap);
 }
 w.appendChild(bil);
 // Data management
