@@ -3639,6 +3639,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
     cb.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'700',marginBottom:'8px'}},'新しいカード情報を入力'));
     cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',lineHeight:'1.7',marginBottom:'10px'}},'登録すると、次回請求から新しいカードに切り替わります。旧カードは無効化されます。'));
     cb.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
+    cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'6px',padding:'8px 10px',background:'#f8fafc',borderLeft:'2px solid #0891b2',borderRadius:'4px',lineHeight:'1.6'}},'※「ZIP」または「郵便番号」入力欄が表示された場合は、カード請求先住所の郵便番号を入力してください（日本：7桁、米国：5桁）。JCB など一部のカードでは表示されません。'));
     cb.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
     const btnRow=h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}});
     btnRow.appendChild(btn('カードを変更する','btn-pri',async()=>{
@@ -3711,6 +3712,7 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
            :'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。カード情報を登録すると Pro 契約が開始されます。'));
   bil.appendChild(h('label',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-l)',display:'block',marginBottom:'6px'}},'カード情報'));
   bil.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
+  bil.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'6px',padding:'8px 10px',background:'#f8fafc',borderLeft:'2px solid #0891b2',borderRadius:'4px',lineHeight:'1.6'}},'※「ZIP」または「郵便番号」入力欄が表示された場合は、カード請求先住所の郵便番号を入力してください（日本：7桁、米国：5桁）。JCB など一部のカードでは表示されません。'));
   bil.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
   bil.appendChild(btn(isReact?'再契約する':'Proプランを開始する','btn-pri',async()=>{
     const st=document.getElementById('sq-status');
