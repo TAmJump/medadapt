@@ -189,6 +189,9 @@ function renderBillingEvent(ev){
   if(ev.event_type==='subscription_started'){
     const mc=d.member_count||1;const amt=d.amount_jpy||(200*mc);
     summary='契約開始（'+mc+'名・¥'+amt.toLocaleString()+'/月）';
+  }else if(ev.event_type==='subscription_resumed'){
+    const mc=d.member_count||1;const amt=d.amount_jpy||(200*mc);
+    summary='再契約（'+mc+'名・¥'+amt.toLocaleString()+'/月）';
   }else if(ev.event_type==='card_changed'){
     const oc=d.old_card,nc=d.new_card||{};
     const ncStr=brandToLabel(nc.brand)+' •••• '+(nc.last_4||'****');
@@ -3694,19 +3697,22 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
       '解約済みです。新しいカード情報で再契約できます。'
     ));
     bil.appendChild(btn('再契約する（カード情報を入力）','btn-pri',()=>{
-      // 再契約UIに切替（カード入力フォームを表示）
-      info.has_subscription=false;rr();
+      // 再契約UIに切替（カード入力フォームを表示・_reactivate フラグで API パスを切替）
+      info.has_subscription=false;info._reactivate=true;rr();
     }));
   }else if(isCancelled){
     bil.appendChild(h('div',{style:{padding:'12px 14px',background:'#f3f4f6',borderRadius:'8px',fontSize:'12px',color:'var(--ink-m)'}},'解約済みです。'));
   }
 }else{
-  // サブスク未開始 → カード入力フォーム表示
-  bil.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.8'}},'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。カード情報を登録すると Pro 契約が開始されます。'));
+  // サブスク未開始 → カード入力フォーム表示（_reactivate=true なら再契約モード）
+  const isReact=!!info._reactivate;
+  bil.appendChild(h('div',{style:{fontSize:'13px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.8'}},
+    isReact?'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。新しいカード情報を登録すると再契約が完了します。'
+           :'¥200/ユーザー/月（組織まとめ決済・代表者カードで一括請求）。カード情報を登録すると Pro 契約が開始されます。'));
   bil.appendChild(h('label',{style:{fontSize:'12px',fontWeight:'700',color:'var(--ink-l)',display:'block',marginBottom:'6px'}},'カード情報'));
   bil.appendChild(h('div',{id:'sq-card-container',style:{padding:'12px',border:'1px solid var(--border)',borderRadius:'8px',minHeight:'90px',background:'#fff'}}));
   bil.appendChild(h('div',{id:'sq-status',style:{fontSize:'11px',color:'var(--ink-m)',minHeight:'14px',margin:'8px 0'}}));
-  bil.appendChild(btn('Proプランを開始する','btn-pri',async()=>{
+  bil.appendChild(btn(isReact?'再契約する':'Proプランを開始する','btn-pri',async()=>{
     const st=document.getElementById('sq-status');
     if(!SQ.card){
       if(st)st.textContent='カード入力を準備中...';
@@ -3717,14 +3723,20 @@ if(!SQ.infoLoaded||(SQ.infoLoaded&&info===null&&!SQ.error)){
     try{
       const r=await SQ.card.tokenize({intent:'STORE',customerInitiated:true,sellerKeyedIn:false,billingContact:{email:u.email||'',givenName:u.name||''}});
       if(r.status!=='OK'){if(st)st.textContent=(r.errors||[]).map(e=>e.message).join(', ')||'カード入力エラー';return;}
-      const setup=await api('/billing/setup',{method:'POST',body:JSON.stringify({card_source_id:r.token,verification_token:r.verificationToken,billing_email:u.email})});
+      const apiPath=isReact?'/billing/reactivate':'/billing/setup';
+      const reqBody=isReact
+        ?{card_source_id:r.token,verification_token:r.verificationToken}
+        :{card_source_id:r.token,verification_token:r.verificationToken,billing_email:u.email};
+      const setup=await api(apiPath,{method:'POST',body:JSON.stringify(reqBody)});
       if(setup&&setup.success){
         u.plan='pro';saveUser(u);
-        if(st)st.textContent='決済設定完了';
-        toast('Pro プランを開始しました（¥'+setup.amount_jpy+'/月・'+setup.member_count+'名）');
+        if(st)st.textContent=isReact?'再契約完了':'決済設定完了';
+        toast(isReact
+          ?('再契約しました（¥'+setup.amount_jpy+'/月・'+setup.member_count+'名）')
+          :('Pro プランを開始しました（¥'+setup.amount_jpy+'/月・'+setup.member_count+'名）'));
         await refreshBillingInfo();rr();
       }else{
-        if(st)st.textContent=setup?.error||'決済設定失敗';
+        if(st)st.textContent=setup?.error||(isReact?'再契約失敗':'決済設定失敗');
       }
     }catch(e){if(st)st.textContent='エラー: '+e.message;}
   }));

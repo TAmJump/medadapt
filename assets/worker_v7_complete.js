@@ -1392,6 +1392,101 @@ async function handleRequest(request, env, json, err) {
     }
   }
 
+  // ── POST /billing/reactivate（v28 Phase3: 解約済→再契約）──
+  if (path === '/billing/reactivate' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('代表者のみ操作できます', 403);
+    const { card_source_id, verification_token } = await request.json().catch(() => ({}));
+    if (!card_source_id) return err('card_source_id が必要です');
+
+    const orgId = currentUser.org_id || currentUser.id;
+    const moduleId = 'medical-adapt';
+    const sub = await env.DB.prepare(
+      'SELECT * FROM subscriptions WHERE org_id=? AND module_id=?'
+    ).bind(orgId, moduleId).first();
+    if (!sub) return err('再契約対象のサブスクが見つかりません', 404);
+    if (sub.status !== 'cancelled') return err('解約済のサブスクのみ再契約できます', 409);
+
+    let newCardId = null;
+    try {
+      // 1. Square Customer 確認/作成（cancelled でも通常は残っている）
+      let squareCustomerId = sub.square_customer_id || currentUser.square_customer_id;
+      if (!squareCustomerId) {
+        const billEmail = sub.billing_email || currentUser.billing_email || currentUser.email || '';
+        const custRes = await squareCreateCustomer(env, billEmail, currentUser.name);
+        squareCustomerId = custRes?.customer?.id;
+        if (!squareCustomerId) throw new Error('Customer取得/作成失敗');
+        await env.DB.prepare(
+          'UPDATE users SET square_customer_id=? WHERE id=?'
+        ).bind(squareCustomerId, currentUser.id).run();
+      }
+
+      // 2. 新カード保存
+      const cardRes = await squareCreateCard(env, squareCustomerId, card_source_id, verification_token);
+      const cardObj = cardRes?.card || {};
+      newCardId = cardObj.id;
+      if (!newCardId) throw new Error('カード保存失敗');
+      const newLast4 = cardObj.last_4 || null;
+      const newBrand = cardObj.card_brand || null;
+      const newExpMonth = cardObj.exp_month || null;
+      const newExpYear = cardObj.exp_year || null;
+
+      // 3. member_count 集計（v22: status='active' のみカウント）
+      const cnt = await env.DB.prepare(
+        "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
+      ).bind(orgId).first();
+      const memberCount = Math.max(1, cnt?.n || 1);
+      const amountJpy = 200 * memberCount;
+
+      // 4. 新 Subscription 作成
+      const subRes = await squareCreateSubscription(env, squareCustomerId, newCardId, memberCount);
+      const newSquareSubId = subRes?.subscription?.id;
+      if (!newSquareSubId) throw new Error('Subscription再作成失敗');
+
+      // 5. D1 UPDATE（status='active' 戻し + 新 sub_id + 新カード情報 + cancelled_at NULL）
+      const now = new Date().toISOString();
+      const previousSquareSubId = sub.square_subscription_id || null;
+      await env.DB.prepare(
+        `UPDATE subscriptions SET
+           status='active', square_customer_id=?, square_subscription_id=?,
+           started_at=?, cancelled_at=NULL, scheduled_cancel_month=NULL,
+           member_count=?, amount_jpy=?,
+           card_id=?, card_last_4=?, card_brand=?, card_exp_month=?, card_exp_year=?
+         WHERE org_id=? AND module_id=?`
+      ).bind(squareCustomerId, newSquareSubId, now, memberCount, amountJpy,
+             newCardId, newLast4, newBrand, newExpMonth, newExpYear,
+             orgId, moduleId).run();
+
+      // 6. 親 adapt-api に同期
+      await syncToParent(env, currentUser.login_id, {
+        member_count: memberCount,
+        square_subscription_id: newSquareSubId,
+        started_at: now,
+      });
+
+      // 7. 課金履歴イベント記録（subscription_resumed）
+      await recordBillingEvent(env, 'subscription_resumed', {
+        member_count: memberCount,
+        amount_jpy: amountJpy,
+        square_subscription_id: newSquareSubId,
+        previous_subscription_id: previousSquareSubId,
+      }, currentUser);
+
+      return json({
+        success: true,
+        subscription_id: newSquareSubId,
+        amount_jpy: amountJpy,
+        member_count: memberCount,
+        card: { id: newCardId, last_4: newLast4, brand: newBrand, exp_month: newExpMonth, exp_year: newExpYear },
+      });
+    } catch (e) {
+      console.error('billing/reactivate error:', e);
+      if (newCardId) {
+        try { await squareDisableCard(env, newCardId); } catch (_) {}
+      }
+      return err('再契約に失敗しました: ' + e.message, 500);
+    }
+  }
+
   // ── POST /billing/setup（初回サブスク作成）──
   if (path === '/billing/setup' && method === 'POST') {
     const { card_source_id, verification_token, billing_email } = await request.json().catch(() => ({}));
