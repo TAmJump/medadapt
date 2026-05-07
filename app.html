@@ -278,10 +278,15 @@ function bindZipBlock(){
   };
   btn.onclick=run;
   inp.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();run();}};
+  // v29: 入力修正時に古いエラー/結果メッセージをクリア
+  inp.oninput=()=>{disp.textContent='';};
 }
 
 // v29 Phase 4: tokenize 用 billingContact.postalCode を独自 ZIP 欄から取得
+// 独自欄が display:none（AVS 対象ブランド時）の場合は送らない（SDK 側 ZIP 欄と二重送信防止）
 function getZipForTokenize(){
+  const block=document.getElementById('app-zip-block');
+  if(block&&block.style.display==='none')return '';
   const inp=document.getElementById('app-zip-input');
   const v=inp&&inp.value?inp.value.trim():'';
   return /^\d{7}$/.test(v)?v:'';
