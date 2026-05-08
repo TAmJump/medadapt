@@ -1403,6 +1403,15 @@ async function handleRequest(request, env, json, err) {
       await env.DB.prepare(
         'UPDATE subscriptions SET pending_member_count=? WHERE square_subscription_id=?'
       ).bind(nextPending?.member_count ?? null, sub.square_subscription_id).run();
+      // ★Phase 7: 親 adapt-api に人数同期（debug でも Webhook と同じく親同期する）
+      // debug は admin user 自身が叩くので currentUser.login_id を使用
+      await syncToParent(env, currentUser.login_id, {
+        member_count: pendingChange.member_count,
+        square_subscription_id: sub.square_subscription_id,
+        started_at: sub.started_at,
+        status: 'active',
+        unit_price: 200,
+      });
       return json({
         ok: true,
         applied: true,
