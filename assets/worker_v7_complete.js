@@ -434,6 +434,19 @@ async function handleRequest(request, env, json, err) {
               ).bind(now, subscriptionId).run();
               console.log('Auto-cancelled by schedule:', subscriptionId, sub.scheduled_cancel_month);
               cancelled = true;
+              // ★Phase 7: 親 adapt-api に解約同期（Webhook 経由・status='expired' / ended_at 設定）
+              const adminLoginId = await getOrgAdminLoginId(env, sub.org_id);
+              if (adminLoginId) {
+                await syncToParent(env, adminLoginId, {
+                  member_count: sub.member_count,
+                  square_subscription_id: subscriptionId,
+                  started_at: sub.started_at,
+                  status: 'cancelled',  // syncToParent 内で 'expired' に正規化
+                  ended_at: now,
+                });
+              } else {
+                console.error('Phase 7 syncToParent skipped: admin login_id not found for org_id=', sub.org_id);
+              }
             } catch (e) {
               console.error('Auto-cancel failed:', e);
             }
@@ -462,6 +475,19 @@ async function handleRequest(request, env, json, err) {
                   'UPDATE subscriptions SET pending_member_count=? WHERE square_subscription_id=?'
                 ).bind(nextPending?.member_count ?? null, subscriptionId).run();
                 console.log('Applied pending_member_change:', subscriptionId, nextMonth, pendingChange.member_count);
+                // ★Phase 7: 親 adapt-api に人数同期（Webhook 経由・seat_count / unit_price 更新）
+                const adminLoginId = await getOrgAdminLoginId(env, sub.org_id);
+                if (adminLoginId) {
+                  await syncToParent(env, adminLoginId, {
+                    member_count: pendingChange.member_count,
+                    square_subscription_id: subscriptionId,
+                    started_at: sub.started_at,
+                    status: 'active',
+                    unit_price: 200,
+                  });
+                } else {
+                  console.error('Phase 7 syncToParent skipped: admin login_id not found for org_id=', sub.org_id);
+                }
               } catch (e) {
                 console.error('Apply pending_member_change failed:', e);
               }
@@ -1653,6 +1679,16 @@ async function handleRequest(request, env, json, err) {
         square_subscription_id: sub.square_subscription_id,
       }, currentUser);
 
+      // ★Phase 7: 親 adapt-api に解約同期（status='expired' / ended_at 設定）
+      // 失敗してもメイン処理は止めない（syncToParent 内で try/catch 済）
+      await syncToParent(env, currentUser.login_id, {
+        member_count: sub.member_count,
+        square_subscription_id: sub.square_subscription_id,
+        started_at: sub.started_at,
+        status: 'cancelled',  // syncToParent 内で 'expired' に正規化
+        ended_at: now,
+      });
+
       return json({ success: true, cancelled_at: now });
     } catch (e) {
       console.error('billing/cancel error:', e);
@@ -2173,6 +2209,10 @@ async function syncToParent(env, loginId, subData) {
     }
 
     // STEP 2: 親に subscription-sync を投げる
+    // ★Phase 7：subData.status / subData.ended_at / subData.unit_price を optional 受付
+    // 子の status='cancelled' は親では 'expired' に正規化（adapt-db の status 体系に合わせる）
+    const rawStatus = subData.status || 'active';
+    const normalizedStatus = (rawStatus === 'cancelled') ? 'expired' : rawStatus;
     const syncRes = await adaptFetch(
       '/api/internal/subscription-sync',
       {
@@ -2186,10 +2226,11 @@ async function syncToParent(env, loginId, subData) {
           app_name: 'medadapt',
           plan: 'pro',
           seat_count: subData.member_count,
-          unit_price: 200,
+          unit_price: subData.unit_price ?? 200,
           square_subscription_id: subData.square_subscription_id,
           started_at: subData.started_at,
-          status: 'active',
+          status: normalizedStatus,
+          ended_at: subData.ended_at ?? null,
         }),
       }
     );
@@ -2197,6 +2238,26 @@ async function syncToParent(env, loginId, subData) {
     console.log('syncToParent result:', syncResult);
   } catch (e) {
     console.error('syncToParent error (non-fatal):', e);
+  }
+}
+
+// ============================================================
+// Phase 7: org_id から代表者の login_id を引き当てるヘルパー
+// ============================================================
+// Webhook は authenticated user を持たないため、Webhook 内で syncToParent を
+// 呼ぶ際に loginId を子 DB から動的引き当てする。
+// users.role='admin' で status='active' のユーザーのうち、最古に作成された 1 件を採用。
+// （複数 admin が存在する場合に備える）
+async function getOrgAdminLoginId(env, orgId) {
+  if (!orgId) return null;
+  try {
+    const admin = await env.DB.prepare(
+      "SELECT login_id FROM users WHERE org_id=? AND role='admin' AND status='active' ORDER BY created ASC LIMIT 1"
+    ).bind(orgId).first();
+    return admin?.login_id || null;
+  } catch (e) {
+    console.error('getOrgAdminLoginId error:', e);
+    return null;
   }
 }
 
