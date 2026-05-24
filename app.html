@@ -748,7 +748,7 @@ w.appendChild(cd);return w;}
 function changepwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワード変更'),h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'8px'}},'初回ログインのため、パスワードを変更してください')));cd.appendChild(fld('新しいパスワード','c_newpw','',()=>{},{type:'password',ph:'8文字以上'}));cd.appendChild(fld('確認','c_newpw2','',()=>{},{type:'password',ph:'もう一度入力'}));cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('変更して利用開始','btn-pri btn-full',async()=>{const pw=document.getElementById('c_newpw')?.value?.trim(),pw2=document.getElementById('c_newpw2')?.value?.trim();if(!pw||pw.length<8){toast('8文字以上');return}if(pw!==pw2){toast('パスワードが一致しません');return}const res=await api('/auth/change-password',{method:'POST',body:JSON.stringify({newPassword:pw})});if(res&&res.success){S.user.must_change_pw=0;await loadPatients();S.scr='app';S.page='patients';toast('パスワード変更完了');rr()}})));w.appendChild(cd);return w}
 // --- APP SHELL ---
 function appShell(){const u=S.user,shell=h('div',{className:'app-shell'});const sb=h('div',{className:'sidebar'});const logoLink=h('a',{href:'index.html',style:{textDecoration:'none',color:'var(--yellow)'},className:'sidebar-logo'},APP_CONFIG.name);sb.appendChild(logoLink);const nav=h('div',{className:'sidebar-nav'});
-[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
+[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'consent',l:'同意書'},{id:'claims',l:'加算管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
 sb.appendChild(nav);
 // 今月の使用状況ウィジェット（中央の空白部分）
 if(u.plan==='free'){
@@ -824,6 +824,10 @@ else if(S.page==='discharge'){main.appendChild(dischargePage())}
 else if(S.page==='discharge_new'){main.appendChild(dischargeNewPage())}
 else if(S.page==='shared_chart'){main.appendChild(sharedChartPage())}
 else if(S.page==='nda'){main.appendChild(ndaPage())}
+else if(S.page==='consent'){main.appendChild(consentPage())}
+else if(S.page==='consent_new'){main.appendChild(consentNewPage())}
+else if(S.page==='consent_detail'&&S.consentId){main.appendChild(consentDetailPage())}
+else if(S.page==='claims'){main.appendChild(claimsPage())}
 else{main.appendChild(patientsPage())}
 shell.appendChild(main);
 if(S.modal){const ov=h('div',{className:'modal-overlay',onClick:e=>{if(e.target===ov){S.modal=null;rr()}}});ov.appendChild(S.modal);shell.appendChild(ov)}
@@ -2509,6 +2513,438 @@ function showNdaActionModal(nda, action){
   ));
   S.modal=modal;rr();
 }
+
+// ===========================================================
+// 同意書管理（Phase 8 v13 / コンパス書式・改ざん防止対応）
+// ===========================================================
+function consentPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}},
+    h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'同意書（鍼灸・マッサージ／訪問診療）'),
+    btn('+ 同意書を発行する','btn-pri btn-sm',()=>{S.page='consent_new';rr()})
+  ));
+  w.appendChild(h('div',{style:{padding:'12px 14px',background:'#eff6ff',borderLeft:'4px solid #3b82f6',borderRadius:'4px',fontSize:'13px',color:'#1e40af',marginBottom:'16px'}},
+    '厚労省様式準拠（保医発第1001002号・コンパスクリニック書式）。発行時に SHA-256 ハッシュチェーン化され、QRコードで第三者から真正性検証が可能です。'
+  ));
+  if(!S.consentList){
+    api('/consent/list').then(res=>{S.consentList=res?.items||[];rr()}).catch(()=>{S.consentList=[]});
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}},'読み込み中...'));
+    return w;
+  }
+  if(S.consentList.length===0){
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)',border:'1px dashed #d1d5db',borderRadius:'8px',background:'#fff'}},
+      h('div',{style:{fontSize:'14px',marginBottom:'8px'}},'同意書はまだ発行されていません'),
+      h('div',{style:{fontSize:'12px'}},'「+ 同意書を発行する」から作成してください')
+    ));
+    return w;
+  }
+  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  S.consentList.forEach(item=>{
+    const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
+    const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','revoked':'#dc2626','renewed':'#6b7280'};
+    const typeLabels={'acupuncture':'はり・きゅう','massage':'あマ指','both':'はり・きゅう＋あマ指'};
+    const card=h('div',{
+      style:{padding:'14px 16px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'8px',cursor:'pointer',transition:'all .15s'},
+      onClick:()=>{S.consentId=item.id;S.page='consent_detail';rr()}
+    });
+    card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}},
+      h('div',{style:{flex:'1',minWidth:'200px'}},
+        h('div',{style:{fontWeight:'700',fontSize:'14px',marginBottom:'4px'}},typeLabels[item.consent_type]||item.consent_type),
+        h('div',{style:{fontSize:'12px',color:'#64748b'}},'同意日: '+item.consent_date+' / 有効期限: '+(item.expires_at||'').slice(0,10))
+      ),
+      h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700',background:statusColors[item.status]||'#94a3b8',color:'#fff'}},statusLabels[item.status]||item.status)
+    ));
+    list.appendChild(card);
+  });
+  w.appendChild(list);
+  return w;
+}
+
+function consentNewPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'760px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}},
+    h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.page='consent';rr()}},'← 同意書一覧'),
+    h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'同意書を発行する')
+  ));
+  const form=h('div',{style:{display:'flex',flexDirection:'column',gap:'14px',background:'#fff',padding:'20px',borderRadius:'8px',border:'1px solid #e5e7eb'}});
+  // 患者選択
+  const ptWrap=h('div');
+  ptWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'患者 *'));
+  const ptSelect=h('select',{id:'cf-patient',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  ptSelect.appendChild(h('option',{value:''},'患者を選択'));
+  ptWrap.appendChild(ptSelect);
+  form.appendChild(ptWrap);
+  // 患者リストを取得
+  api('/patient/list').then(res=>{
+    const items=res?.items||res?.patients||[];
+    items.forEach(p=>{
+      const name=p.data?(safeParse(p.data).name||p.id):(p.name||p.id);
+      ptSelect.appendChild(h('option',{value:p.id},name+' ('+p.id+')'));
+    });
+  }).catch(()=>{});
+
+  // 施術種別
+  const typeWrap=h('div');
+  typeWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'施術種別 *'));
+  const typeSel=h('select',{id:'cf-type',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  ['acupuncture:はり・きゅう','massage:あマ指（あん摩・マッサージ・指圧）','both:はり・きゅう＋あマ指'].forEach(o=>{
+    const [v,l]=o.split(':');
+    typeSel.appendChild(h('option',{value:v},l));
+  });
+  typeSel.value='massage';
+  typeWrap.appendChild(typeSel);
+  form.appendChild(typeWrap);
+
+  // 同意日
+  const dateWrap=h('div');
+  dateWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'同意年月日 *'));
+  const dateInp=h('input',{type:'date',id:'cf-date',value:new Date().toISOString().slice(0,10),style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  dateWrap.appendChild(dateInp);
+  form.appendChild(dateWrap);
+
+  // 有効月数
+  const monthsWrap=h('div');
+  monthsWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'有効月数（通常6か月／変形徒手は1か月）'));
+  const monthsSel=h('select',{id:'cf-months',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  monthsSel.appendChild(h('option',{value:'6'},'6か月（通常）'));
+  monthsSel.appendChild(h('option',{value:'1'},'1か月（変形徒手矯正術）'));
+  monthsWrap.appendChild(monthsSel);
+  form.appendChild(monthsWrap);
+
+  // 傷病名（JSON テキストエリア・簡易版）
+  const dWrap=h('div');
+  dWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'傷病名（1行1疾病・「疾病名:発症日YYYY-MM-DD」形式）*'));
+  const dInp=h('textarea',{id:'cf-diseases',rows:4,placeholder:'変形性膝関節症（両）:2023-04-01\n腰痛症:2024-06-15',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',fontSize:'13px'}});
+  dWrap.appendChild(dInp);
+  form.appendChild(dWrap);
+
+  // 通院困難理由（簡易チェックボックス）
+  const drWrap=h('div',{style:{padding:'12px',background:'#f9fafb',borderRadius:'4px',border:'1px solid #e5e7eb'}});
+  drWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'8px'}},'通院困難理由（チェック）'));
+  const reasons=['肩関節周囲炎','変形性膝関節症','腰痛症','変形性腰椎症','脊柱管狭窄症','関節リウマチ','脳梗塞・脳梗塞後遺症','脳出血・脳出血後遺症','麻痺','神経痛','パーキンソン','その他'];
+  reasons.forEach((r,i)=>{
+    const lbl=h('label',{style:{display:'inline-block',marginRight:'12px',marginBottom:'4px',fontSize:'13px',cursor:'pointer'}});
+    const cb=h('input',{type:'checkbox',className:'cf-reason',value:r,style:{marginRight:'4px'}});
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(r));
+    drWrap.appendChild(lbl);
+  });
+  form.appendChild(drWrap);
+
+  // 算定設定
+  const claimWrap=h('div',{style:{padding:'12px',background:'#fef3c7',borderRadius:'4px',border:'1px solid #fbbf24'}});
+  claimWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'保険算定（療養費同意書交付料 B013）'));
+  const claimCb=h('input',{type:'checkbox',id:'cf-claim',checked:true,style:{marginRight:'6px'}});
+  const claimLbl=h('label',{style:{fontSize:'13px',cursor:'pointer'}});
+  claimLbl.appendChild(claimCb);
+  claimLbl.appendChild(document.createTextNode('療養費同意書交付料 100点 を算定対象として登録する'));
+  claimWrap.appendChild(claimLbl);
+  form.appendChild(claimWrap);
+
+  // 発行ボタン
+  const submitBtn=btn('発行する（医師署名へ進む）','btn-pri',async ()=>{
+    const pt=document.getElementById('cf-patient').value;
+    if(!pt){toast('患者を選択してください');return;}
+    const dRaw=document.getElementById('cf-diseases').value.trim();
+    if(!dRaw){toast('傷病名を1つ以上入力してください');return;}
+    const diseases=dRaw.split('\n').filter(l=>l.trim()).map(l=>{
+      const m=l.split(':');
+      return {name:(m[0]||'').trim(),onset_date:(m[1]||'').trim()||null};
+    });
+    const reasonChecks=document.querySelectorAll('.cf-reason:checked');
+    const drJson={};
+    reasonChecks.forEach(cb=>{drJson[cb.value]=true});
+    const body={
+      patient_id:pt,
+      consent_type:document.getElementById('cf-type').value,
+      disease_names:diseases,
+      consent_date:document.getElementById('cf-date').value,
+      validity_months:Number(document.getElementById('cf-months').value),
+      difficulty_reasons:drJson,
+      treatment_plan:{
+        visit_frequency:'biannual',
+        evaluation_frequency:'monthly',
+        goals:'',
+        treatment_method:''
+      }
+    };
+    submitBtn.disabled=true;
+    submitBtn.textContent='発行中...';
+    try{
+      const res=await api('/consent/create',{method:'POST',body:JSON.stringify(body)});
+      if(!res?.ok){toast(res?.error||'発行に失敗しました');submitBtn.disabled=false;submitBtn.textContent='発行する（医師署名へ進む）';return;}
+      const cfId=res.consent_form_id;
+      // 算定対象として登録
+      if(document.getElementById('cf-claim').checked){
+        // signed_documents への登録は consent_form 署名完了後に finalize で行う設計
+        // ここでは consent_form_id を保持して詳細画面へ遷移
+      }
+      toast('同意書を発行しました');
+      S.consentList=null;
+      S.consentId=cfId;
+      S.page='consent_detail';
+      rr();
+    }catch(e){
+      toast('エラー: '+(e.message||e));
+      submitBtn.disabled=false;
+      submitBtn.textContent='発行する（医師署名へ進む）';
+    }
+  });
+  form.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}},submitBtn,btn('キャンセル','btn-out',()=>{S.page='consent';rr()})));
+  w.appendChild(form);
+  return w;
+}
+
+function consentDetailPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}},
+    h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.page='consent';rr()}},'← 同意書一覧')
+  ));
+  if(!S.consentDetail||S.consentDetail.consent_form?.id!==S.consentId){
+    api('/consent/'+S.consentId).then(res=>{S.consentDetail=res;rr()}).catch(()=>{});
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center'}},'読み込み中...'));
+    return w;
+  }
+  const d=S.consentDetail;
+  const cf=d.consent_form;
+  const sigs=d.signatures||[];
+  w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 12px'}},'同意書 '+cf.id));
+  // ステータス
+  const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
+  w.appendChild(h('div',{style:{padding:'12px 14px',background:'#f9fafb',borderRadius:'6px',marginBottom:'12px',fontSize:'13px'}},
+    h('div',{style:{marginBottom:'4px'}},'ステータス: ',h('span',{style:{fontWeight:'700'}},statusLabels[cf.status]||cf.status)),
+    h('div',{style:{marginBottom:'4px'}},'同意日: '+cf.consent_date+' / 有効期限: '+(cf.expires_at||'').slice(0,10)),
+    h('div',{},'施術種別: '+cf.consent_type+' / 有効月数: '+cf.validity_months+'ヶ月')
+  ));
+  // 改ざん検知情報
+  if(cf.content_hash){
+    w.appendChild(h('div',{style:{padding:'10px 14px',background:'#dcfce7',border:'1px solid #16a34a',borderRadius:'6px',marginBottom:'12px',fontSize:'12px',fontFamily:'monospace'}},
+      h('div',{style:{fontWeight:'700',marginBottom:'4px',fontFamily:'system-ui'}},'✓ 改ざん防止：登録済み（SHA-256 ハッシュチェーン）'),
+      h('div',{},'HASH: '+cf.content_hash.slice(0,16)+'...'+cf.content_hash.slice(-16)),
+      h('div',{},'CHAIN: #'+cf.chain_index)
+    ));
+  }
+  // アクションボタン
+  const actions=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'16px'}});
+  if(cf.status==='draft'){
+    actions.appendChild(btn('医師署名する','btn-pri btn-sm',async()=>{
+      const name=prompt('医師署名（氏名）を入力してください');
+      if(!name)return;
+      const res=await api('/consent/'+cf.id+'/sign-doctor',{method:'POST',body:JSON.stringify({signature_method:'typed_name',signature_data:name})});
+      if(res?.ok){toast('医師署名完了');S.consentDetail=null;rr()}else toast(res?.error||'エラー');
+    }));
+  }
+  if(cf.status==='signed_by_doctor'){
+    actions.appendChild(btn('患者署名する','btn-pri btn-sm',async()=>{
+      const name=prompt('患者署名（氏名）を入力してください');
+      if(!name)return;
+      const res=await api('/consent/'+cf.id+'/sign-patient',{method:'POST',body:JSON.stringify({signature_method:'typed_name',signature_data:name})});
+      if(res?.ok){
+        toast('患者署名完了・確定しました');
+        // 確定後、signed_documents に finalize
+        await finalizeConsentSignedDoc(cf.id);
+        S.consentDetail=null;rr();
+      }else toast(res?.error||'エラー');
+    }));
+  }
+  if(cf.status==='signed_by_patient'||cf.status==='shared'){
+    actions.appendChild(btn('PDFをプレビュー','btn-out btn-sm',()=>previewConsentPDF(cf.id)));
+    actions.appendChild(btn('QR検証URLをコピー','btn-out btn-sm',async()=>{
+      const sdRes=await api('/signed-docs/by-doc/consent_form/'+cf.id);
+      if(sdRes?.signed_document?.qr_payload){
+        navigator.clipboard.writeText(sdRes.signed_document.qr_payload);
+        toast('検証URLをコピーしました');
+      }
+    }));
+  }
+  if(cf.status==='draft'||cf.status==='signed_by_doctor'||cf.status==='signed_by_patient'){
+    actions.appendChild(btn('取消し','btn-out btn-sm',async()=>{
+      if(!confirm('この同意書を取消しますか？（改ざん防止のため履歴は残ります）'))return;
+      const reason=prompt('取消し理由')||'';
+      const res=await api('/consent/'+cf.id+'/revoke',{method:'POST',body:JSON.stringify({reason})});
+      if(res?.ok){toast('取消しました');S.consentDetail=null;rr()}
+    }));
+  }
+  w.appendChild(actions);
+  // 署名履歴
+  if(sigs.length){
+    w.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',margin:'12px 0 6px'}},'署名履歴（改ざん不可）'));
+    const sigList=h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
+    sigs.forEach(s=>{
+      const roleLabel={'doctor':'医師','patient':'患者','acupuncturist':'施術者'}[s.signer_role]||s.signer_role;
+      sigList.appendChild(h('div',{style:{padding:'8px 12px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',fontSize:'12px'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between'}},
+          h('span',{style:{fontWeight:'700'}},roleLabel),
+          h('span',{style:{color:'#64748b'}},(s.signed_at||'').replace('T',' ').slice(0,19))
+        ),
+        h('div',{style:{fontFamily:'monospace',fontSize:'10px',color:'#94a3b8',marginTop:'2px'}},'HASH: '+(s.event_hash||'').slice(0,32)+'...')
+      ));
+    });
+    w.appendChild(sigList);
+  }
+  return w;
+}
+
+async function finalizeConsentSignedDoc(cfId){
+  // consent_form を signed_documents に登録（改ざん防止確定）
+  try{
+    const detail=await api('/consent/'+cfId);
+    if(!detail?.consent_form)return;
+    const cf=detail.consent_form;
+    await api('/signed-docs/finalize',{method:'POST',body:JSON.stringify({
+      doc_kind:'consent_form',
+      doc_id:cfId,
+      title:'鍼灸・マッサージ 同意書（'+cf.consent_type+'）',
+      content:detail,
+      patient_id:cf.patient_id,
+      insurance_claim_kind:'b013_ryouyouhi_doui',
+      claim_points:100,
+      claim_unit:'medical_points'
+    })});
+  }catch(e){console.error('finalize failed',e);}
+}
+
+async function previewConsentPDF(cfId){
+  // 別タブで PDF テンプレートを開きデータを差し込む
+  const win=window.open('assets/consent_form_template.html','_blank');
+  if(!win){toast('ポップアップがブロックされました');return;}
+  // データ取得
+  const [detail,sdRes]=await Promise.all([
+    api('/consent/'+cfId),
+    api('/signed-docs/by-doc/consent_form/'+cfId)
+  ]);
+  if(!detail?.consent_form){toast('データ取得失敗');return;}
+  const cf=detail.consent_form;
+  const sd=sdRes?.signed_document;
+  // 和暦変換
+  const d=new Date(cf.consent_date);
+  const reiwaYear=d.getFullYear()-2018;
+  // difficulty_reasons パース
+  let dr={};
+  try{dr=typeof cf.difficulty_reasons==='string'?JSON.parse(cf.difficulty_reasons):cf.difficulty_reasons||{}}catch(e){}
+  const data={
+    sd_id:sd?.id||'未確定',
+    content_hash:sd?.content_hash||cf.content_hash||'',
+    chain_index:sd?.chain_index||cf.chain_index||0,
+    qr_image_base64:'',  // QR は別途生成
+    verify_url:sd?.qr_payload||'',
+    addressee:'コンパス内科歯科クリニック大宮',
+    visit_plan:cf.visit_plan||'年２回（６か月に１回）',
+    difficulty_reasons:dr,
+    consent_date_jp:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
+    patient:{address:'',name:'',phone:''}
+  };
+  // テンプレートのロード完了を待つ
+  win.addEventListener('load',()=>{
+    if(win.consentTemplateRender){
+      win.consentTemplateRender(data);
+      // QR を qrcode ライブラリで生成（CDN 動的読込）
+      if(sd?.qr_payload){
+        const script=win.document.createElement('script');
+        script.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        script.onload=()=>{
+          const qrDiv=win.document.createElement('div');
+          win.document.body.appendChild(qrDiv);
+          new win.QRCode(qrDiv,{text:sd.qr_payload,width:120,height:120});
+          setTimeout(()=>{
+            const img=qrDiv.querySelector('img');
+            if(img)win.document.getElementById('qr-image').src=img.src;
+            qrDiv.remove();
+          },300);
+        };
+        win.document.head.appendChild(script);
+      }
+    }
+  });
+}
+
+// ===========================================================
+// 加算管理（療養費同意書交付料・退院時共同指導加算 等）
+// ===========================================================
+function claimsPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 8px'}},'加算管理（医療保険算定）'));
+  w.appendChild(h('div',{style:{fontSize:'13px',color:'#64748b',marginBottom:'16px'}},'療養費同意書交付料 100点・退院時共同指導料・訪問看護退院時共同指導加算 等'));
+  if(!S.claimSummary){
+    const month=new Date().toISOString().slice(0,7);
+    Promise.all([
+      api('/signed-docs/claim-summary?month='+month),
+      api('/signed-docs/list')
+    ]).then(([sum,list])=>{
+      S.claimSummary={month,summary:sum?.summary||[],list:list?.items||[]};
+      rr();
+    }).catch(()=>{S.claimSummary={month,summary:[],list:[]}});
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center'}},'読み込み中...'));
+    return w;
+  }
+  // 月次サマリ
+  const summaryBox=h('div',{style:{padding:'14px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'8px',marginBottom:'16px'}});
+  summaryBox.appendChild(h('div',{style:{fontWeight:'700',marginBottom:'8px',fontSize:'14px'}},S.claimSummary.month+' 算定サマリ'));
+  const claimKindLabels={
+    'b013_ryouyouhi_doui':'療養費同意書交付料（B013・100点）',
+    'b004_taiin_kyodo_1':'退院時共同指導料1（B004）',
+    'b005_taiin_kyodo_2':'退院時共同指導料2（B005）',
+    'visit_nursing_kyodo':'訪問看護退院時共同指導加算（600単位）'
+  };
+  if(S.claimSummary.summary.length===0){
+    summaryBox.appendChild(h('div',{style:{color:'#94a3b8',fontSize:'13px'}},'今月の算定はまだありません'));
+  }else{
+    const tbl=h('table',{style:{width:'100%',fontSize:'13px',borderCollapse:'collapse'}});
+    tbl.appendChild(h('thead',{},h('tr',{},
+      h('th',{style:{textAlign:'left',padding:'6px',borderBottom:'1px solid #e5e7eb'}},'算定区分'),
+      h('th',{style:{textAlign:'left',padding:'6px',borderBottom:'1px solid #e5e7eb'}},'状態'),
+      h('th',{style:{textAlign:'right',padding:'6px',borderBottom:'1px solid #e5e7eb'}},'件数'),
+      h('th',{style:{textAlign:'right',padding:'6px',borderBottom:'1px solid #e5e7eb'}},'合計点数')
+    )));
+    S.claimSummary.summary.forEach(row=>{
+      tbl.appendChild(h('tr',{},
+        h('td',{style:{padding:'6px',borderBottom:'1px solid #f3f4f6'}},claimKindLabels[row.claim_kind]||row.claim_kind),
+        h('td',{style:{padding:'6px',borderBottom:'1px solid #f3f4f6'}},row.claim_status),
+        h('td',{style:{padding:'6px',textAlign:'right',borderBottom:'1px solid #f3f4f6'}},row.cnt),
+        h('td',{style:{padding:'6px',textAlign:'right',borderBottom:'1px solid #f3f4f6'}},(row.total_points||0)+'点')
+      ));
+    });
+    summaryBox.appendChild(tbl);
+  }
+  w.appendChild(summaryBox);
+  // 算定対象一覧
+  w.appendChild(h('div',{style:{fontWeight:'700',marginBottom:'8px',fontSize:'14px'}},'算定対象の文書'));
+  const eligibleList=S.claimSummary.list.filter(x=>x.insurance_claim_kind);
+  if(eligibleList.length===0){
+    w.appendChild(h('div',{style:{padding:'20px',textAlign:'center',color:'#94a3b8',fontSize:'13px',background:'#f9fafb',borderRadius:'6px'}},'算定対象の文書はありません'));
+  }else{
+    const ul=h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
+    eligibleList.forEach(item=>{
+      const card=h('div',{style:{padding:'10px 14px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',fontSize:'13px'}});
+      card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px',flexWrap:'wrap'}},
+        h('div',{},h('div',{style:{fontWeight:'700'}},item.title),h('div',{style:{fontSize:'11px',color:'#64748b'}},(claimKindLabels[item.insurance_claim_kind]||item.insurance_claim_kind)+' / '+item.claim_points+'点')),
+        h('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},
+          h('span',{style:{padding:'2px 8px',borderRadius:'10px',fontSize:'10px',fontWeight:'700',background:item.claim_status==='claimed'?'#16a34a':item.claim_status==='eligible'?'#f59e0b':'#94a3b8',color:'#fff'}},item.claim_status),
+          item.claim_status==='eligible'?btn('算定記録','btn-out',()=>recordClaim(item.id)):null
+        )
+      ));
+      ul.appendChild(card);
+    });
+    w.appendChild(ul);
+  }
+  return w;
+}
+
+async function recordClaim(sdId){
+  const month=new Date().toISOString().slice(0,7);
+  if(!confirm(month+' の算定として記録しますか？'))return;
+  const res=await api('/signed-docs/'+sdId+'/claim',{method:'POST',body:JSON.stringify({claim_status:'recorded',claim_month:month})});
+  if(res?.ok){
+    toast('算定を記録しました');
+    S.claimSummary=null;
+    rr();
+  }else{
+    toast(res?.error||'エラー');
+  }
+}
+
+function safeParse(s){try{return typeof s==='string'?JSON.parse(s):s}catch(e){return null}}
+
 
 function ndaPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'720px'}});

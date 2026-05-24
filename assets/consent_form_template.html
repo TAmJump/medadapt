@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>鍼灸・マッサージ 同意書作成の依頼書 兼 訪問診療同意書及び計画書</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Serif JP', serif;
+    font-size: 11pt;
+    line-height: 1.85;
+    color: #000;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 15mm;
+    margin: 0 auto;
+    background: #fff;
+    position: relative;
+  }
+  .seal-mark {
+    text-align: right;
+    font-size: 10pt;
+    margin-bottom: 6mm;
+  }
+  .title {
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    line-height: 1.6;
+    margin-bottom: 8mm;
+  }
+  .addressee {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-bottom: 6mm;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2mm;
+  }
+  .plan-block {
+    margin: 4mm 0;
+    font-size: 11pt;
+  }
+  .plan-block .label {
+    display: inline-block;
+    width: 12mm;
+    font-weight: bold;
+  }
+  .body-text {
+    margin: 6mm 0;
+    font-size: 11pt;
+    line-height: 2;
+    text-indent: 0;
+  }
+  .difficulty-title {
+    font-weight: bold;
+    margin: 6mm 0 3mm;
+    border-left: 4px solid #000;
+    padding-left: 3mm;
+    font-size: 11pt;
+  }
+  .difficulty-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5mm 4mm;
+    font-size: 10.5pt;
+    margin-bottom: 5mm;
+  }
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+  }
+  .check-box {
+    display: inline-block;
+    width: 4mm;
+    height: 4mm;
+    border: 1.2px solid #000;
+    margin-right: 2mm;
+    margin-top: 1.5mm;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .check-box.checked::after {
+    content: '✓';
+    position: absolute;
+    top: -2mm;
+    left: 0.3mm;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: 1;
+  }
+  .check-text {
+    flex: 1;
+  }
+  .check-text .sub-options {
+    font-size: 9.5pt;
+    color: #333;
+  }
+  .check-text .selected-option {
+    text-decoration: underline;
+    font-weight: bold;
+  }
+  .date-line {
+    text-align: right;
+    margin: 8mm 0 4mm;
+    font-size: 11pt;
+    letter-spacing: 0.5mm;
+  }
+  .patient-info {
+    margin: 4mm 0;
+    font-size: 11pt;
+  }
+  .patient-info .field {
+    margin: 3mm 0;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1mm;
+    display: flex;
+  }
+  .patient-info .field-label {
+    display: inline-block;
+    min-width: 22mm;
+    font-weight: bold;
+  }
+  .patient-info .field-value {
+    flex: 1;
+    margin-left: 2mm;
+  }
+  .patient-info .field-inline {
+    display: flex;
+    gap: 5mm;
+  }
+  .patient-info .field-inline > div {
+    flex: 1;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1mm;
+  }
+  .clinic-block {
+    margin-top: 10mm;
+    padding-top: 4mm;
+    border-top: 1.5px solid #000;
+    font-size: 10pt;
+    line-height: 1.7;
+  }
+  .clinic-block .clinic-name {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 1.5mm;
+  }
+  .footer-hash {
+    position: absolute;
+    bottom: 10mm;
+    right: 15mm;
+    font-size: 7pt;
+    color: #444;
+    font-family: 'Consolas', 'Menlo', monospace;
+    text-align: right;
+    line-height: 1.4;
+  }
+  .footer-qr {
+    position: absolute;
+    bottom: 10mm;
+    left: 15mm;
+    text-align: center;
+    font-size: 7pt;
+    color: #444;
+  }
+  .footer-qr img {
+    width: 22mm;
+    height: 22mm;
+    display: block;
+    margin-bottom: 1mm;
+  }
+  .supervisor-credit {
+    position: absolute;
+    bottom: 5mm;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7pt;
+    color: #555;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="page" id="consent-page">
+
+  <!-- 正・控マーカー -->
+  <div class="seal-mark">（<span id="copy-mark">正</span>・控）</div>
+
+  <!-- タイトル -->
+  <div class="title">
+    鍼灸・マッサージ　同意書作成の依頼書<br>
+    兼　訪問診療同意書及び計画書
+  </div>
+
+  <!-- 宛先（医療機関名） -->
+  <div class="addressee" id="addressee-name">
+    コンパス内科歯科クリニック大宮　宛
+  </div>
+
+  <!-- 計画 -->
+  <div class="plan-block">
+    <span class="label">計画：</span><span id="visit-plan">年２回（６か月に１回）</span>
+  </div>
+
+  <!-- 本文（厚労省様式準拠の定型文） -->
+  <div class="body-text">
+    内容：通院困難のため在宅にて上記回数により同意書を作成することを依頼する。<br>
+    また、６か月に１回（変形徒手は１か月に１回）鍼灸・マッサージ の効果判定の<br>
+    定期診察を受け継続の要否を決定することに同意する。
+  </div>
+
+  <!-- 通院困難理由 -->
+  <div class="difficulty-title">【通院困難理由】</div>
+  <div class="difficulty-grid" id="difficulty-grid">
+    <!-- 動的生成（下記 JS で挿入） -->
+  </div>
+
+  <!-- 日付欄 -->
+  <div class="date-line">
+    令和　<span id="reiwa-year">　　</span>　年　<span id="month">　　</span>　月　<span id="day">　　</span>　日
+  </div>
+
+  <!-- 患者情報 -->
+  <div class="patient-info">
+    <div class="field">
+      <span class="field-label">住所：</span>
+      <span class="field-value" id="patient-address"></span>
+    </div>
+    <div class="field-inline">
+      <div>
+        <span class="field-label">自署氏名：</span>
+        <span class="field-value" id="patient-name"></span>
+      </div>
+      <div>
+        <span class="field-label">連絡先：</span>
+        <span class="field-value" id="patient-phone"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 医療機関情報（コンパス書式準拠） -->
+  <div class="clinic-block" id="clinic-block">
+    <div class="clinic-name">医療法人社団コンパス　コンパス内科歯科クリニック大宮</div>
+    <div>〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室</div>
+    <div>TEL：048-783-2713　　FAX：03-6369-4732</div>
+  </div>
+
+  <!-- フッタ QR（改ざん検証用） -->
+  <div class="footer-qr" id="footer-qr">
+    <img id="qr-image" src="" alt="検証QR">
+    <div>QRで真正性検証</div>
+  </div>
+
+  <!-- フッタ ハッシュ（改ざん検証用） -->
+  <div class="footer-hash" id="footer-hash">
+    <div>ID: <span id="sd-id">SD-XXXXXXXX</span></div>
+    <div>HASH: <span id="content-hash-short">XXXXXXXX...XXXXXXXX</span></div>
+    <div>CHAIN: #<span id="chain-index">XXXX</span></div>
+    <div id="tsa-line" style="display:none">TSA: <span id="tsa-authority"></span> <span id="tsa-acquired"></span></div>
+  </div>
+
+  <!-- 医監修クレジット（v4.3 §48-2-3） -->
+  <div class="supervisor-credit">
+    本書式は ｍやるゼ！プラットフォーム（医監修：後藤基温医師）にて電子発行されました
+  </div>
+
+</div>
+
+<script>
+/**
+ * コンパスクリニック書式の同意書を動的に組み立てる。
+ *
+ * window.consentTemplateRender(data) を呼び出すことで、サーバから受け取った
+ * signed_documents + consent_forms のスナップショットをこのテンプレートに差し込む。
+ *
+ * data 形式：
+ * {
+ *   sd_id: 'SD-xxxxx',
+ *   content_hash: 'abcd...',
+ *   chain_index: 12345,
+ *   verify_url: 'https://.../verify/document/SD-xxxxx?token=...',
+ *   qr_image_base64: 'data:image/png;base64,...',
+ *   tsa: { authority: 'amano', acquired_at: '2026-...' } | null,
+ *   copy_kind: 'original' | 'copy',
+ *   addressee: '医療機関名 + 宛',
+ *   visit_plan: '年２回（６か月に１回）',
+ *   difficulty_reasons: {
+ *     肩関節周囲炎: 'both' | 'left' | 'right' | null,
+ *     変形性膝関節症: 'both' | 'left' | 'right' | null,
+ *     腰痛症: true | false,
+ *     変形性腰椎症: true | false,
+ *     脊柱管狭窄症: true | false,
+ *     関節リウマチ: true | false,
+ *     脳梗塞: { checked: true, period: '2024年3月' } | { checked: false },
+ *     脳出血: { checked: true, period: '...' } | { checked: false },
+ *     麻痺: { checked: true, location: '左上肢' } | { checked: false },
+ *     神経痛: { checked: true, location: '坐骨' } | { checked: false },
+ *     パーキンソン: true | false,
+ *     その他: { checked: true, text: '...' } | { checked: false }
+ *   },
+ *   consent_date_jp: { year: 8, month: 5, day: 24 },  // 令和8年5月24日 = 2026-05-24
+ *   patient: {
+ *     address: '埼玉県...',
+ *     name: '田中 タムジ',
+ *     phone: '048-xxx-xxxx'
+ *   },
+ *   clinic: { name, address, tel, fax } | null  // null 時はコンパスクリニック既定値
+ * }
+ */
+window.consentTemplateRender = function(data) {
+  // 正・控
+  document.getElementById('copy-mark').textContent = data.copy_kind === 'copy' ? '控' : '正';
+  // 宛先
+  if (data.addressee) {
+    document.getElementById('addressee-name').textContent = data.addressee.endsWith('宛')
+      ? data.addressee
+      : (data.addressee + '　宛');
+  }
+  // 計画
+  if (data.visit_plan) {
+    document.getElementById('visit-plan').textContent = data.visit_plan;
+  }
+  // 通院困難理由のレンダリング
+  renderDifficultyReasons(data.difficulty_reasons || {});
+  // 日付
+  if (data.consent_date_jp) {
+    document.getElementById('reiwa-year').textContent = data.consent_date_jp.year;
+    document.getElementById('month').textContent = data.consent_date_jp.month;
+    document.getElementById('day').textContent = data.consent_date_jp.day;
+  }
+  // 患者情報
+  if (data.patient) {
+    document.getElementById('patient-address').textContent = data.patient.address || '';
+    document.getElementById('patient-name').textContent = data.patient.name || '';
+    document.getElementById('patient-phone').textContent = data.patient.phone || '';
+  }
+  // 医療機関（コンパス固定値を上書き可能）
+  if (data.clinic) {
+    const cb = document.getElementById('clinic-block');
+    cb.innerHTML =
+      `<div class="clinic-name">${escapeHtml(data.clinic.name)}</div>` +
+      `<div>${escapeHtml(data.clinic.address || '')}</div>` +
+      `<div>TEL：${escapeHtml(data.clinic.tel || '')}　　FAX：${escapeHtml(data.clinic.fax || '')}</div>`;
+  }
+  // フッタ
+  document.getElementById('sd-id').textContent = data.sd_id || 'SD-XXXXXXXX';
+  if (data.content_hash) {
+    const h = data.content_hash;
+    document.getElementById('content-hash-short').textContent = h.slice(0, 8) + '...' + h.slice(-8);
+  }
+  if (data.chain_index !== undefined) {
+    document.getElementById('chain-index').textContent = data.chain_index;
+  }
+  if (data.qr_image_base64) {
+    document.getElementById('qr-image').src = data.qr_image_base64;
+  }
+  if (data.tsa && data.tsa.authority) {
+    document.getElementById('tsa-line').style.display = 'block';
+    document.getElementById('tsa-authority').textContent = data.tsa.authority.toUpperCase();
+    document.getElementById('tsa-acquired').textContent = data.tsa.acquired_at ? '@' + data.tsa.acquired_at.slice(0, 10) : '';
+  }
+};
+
+function renderDifficultyReasons(dr) {
+  const grid = document.getElementById('difficulty-grid');
+  grid.innerHTML = '';
+
+  // 部位選択型（両・左・右）
+  const lateralItems = [
+    { key: '肩関節周囲炎', label: '肩関節周囲炎' },
+    { key: '変形性膝関節症', label: '変形性膝関節症' },
+  ];
+  // 単純チェック型
+  const simpleItems = [
+    { key: '腰痛症', label: '腰痛症' },
+    { key: '変形性腰椎症', label: '変形性腰椎症' },
+    { key: '脊柱管狭窄症', label: '脊柱管狭窄症' },
+    { key: '関節リウマチ', label: '関節リウマチ' },
+    { key: 'パーキンソン', label: 'パーキンソン' },
+  ];
+  // 時期付き
+  const withPeriodItems = [
+    { key: '脳梗塞', label: '脳梗塞、脳梗塞後遺症' },
+    { key: '脳出血', label: '脳出血、脳出血後遺症' },
+  ];
+  // 部位付き（フリーテキスト）
+  const withLocationItems = [
+    { key: '麻痺', label: '麻痺' },
+    { key: '神経痛', label: '神経痛' },
+  ];
+
+  lateralItems.forEach(item => {
+    const sel = dr[item.key]; // 'both' | 'left' | 'right' | null
+    const checked = sel === 'both' || sel === 'left' || sel === 'right';
+    const opts = ['両', '左', '右'];
+    const selKey = sel === 'both' ? '両' : sel === 'left' ? '左' : sel === 'right' ? '右' : null;
+    const optsHtml = opts.map(o => o === selKey ? `<span class="selected-option">${o}</span>` : o).join('・');
+    grid.appendChild(createCheckItem(checked, `${item.label}（${optsHtml}）`));
+  });
+
+  simpleItems.forEach(item => {
+    grid.appendChild(createCheckItem(!!dr[item.key], item.label));
+  });
+
+  withPeriodItems.forEach(item => {
+    const v = dr[item.key];
+    const checked = v && v.checked;
+    const period = checked && v.period ? v.period : '　　　　　　　　　　';
+    grid.appendChild(createCheckItem(checked, `${item.label}（時期：${period}）`));
+  });
+
+  withLocationItems.forEach(item => {
+    const v = dr[item.key];
+    const checked = v && v.checked;
+    const location = checked && v.location ? v.location : '　　　　　　　　';
+    grid.appendChild(createCheckItem(checked, `${item.label}（部位：${location}）`));
+  });
+
+  // その他（フリーテキスト）
+  const other = dr['その他'];
+  const otherChecked = other && other.checked;
+  const otherText = otherChecked && other.text ? other.text : '　　　　　　　　　　　　　　　　';
+  grid.appendChild(createCheckItem(otherChecked, `その他（${otherText}）`));
+}
+
+function createCheckItem(checked, htmlText) {
+  const wrap = document.createElement('div');
+  wrap.className = 'check-item';
+  const box = document.createElement('span');
+  box.className = 'check-box' + (checked ? ' checked' : '');
+  wrap.appendChild(box);
+  const t = document.createElement('span');
+  t.className = 'check-text';
+  t.innerHTML = htmlText; // selected-option span を含むため innerHTML
+  wrap.appendChild(t);
+  return wrap;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// 単独で開いた場合のサンプルレンダリング
+if (window.location.search.includes('demo=1')) {
+  window.consentTemplateRender({
+    sd_id: 'SD-DEMO1234',
+    content_hash: 'a3b8e7d2f1c5b4a9e8d7c6b5a4938271a3b8e7d2f1c5b4a9e8d7c6b5a4938271',
+    chain_index: 1,
+    qr_image_base64: '',
+    addressee: 'コンパス内科歯科クリニック大宮',
+    visit_plan: '年２回（６か月に１回）',
+    difficulty_reasons: {
+      変形性膝関節症: 'both',
+      腰痛症: true,
+      脳梗塞: { checked: true, period: '令和6年4月' }
+    },
+    consent_date_jp: { year: 8, month: 5, day: 24 },
+    patient: {
+      address: '埼玉県さいたま市大宮区桜木町4-1-1',
+      name: '田中 タムジ',
+      phone: '048-000-0000'
+    }
+  });
+}
+</script>
+</body>
+</html>

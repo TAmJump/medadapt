@@ -1,4 +1,5 @@
 // ｍやるゼ！ API Worker v7
+// v13追加: 共通改ざん防止基盤（signed_documents / document_attestations / insurance_claim_log）+ 保険算定管理 + 公開 verify エンドポイント
 // v12追加: Phase 8 マッサージ同意書（consent_forms / treatment_plans / signature_events / hash_chain）
 // v11追加: 退院通知 PDF 保存 / meeting_url
 // v9追加: NDA管理・退院通知・アクセス権限制御
@@ -511,6 +512,79 @@ async function handleRequest(request, env, json, err) {
       console.error('webhook handler error:', e);
     }
     return json({ ok: true });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 公開エンドポイント（認証不要・QR や検証 URL から第三者がアクセス可能）
+  // ════════════════════════════════════════════════════════════
+
+  // ── GET /verify/document/:sd_id ─────────────────────────────
+  // 共通改ざん検証エンドポイント（signed_documents 全種類対応）
+  const publicVerifyMatch = path.match(/^\/verify\/document\/(SD-[A-Za-z0-9-]+)$/);
+  if (publicVerifyMatch && method === 'GET') {
+    const sdId = publicVerifyMatch[1];
+    const verifyToken = url.searchParams.get('token') || '';
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    // verify_token が一致しない場合は最小限の情報のみ返す（情報漏洩防止）
+    const tokenMatch = sd.verify_token === verifyToken;
+    // 改ざん検証：保存ハッシュと再計算ハッシュを比較
+    const recomputed = await sha256Hex(sd.content_snapshot);
+    const valid = recomputed === sd.content_hash;
+    // attestations を取得
+    const ats = await env.DB.prepare('SELECT * FROM document_attestations WHERE signed_document_id=? ORDER BY attested_at ASC').bind(sdId).all();
+    const response = {
+      valid,
+      signed_document_id: sdId,
+      doc_kind: sd.doc_kind,
+      doc_id: sd.doc_id,
+      title: sd.title,
+      org_id: sd.org_id,
+      content_hash: sd.content_hash,
+      recomputed_hash: recomputed,
+      chain_index: sd.chain_index,
+      tsa_status: sd.tsa_status,
+      tsa_acquired_at: sd.tsa_acquired_at,
+      finalized_at: sd.finalized_at,
+      created_at: sd.created_at,
+      attestations: (ats?.results || []).map(a => ({
+        role: a.attester_role,
+        attested_at: a.attested_at,
+        event_hash: a.event_hash,
+        method: a.attestation_method
+      })),
+      verified_at: new Date().toISOString()
+    };
+    if (tokenMatch) {
+      response.content_snapshot = safeJson(sd.content_snapshot);
+    }
+    return json(response);
+  }
+
+  // ── GET /consent/:id/verify ─────────────────────────────────
+  // v12 互換：consent_forms 単体検証（公開・認証不要）
+  const consentVerifyPublicMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/verify$/);
+  if (consentVerifyPublicMatch && method === 'GET') {
+    const cfId = consentVerifyPublicMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const sigs = await env.DB.prepare('SELECT * FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cfId).all();
+    const sigConcat = (sigs?.results || []).map(s => s.event_hash).join('|');
+    const recomputedHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
+    const valid = cf.content_hash ? (recomputedHash === cf.content_hash) : false;
+    return json({
+      valid,
+      consent_form_id: cfId,
+      content_hash: cf.content_hash,
+      recomputed_hash: recomputedHash,
+      chain_index: cf.chain_index,
+      status: cf.status,
+      signatures: (sigs?.results || []).map(s => ({
+        role: s.signer_role, signed_at: s.signed_at, event_hash: s.event_hash, signature_method: s.signature_method
+      })),
+      tsa_acquired_at: cf.tsa_acquired_at || null,
+      verified_at: new Date().toISOString()
+    });
   }
 
   // ── Token認証 ─────────────────────────────────────────────
@@ -2212,31 +2286,7 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true, new_consent_form_id: newCfId, renewed_from: cfId });
   }
 
-  // ── GET /consent/:id/verify ─────────────────────────────────
-  // 認証スキップで誰でも検証可能（QR / トークン URL 用）。token クエリで HMAC 検証も可能
-  const verifyMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/verify$/);
-  if (verifyMatch && method === 'GET') {
-    const cfId = verifyMatch[1];
-    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
-    if (!cf) return err('同意書が見つかりません', 404);
-    const sigs = await env.DB.prepare('SELECT * FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cfId).all();
-    const sigConcat = (sigs?.results || []).map(s => s.event_hash).join('|');
-    const recomputedHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
-    const valid = cf.content_hash ? (recomputedHash === cf.content_hash) : false;
-    return json({
-      valid,
-      consent_form_id: cfId,
-      content_hash: cf.content_hash,
-      recomputed_hash: recomputedHash,
-      chain_index: cf.chain_index,
-      status: cf.status,
-      signatures: (sigs?.results || []).map(s => ({
-        role: s.signer_role, signed_at: s.signed_at, event_hash: s.event_hash, signature_method: s.signature_method
-      })),
-      tsa_acquired_at: cf.tsa_acquired_at || null,
-      verified_at: new Date().toISOString()
-    });
-  }
+  // ── GET /consent/:id/verify は line 563 の公開エンドポイントに移動済（v13 修正）
 
   // ── GET /consent/:id/pdf ────────────────────────────────────
   const pdfMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/pdf$/);
@@ -2297,6 +2347,223 @@ async function handleRequest(request, env, json, err) {
       currentUser.id, now
     ).run();
     return json({ ok: true, document_id: docId });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // Phase 8 v13: 共通改ざん防止基盤 + 加算管理（全帳票対応）
+  // 設計書 v4.5 §51〜§54
+  // ════════════════════════════════════════════════════════════
+
+  // ── POST /signed-docs/finalize ──────────────────────────────
+  // 任意の既存帳票（discharge_notice / consent_form / org_nda / treatment_plan / acupuncture_report / joint_guidance_record）
+  // を「確定（finalize）」して signed_documents に登録し、改ざん検知の起点とする。
+  if (path === '/signed-docs/finalize' && method === 'POST') {
+    if (!['med_clinic', 'med_hospital', 'med_visiting_nurse', 'org_admin', 'org_staff', 'admin'].includes(currentUser.role)) {
+      return err('文書確定権限がありません', 403);
+    }
+    const body = await request.json().catch(() => ({}));
+    const { doc_kind, doc_id, title, content, patient_id, insurance_claim_kind, claim_points, claim_unit } = body;
+    if (!doc_kind || !doc_id || !title || !content) {
+      return err('必須項目が不足しています（doc_kind / doc_id / title / content）');
+    }
+    const allowedKinds = ['consent_form', 'discharge_notice', 'org_nda', 'treatment_plan', 'acupuncture_report', 'joint_guidance_record'];
+    if (!allowedKinds.includes(doc_kind)) {
+      return err(`doc_kind は ${allowedKinds.join(' / ')} のいずれか`);
+    }
+    // 既存レコードチェック（既に finalize 済なら 409）
+    const existing = await env.DB.prepare('SELECT id FROM signed_documents WHERE doc_kind=? AND doc_id=?').bind(doc_kind, doc_id).first();
+    if (existing) return err('この文書は既に確定済みです: ' + existing.id, 409);
+    const orgId = currentUser.org_id || currentUser.id;
+    const now = new Date().toISOString();
+    const sdId = 'SD-' + genUuid();
+    // content をスナップショット化
+    const snapshot = typeof content === 'string' ? content : JSON.stringify(content);
+    const contentHash = await sha256Hex(snapshot);
+    // 直前ハッシュ取得（同一 doc_kind 内の最新）
+    const prevRow = await env.DB.prepare('SELECT content_hash FROM signed_documents WHERE doc_kind=? ORDER BY created_at DESC LIMIT 1').bind(doc_kind).first();
+    const prevHash = prevRow?.content_hash || null;
+    // hash_chain に追記してグローバル連鎖に組み込む
+    const chainRow = await appendHashChain(env, doc_kind, sdId, contentHash);
+    // verify_token は HMAC ベース（簡易：crypto.randomUUID で固有値生成）
+    const verifyToken = crypto.randomUUID().replace(/-/g, '');
+    // QR ペイロード（公開検証 URL）
+    const baseUrl = new URL(request.url).origin;
+    const qrPayload = `${baseUrl}/verify/document/${sdId}?token=${verifyToken}`;
+    // 算定情報の妥当性チェック
+    const validClaimKinds = [null, undefined, '', 'b013_ryouyouhi_doui', 'b004_taiin_kyodo_1', 'b005_taiin_kyodo_2', 'visit_nursing_kyodo'];
+    if (insurance_claim_kind && !validClaimKinds.includes(insurance_claim_kind)) {
+      return err('insurance_claim_kind が不正です');
+    }
+    await env.DB.prepare(`INSERT INTO signed_documents (
+      id, doc_kind, doc_id, org_id, patient_id, title,
+      content_snapshot, content_hash, prev_hash, chain_index,
+      tsa_status, verify_token, qr_payload,
+      insurance_claim_kind, claim_points, claim_unit, claim_status,
+      created_at, finalized_at, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      sdId, doc_kind, doc_id, orgId, patient_id || null, title,
+      snapshot, contentHash, prevHash, chainRow.chain_index,
+      verifyToken, qrPayload,
+      insurance_claim_kind || null,
+      claim_points || null,
+      claim_unit || (insurance_claim_kind ? 'medical_points' : null),
+      insurance_claim_kind ? 'eligible' : 'not_claimed',
+      now, now, currentUser.id
+    ).run();
+    return json({
+      ok: true,
+      signed_document_id: sdId,
+      content_hash: contentHash,
+      chain_index: chainRow.chain_index,
+      verify_url: qrPayload,
+      tsa_status: 'pending'
+    });
+  }
+
+  // ── GET /signed-docs/list ───────────────────────────────────
+  if (path === '/signed-docs/list' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    const docKind = url.searchParams.get('doc_kind') || null;
+    const patientId = url.searchParams.get('patient_id') || null;
+    const claimKind = url.searchParams.get('claim_kind') || null;
+    let sql = 'SELECT * FROM signed_documents WHERE org_id=?';
+    const params = [orgId];
+    if (docKind) { sql += ' AND doc_kind=?'; params.push(docKind); }
+    if (patientId) { sql += ' AND patient_id=?'; params.push(patientId); }
+    if (claimKind) { sql += ' AND insurance_claim_kind=?'; params.push(claimKind); }
+    sql += ' ORDER BY created_at DESC LIMIT 200';
+    const rows = await env.DB.prepare(sql).bind(...params).all();
+    const list = (rows?.results || []).map(r => ({
+      id: r.id, doc_kind: r.doc_kind, doc_id: r.doc_id, title: r.title,
+      patient_id: r.patient_id, content_hash: r.content_hash, chain_index: r.chain_index,
+      tsa_status: r.tsa_status, insurance_claim_kind: r.insurance_claim_kind,
+      claim_points: r.claim_points, claim_status: r.claim_status,
+      created_at: r.created_at, finalized_at: r.finalized_at
+    }));
+    return json({ ok: true, items: list });
+  }
+
+  // ── GET /signed-docs/:id ────────────────────────────────────
+  const sdGetMatch = path.match(/^\/signed-docs\/(SD-[A-Za-z0-9-]+)$/);
+  if (sdGetMatch && method === 'GET') {
+    const sdId = sdGetMatch[1];
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (sd.org_id !== orgId && currentUser.role !== 'admin') {
+      return err('閲覧権限がありません', 403);
+    }
+    const ats = await env.DB.prepare('SELECT * FROM document_attestations WHERE signed_document_id=? ORDER BY attested_at ASC').bind(sdId).all();
+    return json({ ok: true, signed_document: sd, attestations: ats?.results || [] });
+  }
+
+  // ── POST /signed-docs/:id/attest ────────────────────────────
+  // 任意の文書に対する署名イベント追加（共通台帳）
+  const attestMatch = path.match(/^\/signed-docs\/(SD-[A-Za-z0-9-]+)\/attest$/);
+  if (attestMatch && method === 'POST') {
+    const sdId = attestMatch[1];
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    const body = await request.json().catch(() => ({}));
+    const { attester_role, attestation_method, attestation_data } = body;
+    if (!attester_role || !attestation_method) return err('attester_role と attestation_method が必要です');
+    const allowedRoles = ['doctor', 'patient', 'acupuncturist', 'nurse', 'careManager', 'pharmacist', 'witness'];
+    if (!allowedRoles.includes(attester_role)) return err('attester_role が不正です');
+    const allowedMethods = ['electronic_seal', 'handwritten_image', 'typed_name', 'sso_verified'];
+    if (!allowedMethods.includes(attestation_method)) return err('attestation_method が不正です');
+    const now = new Date().toISOString();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const ua = request.headers.get('User-Agent') || '';
+    const prevAttest = await env.DB.prepare('SELECT event_hash FROM document_attestations WHERE signed_document_id=? ORDER BY attested_at DESC LIMIT 1').bind(sdId).first();
+    const prevEventHash = prevAttest?.event_hash || '';
+    const atId = 'AT-' + genUuid();
+    const eventHash = await sha256Hex(`${atId}|${sdId}|${currentUser.id}|${attester_role}|${attestation_method}|${attestation_data || ''}|${now}|${prevEventHash}`);
+    const orgId = currentUser.org_id || currentUser.id;
+    await env.DB.prepare(`INSERT INTO document_attestations (
+      id, signed_document_id, attester_user_id, attester_role, attester_org_id,
+      attestation_method, attestation_data, attested_at, attested_ip, attested_user_agent,
+      event_hash, prev_event_hash, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      atId, sdId, currentUser.id, attester_role, orgId,
+      attestation_method, attestation_data || null, now, ip, ua,
+      eventHash, prevEventHash || null, now
+    ).run();
+    // hash_chain にも追加
+    await appendHashChain(env, 'attestation', atId, eventHash);
+    return json({ ok: true, attestation_id: atId, event_hash: eventHash });
+  }
+
+  // ── POST /signed-docs/:id/claim ─────────────────────────────
+  // 保険算定の記録
+  const claimMatch = path.match(/^\/signed-docs\/(SD-[A-Za-z0-9-]+)\/claim$/);
+  if (claimMatch && method === 'POST') {
+    const sdId = claimMatch[1];
+    if (!['med_clinic', 'med_hospital', 'med_visiting_nurse', 'org_admin', 'admin'].includes(currentUser.role)) {
+      return err('保険算定の記録権限がありません', 403);
+    }
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (sd.org_id !== orgId && currentUser.role !== 'admin') return err('他医療機関の文書は記録できません', 403);
+    const body = await request.json().catch(() => ({}));
+    const { claim_status, claim_month, receipt_number, insurer_code, notes } = body;
+    const validStatuses = ['recorded', 'submitted', 'paid', 'rejected', 'reversed'];
+    if (!claim_status || !validStatuses.includes(claim_status)) return err('claim_status が不正です');
+    if (!claim_month || !/^\d{4}-\d{2}$/.test(claim_month)) return err('claim_month は YYYY-MM 形式');
+    if (!sd.insurance_claim_kind) return err('この文書には算定区分が設定されていません');
+    const now = new Date().toISOString();
+    const clId = 'CL-' + genUuid();
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO insurance_claim_log (
+        id, signed_document_id, org_id, patient_id, claim_kind, claim_points, claim_unit,
+        claim_month, claim_status, receipt_number, insurer_code, notes, recorded_by, recorded_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        clId, sdId, sd.org_id, sd.patient_id || null,
+        sd.insurance_claim_kind, sd.claim_points, sd.claim_unit,
+        claim_month, claim_status, receipt_number || null, insurer_code || null,
+        notes || '', currentUser.id, now
+      ),
+      env.DB.prepare('UPDATE signed_documents SET claim_status=?, claim_recorded_at=?, claim_recorded_by=? WHERE id=?').bind(claim_status === 'paid' ? 'claimed' : claim_status, now, currentUser.id, sdId),
+    ]);
+    return json({ ok: true, claim_log_id: clId });
+  }
+
+  // ── GET /signed-docs/claim-summary ──────────────────────────
+  // 加算算定サマリ（月次集計）
+  if (path === '/signed-docs/claim-summary' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    const month = url.searchParams.get('month') || new Date().toISOString().slice(0, 7);
+    const rows = await env.DB.prepare(`
+      SELECT claim_kind, claim_status, COUNT(*) as cnt, SUM(claim_points) as total_points
+      FROM insurance_claim_log
+      WHERE org_id=? AND claim_month=?
+      GROUP BY claim_kind, claim_status
+    `).bind(orgId, month).all();
+    return json({ ok: true, month, summary: rows?.results || [] });
+  }
+
+  // ── POST /signed-docs/:id/qr ────────────────────────────────
+  // QR コード生成（Base64 PNG を返却・クライアント実装での埋込み用）
+  const qrMatch = path.match(/^\/signed-docs\/(SD-[A-Za-z0-9-]+)\/qr$/);
+  if (qrMatch && method === 'GET') {
+    const sdId = qrMatch[1];
+    const sd = await env.DB.prepare('SELECT id, qr_payload, verify_token FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    // QR 画像はクライアント側で qrcode.js などを使って描画する想定
+    return json({ ok: true, qr_payload: sd.qr_payload, verify_token: sd.verify_token });
+  }
+
+  // ── GET /signed-docs/by-doc/:kind/:id ───────────────────────
+  // 既存帳票（discharge_notice 等）から signed_document を逆引き
+  const byDocMatch = path.match(/^\/signed-docs\/by-doc\/([a-z_]+)\/([A-Za-z0-9-]+)$/);
+  if (byDocMatch && method === 'GET') {
+    const docKind = byDocMatch[1];
+    const docId = byDocMatch[2];
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE doc_kind=? AND doc_id=?').bind(docKind, docId).first();
+    if (!sd) return json({ ok: true, signed_document: null });
+    const orgId = currentUser.org_id || currentUser.id;
+    if (sd.org_id !== orgId && currentUser.role !== 'admin') return err('閲覧権限がありません', 403);
+    return json({ ok: true, signed_document: sd });
   }
 
   return err('Not found', 404);
