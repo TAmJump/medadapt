@@ -12,13 +12,15 @@
 <meta property="og:url" content="https://myaruze.tamjump.com/">
 <meta property="og:title" content="ｍやるゼ！｜受入れ・移行を、早く・安全に・揉めずに。">
 <meta property="og:description" content="医療・介護機関の受入れ・移行・連携をスムーズに支援する業務システム。受入れケース管理、NDA電子締結、ケース記録までを一元管理。">
-<meta property="og:image" content="https://myaruze.tamjump.com/og-image.png">
+<meta property="og:image" content="https://myaruze.tamjump.com/assets/img/generated/ogp_v1.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:site_name" content="ｍやるゼ！">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ｍやるゼ！｜受入れ・移行を、早く・安全に・揉めずに。">
 <meta name="twitter:description" content="医療・介護機関のための業務支援システム。">
-<meta name="twitter:image" content="https://myaruze.tamjump.com/og-image.png">
+<meta name="twitter:image" content="https://myaruze.tamjump.com/assets/img/generated/ogp_v1.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@300;400;500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -554,6 +556,90 @@ body {
 </style>
 
 
+<!-- ─── HERO PHOTO BAND (v4.7 新設・実写素材) ─── -->
+<style>
+.hero-band {
+  background: #fff;
+  padding: 0;
+  overflow: hidden;
+}
+.hero-band-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 280px;
+}
+.hero-band-item {
+  position: relative;
+  overflow: hidden;
+  min-height: 280px;
+}
+.hero-band-bg {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 1;
+  transition: transform .6s;
+}
+.hero-band-item:hover .hero-band-bg { transform: scale(1.04); }
+.hero-band-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, rgba(2, 132, 199, 0.78) 0%, rgba(2, 132, 199, 0.30) 50%, transparent 75%);
+  z-index: 2;
+}
+.hero-band-text {
+  position: relative; z-index: 3;
+  padding: 56px 48px;
+  color: #fff;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 60%;
+}
+.hero-band-eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 8px;
+  opacity: 0.95;
+}
+.hero-band-title {
+  font-size: 22px; font-weight: 800; margin: 0 0 8px;
+  line-height: 1.4;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.hero-band-desc {
+  font-size: 13px; line-height: 1.85;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+@media (max-width: 820px) {
+  .hero-band-grid { grid-template-columns: 1fr; }
+  .hero-band-text { max-width: 75%; padding: 40px 28px; }
+  .hero-band-title { font-size: 18px; }
+}
+</style>
+<section class="hero-band">
+  <div class="hero-band-grid">
+    <div class="hero-band-item">
+      <div class="hero-band-bg" style="background-image:url('assets/img/generated/hero_team_v1.jpg');"></div>
+      <div class="hero-band-overlay"></div>
+      <div class="hero-band-text">
+        <div class="hero-band-eyebrow">医療職連携</div>
+        <h3 class="hero-band-title">病院・在宅医・施設・薬局・鍼灸院。<br>立場を越えて、ひとつのチームに。</h3>
+        <p class="hero-band-desc">退院前カンファレンス、共同指導、情報共有を ICT で完結。会えなくても、書類が崩れることはありません。</p>
+      </div>
+    </div>
+    <div class="hero-band-item">
+      <div class="hero-band-bg" style="background-image:url('assets/img/generated/hero_visit_v1.jpg');"></div>
+      <div class="hero-band-overlay" style="background:linear-gradient(105deg, rgba(22, 163, 74, 0.78) 0%, rgba(22, 163, 74, 0.30) 50%, transparent 75%);"></div>
+      <div class="hero-band-text">
+        <div class="hero-band-eyebrow">在宅・訪問</div>
+        <h3 class="hero-band-title">通院困難なご家族にも、<br>同じ医療の温度を。</h3>
+        <p class="hero-band-desc">訪問診療・訪問看護・訪問鍼灸マッサージ。それぞれの専門職が在宅で連携できる仕組みを支えます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ─── PROBLEMS ─── -->
 <section class="sec problems" id="problems">
   <div class="problems-layout">
@@ -704,6 +790,183 @@ body {
         <p class="core-tagline">監査・返戻・事故対策</p>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ─── FEATURE HIGHLIGHTS (v4.7 新設・サイト素材組込) ─── -->
+<style>
+.feature-highlights { padding: 80px 20px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%); }
+.feature-highlights .container { max-width: 1200px; margin: 0 auto; }
+.fh-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; margin-top: 48px; }
+.fh-card {
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+  transition: transform .3s, box-shadow .3s;
+  display: flex; flex-direction: column;
+}
+.fh-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12); }
+.fh-image {
+  width: 100%; aspect-ratio: 1 / 1;
+  background: #f1f5f9;
+  background-size: cover; background-position: center;
+  position: relative;
+}
+.fh-image.aspect-wide { aspect-ratio: 16 / 9; }
+.fh-body { padding: 24px 28px 28px; }
+.fh-eyebrow {
+  display: inline-block;
+  font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: var(--blue); text-transform: uppercase; margin-bottom: 8px;
+}
+.fh-title { font-size: 18px; font-weight: 800; margin: 0 0 10px; color: var(--ink); }
+.fh-desc { font-size: 13px; color: var(--ink-m); line-height: 1.85; margin: 0 0 12px; }
+.fh-points { list-style: none; padding: 0; margin: 0; }
+.fh-points li {
+  font-size: 12.5px; color: var(--ink-l); padding-left: 20px; position: relative;
+  margin-bottom: 4px; line-height: 1.7;
+}
+.fh-points li::before {
+  content: '✓'; position: absolute; left: 0;
+  color: var(--blue); font-weight: 800;
+}
+.fh-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 10px; font-weight: 800; margin-left: 8px;
+  background: #fef3c7; color: #92400e;
+}
+
+/* アイコン6種行 */
+.fh-icons-wrap { margin-top: 64px; }
+.fh-icons-title { text-align: center; font-size: 18px; font-weight: 800; margin: 0 0 8px; }
+.fh-icons-sub { text-align: center; font-size: 13px; color: var(--ink-l); margin: 0 0 32px; }
+.fh-icons-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px;
+  max-width: 900px; margin: 0 auto;
+}
+.fh-icon-item {
+  text-align: center;
+  padding: 20px 12px; background: #fff; border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  transition: all .25s;
+}
+.fh-icon-item:hover { border-color: var(--blue); transform: translateY(-2px); }
+.fh-icon-item img { width: 56px; height: 56px; object-fit: contain; display: block; margin: 0 auto 10px; }
+.fh-icon-item .lbl { font-size: 11.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+
+/* タブレット */
+@media (max-width: 980px) {
+  .fh-grid { grid-template-columns: 1fr; gap: 20px; }
+  .fh-icons-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .feature-highlights { padding: 56px 16px; }
+  .fh-body { padding: 20px; }
+  .fh-icons-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .fh-icon-item { padding: 14px 8px; }
+  .fh-icon-item img { width: 44px; height: 44px; }
+  .fh-icon-item .lbl { font-size: 10.5px; }
+}
+</style>
+<section class="feature-highlights" id="features">
+  <div class="container">
+    <span class="sec-label" style="display:block;text-align:center;">Feature Highlights</span>
+    <h2 class="sec-title" style="text-align:center;">4つの中核機能</h2>
+    <p class="sec-sub" style="text-align:center;">退院通知 × NDA × 同意書 × 訪問鍼灸マッサージ。<br>すべてが SHA-256 ハッシュチェーンで改ざん不可、医療保険算定にも対応。</p>
+
+    <div class="fh-grid">
+      <!-- 退院通知 -->
+      <div class="fh-card">
+        <div class="fh-image" style="background-image:url('assets/img/generated/card_discharge_v1.jpg')"></div>
+        <div class="fh-body">
+          <span class="fh-eyebrow">DISCHARGE NOTICE</span>
+          <h3 class="fh-title">退院通知・退院時共同指導 <span class="fh-badge">B004 算定対応</span></h3>
+          <p class="fh-desc">入院中の患者の退院後の在宅療養を支える医療職連携を、ICT で完結。退院前カンファレンスの記録が、そのまま改ざん不可の証跡になります。</p>
+          <ul class="fh-points">
+            <li>NDA 締結済の法人にのみ患者情報を共有</li>
+            <li>退院時共同指導料 1500点 / 訪問看護退院時共同指導加算 600単位 の算定根拠</li>
+            <li>テレビ電話・チャット・PDF まで一気通貫</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- NDA -->
+      <div class="fh-card">
+        <div class="fh-image" style="background-image:url('assets/img/generated/card_nda_v1.jpg')"></div>
+        <div class="fh-body">
+          <span class="fh-eyebrow">NDA MANAGEMENT</span>
+          <h3 class="fh-title">法人間 NDA・改ざん防止</h3>
+          <p class="fh-desc">病院・施設・訪問看護・薬局・鍼灸院。法人間で締結する秘密保持契約をオンラインで完結。締結と同時に改ざん検知ハッシュチェーンへ登録されます。</p>
+          <ul class="fh-points">
+            <li>テンプレート・カスタム文面 両対応</li>
+            <li>当事者型電子署名 + パスワード認証</li>
+            <li>QR コードで第三者検証が可能</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 同意書 -->
+      <div class="fh-card">
+        <div class="fh-image" style="background-image:url('assets/img/generated/card_consent_v1.jpg')"></div>
+        <div class="fh-body">
+          <span class="fh-eyebrow">DIGITAL CONSENT</span>
+          <h3 class="fh-title">同意書・指示書 改ざん不可 <span class="fh-badge">B013 算定対応</span></h3>
+          <p class="fh-desc">医師・患者・施術者の電子署名が SHA-256 ハッシュチェーンで連結。e-文書法・電子署名法に準拠し、厚労省ガイドラインに沿った真正性保証を実現します。</p>
+          <ul class="fh-points">
+            <li>療養費同意書交付料 100点 の算定根拠</li>
+            <li>令和7年4月「同意年月日・診察日」明記要件に対応</li>
+            <li>有効期限 6か月（変形徒手は1か月）を自動管理</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 訪問鍼灸マッサージ -->
+      <div class="fh-card">
+        <div class="fh-image" style="background-image:url('assets/img/generated/card_massage_v1.jpg')"></div>
+        <div class="fh-body">
+          <span class="fh-eyebrow">HOME-VISIT ACUPUNCTURE</span>
+          <h3 class="fh-title">訪問鍼灸・あん摩マッサージ 連携</h3>
+          <p class="fh-desc">医師の同意書交付から、鍼灸師の施術報告書投稿、療養費請求まで。在宅医療の現場と施術所をシームレスにつなぎます。</p>
+          <ul class="fh-points">
+            <li>鍼灸師専用ポータルで同意書を即時受領</li>
+            <li>施術報告書も改ざん防止チェーンに自動登録</li>
+            <li>厚労省様式準拠・コンパスクリニック書式の自動 PDF 発行</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アイコン6種：機能の象徴的アイコンを横並び表示 -->
+    <div class="fh-icons-wrap">
+      <h3 class="fh-icons-title">ｍやるゼ！の 6 つの強み</h3>
+      <p class="fh-icons-sub">すべての帳票が、改ざん不可の同じ仕組みで守られます。</p>
+      <div class="fh-icons-grid">
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_discharge_v1.png" alt="退院通知">
+          <div class="lbl">退院通知</div>
+        </div>
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_nda_v1.png" alt="NDA">
+          <div class="lbl">法人間 NDA</div>
+        </div>
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_match_v1.png" alt="マッチング">
+          <div class="lbl">受入マッチング</div>
+        </div>
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_consent_v1.png" alt="同意書">
+          <div class="lbl">電子同意書</div>
+        </div>
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_blockchain_v1.png" alt="改ざん防止">
+          <div class="lbl">改ざん防止<br>チェーン</div>
+        </div>
+        <div class="fh-icon-item">
+          <img src="assets/img/generated/icon_qr_v1.png" alt="QR検証">
+          <div class="lbl">QR 真正性<br>検証</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
