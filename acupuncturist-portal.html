@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鍼灸・マッサージ施術者ポータル - ｍやるゼ！</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --ink: #0f172a;
+    --ink-l: #64748b;
+    --accent: #2563eb;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+  }
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header .logo {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .header .user {
+    font-size: 13px;
+    color: var(--ink-l);
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .tab-bar {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-l);
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+  }
+  .card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card .title-text {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .card .meta {
+    font-size: 11px;
+    color: var(--ink-l);
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .badge-valid { background: var(--success); }
+  .badge-expired { background: var(--danger); }
+  .badge-warn { background: var(--warning); }
+  .empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--ink-l);
+    background: #fff;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .btn {
+    display: inline-block;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .btn-pri { background: var(--accent); color: #fff; }
+  .btn-out { background: #fff; border: 1px solid var(--accent); color: var(--accent); }
+  .login-box {
+    max-width: 400px;
+    margin: 60px auto;
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .login-box h2 {
+    margin: 0 0 16px;
+    font-size: 18px;
+  }
+  .login-box .field {
+    margin-bottom: 12px;
+  }
+  .login-box label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .login-box input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+  }
+  .alert {
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .alert-info { background: #eff6ff; color: #1e40af; border-left: 4px solid #3b82f6; }
+  .alert-warn { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+  .form-row {
+    margin-bottom: 12px;
+  }
+  .form-row label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .form-row textarea { resize: vertical; min-height: 80px; }
+  .footer {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--ink-l);
+    font-size: 11px;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .supervisor {
+    font-size: 10px;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">ｍやるゼ！</div>
+    <div style="font-size:11px;color:var(--ink-l)">鍼灸・マッサージ施術者ポータル</div>
+  </div>
+  <div class="user" id="user-info"></div>
+</div>
+
+<div class="container" id="content">
+  <div style="text-align:center;padding:40px">読み込み中...</div>
+</div>
+
+<div class="footer">
+  <div>本ポータルは ｍやるゼ！プラットフォームの施術者向け公式画面です。</div>
+  <div class="supervisor">医監修：後藤基温 医師（医療法人社団コンパス 理事長）</div>
+  <div style="margin-top:8px"><a href="https://myaruze.tamjump.com/">ｍやるゼ！について</a></div>
+</div>
+
+<script>
+const API_BASE = 'https://medadapt-api-v2.tamjump.workers.dev';
+const TOKEN_KEY = 'myaruze_acupuncturist_token';
+
+let state = {
+  token: localStorage.getItem(TOKEN_KEY) || null,
+  user: null,
+  tab: 'consents',
+  consents: null,
+  reports: null
+};
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+  const res = await fetch(API_BASE + path, { ...opts, headers });
+  if (res.status === 401) {
+    state.token = null;
+    localStorage.removeItem(TOKEN_KEY);
+    render();
+    return null;
+  }
+  return res.json();
+}
+
+function render() {
+  if (!state.token) {
+    renderLogin();
+    return;
+  }
+  if (!state.user) {
+    api('/auth/me').then(res => {
+      if (res?.user) {
+        state.user = res.user;
+        document.getElementById('user-info').textContent = state.user.name || state.user.email;
+        render();
+      } else {
+        state.token = null;
+        localStorage.removeItem(TOKEN_KEY);
+        render();
+      }
+    });
+    return;
+  }
+  renderMain();
+}
+
+function renderLogin() {
+  document.getElementById('user-info').textContent = '';
+  document.getElementById('content').innerHTML = `
+    <div class="login-box">
+      <h2>施術者ログイン</h2>
+      <div class="alert alert-info">
+        ｍやるゼ！の施術者アカウント（med_acupuncturist ロール）でログインしてください。
+      </div>
+      <div class="field">
+        <label>メール / ログインID</label>
+        <input type="text" id="login-id" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>パスワード</label>
+        <input type="password" id="login-pw" autocomplete="current-password">
+      </div>
+      <button class="btn btn-pri" style="width:100%" onclick="doLogin()">ログイン</button>
+      <div style="margin-top:12px;font-size:11px;color:var(--ink-l);text-align:center">
+        アカウントは医療機関側で発行されます。
+      </div>
+    </div>
+  `;
+}
+
+async function doLogin() {
+  const loginId = document.getElementById('login-id').value.trim();
+  const password = document.getElementById('login-pw').value;
+  if (!loginId || !password) {
+    alert('入力してください');
+    return;
+  }
+  const res = await fetch(API_BASE + '/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login_id: loginId, password })
+  }).then(r => r.json()).catch(() => null);
+  if (res?.token) {
+    state.token = res.token;
+    localStorage.setItem(TOKEN_KEY, res.token);
+    state.user = null;
+    render();
+  } else {
+    alert('ログインに失敗しました: ' + (res?.error || ''));
+  }
+}
+
+function renderMain() {
+  const tabs = [
+    { id: 'consents', l: '同意書（私宛）' },
+    { id: 'reports', l: '施術報告書' },
+    { id: 'newreport', l: '+ 報告書を投稿' }
+  ];
+  let tabsHtml = '<div class="tab-bar">';
+  tabs.forEach(t => {
+    tabsHtml += `<div class="tab${state.tab === t.id ? ' active' : ''}" onclick="setTab('${t.id}')">${escapeHtml(t.l)}</div>`;
+  });
+  tabsHtml += '</div>';
+
+  let body = '';
+  if (state.tab === 'consents') body = renderConsents();
+  else if (state.tab === 'reports') body = renderReports();
+  else if (state.tab === 'newreport') body = renderNewReport();
+
+  document.getElementById('content').innerHTML = tabsHtml + body;
+}
+
+function setTab(t) {
+  state.tab = t;
+  state.consents = null;
+  state.reports = null;
+  render();
+}
+
+function renderConsents() {
+  if (!state.consents) {
+    api('/consent/list?for_acupuncturist=1').then(res => {
+      state.consents = res?.items || [];
+      render();
+    }).catch(() => { state.consents = []; render(); });
+    return '<div style="text-align:center;padding:40px;color:var(--ink-l)">読み込み中...</div>';
+  }
+  if (state.consents.length === 0) {
+    return '<div class="empty">あなた宛に共有された同意書はまだありません。<br>医療機関側で「施術者へ共有」操作が必要です。</div>';
+  }
+  const typeMap = { 'acupuncture': 'はり・きゅう', 'massage': 'あマ指', 'both': 'はり・きゅう＋あマ指' };
+  let html = '<div>';
+  state.consents.forEach(c => {
+    const exp = new Date(c.expires_at);
+    const now = new Date();
+    const daysLeft = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
+    let badge = '<span class="badge badge-valid">有効</span>';
+    if (daysLeft < 0) badge = '<span class="badge badge-expired">期限切れ</span>';
+    else if (daysLeft < 30) badge = '<span class="badge badge-warn">残' + daysLeft + '日</span>';
+    html += `
+      <div class="card" onclick="viewConsent('${escapeHtml(c.id)}')">
+        <div class="row">
+          <div style="flex:1;min-width:200px">
+            <div class="title-text">${escapeHtml(typeMap[c.consent_type] || c.consent_type)}</div>
+            <div class="meta">
+              同意日: ${escapeHtml(c.consent_date)} / 有効期限: ${escapeHtml((c.expires_at || '').slice(0, 10))}
+            </div>
+          </div>
+          ${badge}
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  return html;
+}
+
+function viewConsent(cfId) {
+  api('/consent/' + cfId).then(res => {
+    if (!res?.consent_form) {
+      alert('同意書情報を取得できませんでした');
+      return;
+    }
+    showConsentModal(res);
+  });
+}
+
+function showConsentModal(detail) {
+  const cf = detail.consent_form;
+  const sigs = detail.signatures || [];
+  const typeMap = { 'acupuncture': 'はり・きゅう', 'massage': 'あマ指（あん摩・マッサージ・指圧）', 'both': 'はり・きゅう＋あマ指' };
+  const roleLabels = { 'doctor': '医師', 'patient': '患者', 'acupuncturist': '施術者' };
+  let html = `
+    <h3>同意書詳細</h3>
+    <div class="form-row"><label>施術種別</label><div style="font-size:14px">${escapeHtml(typeMap[cf.consent_type] || cf.consent_type)}</div></div>
+    <div class="form-row"><label>同意年月日</label><div>${escapeHtml(cf.consent_date)}</div></div>
+    <div class="form-row"><label>有効期限</label><div>${escapeHtml((cf.expires_at || '').slice(0, 10))}（${cf.validity_months || 6}か月）</div></div>
+  `;
+  try {
+    let diseases = cf.disease_names;
+    if (typeof diseases === 'string') diseases = JSON.parse(diseases);
+    if (Array.isArray(diseases) && diseases.length) {
+      html += '<div class="form-row"><label>傷病名</label><div>';
+      diseases.forEach(d => {
+        html += `・${escapeHtml(d.name || d)}${d.onset_date ? '（' + escapeHtml(d.onset_date) + '）' : ''}<br>`;
+      });
+      html += '</div></div>';
+    }
+  } catch (e) {}
+  html += '<div class="form-row"><label>署名履歴</label><div>';
+  sigs.forEach(s => {
+    html += `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <strong>${escapeHtml(roleLabels[s.signer_role] || s.signer_role)}</strong>
+      <span style="color:var(--ink-l);margin-left:8px">${escapeHtml((s.signed_at || '').slice(0, 19).replace('T', ' '))}</span>
+    </div>`;
+  });
+  html += '</div></div>';
+  if (cf.content_hash) {
+    html += `<div class="form-row"><label>改ざん検知</label>
+      <div style="font-family:monospace;font-size:10px;color:var(--ink-l);word-break:break-all">
+        HASH: ${escapeHtml(cf.content_hash.slice(0, 32))}...<br>
+        CHAIN: #${cf.chain_index || '—'}
+      </div>
+    </div>`;
+  }
+  html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">';
+  html += `<button class="btn btn-out" onclick="closeModal()">閉じる</button>`;
+  html += `<button class="btn btn-pri" onclick="closeModal();state.tab='newreport';state.preselectConsent='${escapeHtml(cf.id)}';render()">この同意書で報告書投稿</button>`;
+  html += '</div>';
+  showModal(html);
+}
+
+function renderReports() {
+  if (!state.reports) {
+    api('/consent/reports/my').then(res => {
+      state.reports = res?.items || [];
+      render();
+    }).catch(() => { state.reports = []; render(); });
+    return '<div style="text-align:center;padding:40px;color:var(--ink-l)">読み込み中...</div>';
+  }
+  if (state.reports.length === 0) {
+    return '<div class="empty">投稿済みの施術報告書はまだありません。</div>';
+  }
+  let html = '<div>';
+  state.reports.forEach(r => {
+    html += `
+      <div class="card">
+        <div class="row">
+          <div style="flex:1">
+            <div class="title-text">施術日: ${escapeHtml(r.session_date)}</div>
+            <div class="meta">同意書ID: ${escapeHtml(r.consent_form_id)} / 投稿: ${escapeHtml((r.created_at || '').slice(0, 10))}</div>
+            <div style="font-size:12px;margin-top:6px;color:var(--ink)">${escapeHtml((r.treatment_content || '').slice(0, 100))}${(r.treatment_content || '').length > 100 ? '...' : ''}</div>
+          </div>
+          <span class="badge badge-valid">投稿済</span>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderNewReport() {
+  const preselected = state.preselectConsent || '';
+  state.preselectConsent = null;
+  let html = `
+    <div class="card" style="cursor:default">
+      <h3 style="margin:0 0 12px">施術報告書を投稿</h3>
+      <div class="alert alert-info">
+        定期的な施術報告は、療養費の継続支給判断に必要です。改ざん防止のためハッシュチェーンに記録されます。
+      </div>
+      <div class="form-row">
+        <label>対象の同意書ID *</label>
+        <input type="text" id="report-cfid" value="${escapeHtml(preselected)}" placeholder="CF-xxxxxxxx">
+        <div style="font-size:11px;color:var(--ink-l);margin-top:3px">「同意書」タブから選択するか、IDを直接入力</div>
+      </div>
+      <div class="form-row">
+        <label>施術日 *</label>
+        <input type="date" id="report-date" value="${new Date().toISOString().slice(0, 10)}">
+      </div>
+      <div class="form-row">
+        <label>施術内容 *</label>
+        <textarea id="report-content" placeholder="例：両膝関節周囲のマッサージ、腰部のはり施術（30分）"></textarea>
+      </div>
+      <div class="form-row">
+        <label>所要時間（分）</label>
+        <input type="number" id="report-duration" placeholder="30">
+      </div>
+      <div class="form-row">
+        <label>患者状態・経過</label>
+        <textarea id="report-status" placeholder="例：膝の可動域が改善傾向。腰部の痛みは継続。"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-out" onclick="setTab('consents')">キャンセル</button>
+        <button class="btn btn-pri" onclick="submitReport()">投稿する</button>
+      </div>
+    </div>
+  `;
+  return html;
+}
+
+async function submitReport() {
+  const cfId = document.getElementById('report-cfid').value.trim();
+  const date = document.getElementById('report-date').value;
+  const content = document.getElementById('report-content').value.trim();
+  const duration = document.getElementById('report-duration').value;
+  const status = document.getElementById('report-status').value.trim();
+  if (!cfId || !date || !content) {
+    alert('同意書ID・施術日・施術内容は必須です');
+    return;
+  }
+  // status があれば content に統合（Worker は report_date/content/treatment_minutes のみ受領）
+  const fullContent = status ? content + '\n\n【患者状態・経過】\n' + status : content;
+  const res = await api('/consent/' + cfId + '/report', {
+    method: 'POST',
+    body: JSON.stringify({
+      report_date: date,
+      content: fullContent,
+      treatment_minutes: duration ? Number(duration) : 0
+    })
+  });
+  if (res?.ok) {
+    alert('施術報告書を投稿しました');
+    setTab('reports');
+  } else {
+    alert('投稿失敗: ' + (res?.error || ''));
+  }
+}
+
+function showModal(html) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.id = 'modal-bg';
+  bg.onclick = (e) => { if (e.target === bg) closeModal(); };
+  const m = document.createElement('div');
+  m.className = 'modal';
+  m.innerHTML = html;
+  bg.appendChild(m);
+  document.body.appendChild(bg);
+}
+
+function closeModal() {
+  const bg = document.getElementById('modal-bg');
+  if (bg) bg.remove();
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+render();
+</script>
+</body>
+</html>

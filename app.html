@@ -2431,7 +2431,19 @@ function showNdaSignModal(nda){
       if(!sname){toast('署名者氏名を入力してください');return;}
       if(!pw){toast('パスワードを入力してください');return;}
       const res=await api('/nda/sign',{method:'POST',body:JSON.stringify({nda_id:nda.id,password:pw,signer_name:sname,signer_role:srole||''})});
-      if(res?.success){S.modal=null;S.ndaList=null;toast(res.message);rr();}
+      if(res?.success){
+        // v13: NDA を共通改ざん防止基盤へ自動 finalize
+        try{
+          await api('/signed-docs/finalize',{method:'POST',body:JSON.stringify({
+            doc_kind:'org_nda',
+            doc_id:nda.id,
+            title:'NDA: '+(nda.partner_org_name||nda.id),
+            content:{nda_id:nda.id,signer_name:sname,signer_role:srole||'',signed_at:new Date().toISOString(),nda_type:nda.nda_type||'standard'},
+            patient_id:null
+          })}).catch(e=>console.warn('NDA signed-docs finalize skipped:',e?.message||e));
+        }catch(e){console.warn('NDA finalize error:',e);}
+        S.modal=null;S.ndaList=null;toast(res.message+'（改ざん防止登録済）');rr();
+      }
       else toast(res?.error||'署名に失敗しました');
     })
   ));
@@ -3474,8 +3486,23 @@ function dischargeNewPage(){
         patient_id:ptId,title,memo,pdf_data:pdfData,pdf_filename:pdfFilename,pdf_file_type:pdfFileType,recipient_org_ids:checks,requirements_data,schedule_slots
       })});
       if(res?.success){
+        // v13: 共通改ざん防止基盤へ自動 finalize（退院時共同指導記録として）
+        try{
+          if(res.id){
+            await api('/signed-docs/finalize',{method:'POST',body:JSON.stringify({
+              doc_kind:'joint_guidance_record',
+              doc_id:res.id,
+              title:'退院時共同指導記録: '+title,
+              content:{patient_id:ptId,title,memo,recipient_org_ids:checks,requirements_data,schedule_slots,notice_id:res.id,issued_at:new Date().toISOString()},
+              patient_id:ptId,
+              insurance_claim_kind:'b004_taiin_kyodo_1',
+              claim_points:1500,
+              claim_unit:'medical_points'
+            })}).catch(e=>console.warn('signed-docs finalize skipped:',e?.message||e));
+          }
+        }catch(e){console.warn('signed-docs finalize error:',e);}
         S.page='discharge';S.dischargeList=null;S.dnSlots=null;
-        toast('退院通知を送信しました（'+checks.length+'件）');rr();
+        toast('退院通知を送信しました（'+checks.length+'件・改ざん防止登録済）');rr();
       } else toast(res?.error||'送信に失敗しました');
     })
   ));

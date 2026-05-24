@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同意書 確認 - ｍやるゼ！</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --ink: #0f172a;
+    --ink-l: #64748b;
+    --accent: #2563eb;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+  }
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    text-align: center;
+  }
+  .header .logo {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .header .sub {
+    font-size: 11px;
+    color: var(--ink-l);
+    margin-top: 2px;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .verify-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .verify-badge.valid {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #16a34a;
+  }
+  .verify-badge.invalid {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #dc2626;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 8px 0;
+    line-height: 1.4;
+  }
+  .meta {
+    font-size: 12px;
+    color: var(--ink-l);
+    margin-bottom: 12px;
+  }
+  .hash-info {
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    word-break: break-all;
+    color: var(--ink-l);
+    margin: 12px 0;
+  }
+  .doc-section {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+  .doc-section h3 {
+    font-size: 13px;
+    color: var(--ink-l);
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  .doc-section .v {
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .signature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .signature-item {
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+    font-size: 12px;
+  }
+  .signature-item .role {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .signature-item .time {
+    color: var(--ink-l);
+    font-size: 11px;
+  }
+  .btn {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-pri {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+  }
+  .btn-out {
+    background: #fff;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+  }
+  .alert {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .alert.info { background: #eff6ff; color: #1e40af; border-left: 4px solid #3b82f6; }
+  .alert.warn { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+  .alert.err { background: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; }
+  .footer {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--ink-l);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .supervisor {
+    font-size: 10px;
+    color: var(--ink-l);
+    margin-top: 4px;
+  }
+  .sign-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sign-form label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .sign-form input[type="text"], .sign-form input[type="date"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .sign-form .checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--ink-l);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">ｍやるゼ！</div>
+  <div class="sub">医療・介護連携プラットフォーム</div>
+</div>
+
+<div class="container" id="content">
+  <div class="loading">読み込み中...</div>
+</div>
+
+<div class="footer">
+  <div>本ページは ｍやるゼ！プラットフォームで電子発行された文書の改ざん検証ページです。</div>
+  <div class="supervisor">医監修：後藤基温 医師（医療法人社団コンパス 理事長）</div>
+  <div style="margin-top:8px"><a href="https://myaruze.tamjump.com/">ｍやるゼ！について</a></div>
+</div>
+
+<script>
+const API_BASE = 'https://medadapt-api-v2.tamjump.workers.dev';
+
+// URL から sd_id と token を抽出
+function getParams() {
+  const path = window.location.pathname;
+  const m = path.match(/\/verify\/document\/(SD-[A-Za-z0-9-]+)/);
+  const sdId = m ? m[1] : new URLSearchParams(window.location.search).get('id');
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  return { sdId, token };
+}
+
+async function loadDocument() {
+  const { sdId, token } = getParams();
+  if (!sdId) {
+    document.getElementById('content').innerHTML = '<div class="card"><div class="alert err">URLが不正です。QRコードから再アクセスしてください。</div></div>';
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/verify/document/${sdId}${token ? '?token=' + token : ''}`);
+    if (!res.ok) {
+      document.getElementById('content').innerHTML = '<div class="card"><div class="alert err">文書が見つかりません（404）</div></div>';
+      return;
+    }
+    const data = await res.json();
+    renderDocument(data);
+  } catch (e) {
+    document.getElementById('content').innerHTML = '<div class="card"><div class="alert err">通信エラー: ' + (e.message || e) + '</div></div>';
+  }
+}
+
+function renderDocument(data) {
+  const docKindLabels = {
+    'consent_form': '同意書（鍼灸・マッサージ／訪問診療）',
+    'discharge_notice': '退院通知',
+    'org_nda': 'NDA（秘密保持契約）',
+    'treatment_plan': '施術計画書',
+    'acupuncture_report': '施術報告書',
+    'joint_guidance_record': '退院時共同指導記録'
+  };
+  const roleLabels = {
+    'doctor': '医師',
+    'patient': '患者',
+    'acupuncturist': '施術者',
+    'nurse': '看護師',
+    'careManager': 'ケアマネージャー',
+    'pharmacist': '薬剤師',
+    'witness': '立会人'
+  };
+  const verifyBadge = data.valid
+    ? '<span class="verify-badge valid">✓ 改ざんなし（SHA-256 検証済）</span>'
+    : '<span class="verify-badge invalid">✗ 改ざん検知</span>';
+  const tsaInfo = data.tsa_acquired_at
+    ? `<div class="alert info">認定タイムスタンプ取得済（${escapeHtml(data.tsa_acquired_at.slice(0, 19))}）</div>`
+    : '<div class="alert warn">認定タイムスタンプ未取得（Phase 9 で対応予定）。現状は SHA-256 ハッシュチェーンによる改ざん検知のみ有効</div>';
+  let html = `
+    <div class="card">
+      ${verifyBadge}
+      <h1>${escapeHtml(docKindLabels[data.doc_kind] || data.doc_kind)}</h1>
+      <div class="meta">
+        文書ID: ${escapeHtml(data.signed_document_id)}<br>
+        確定日時: ${escapeHtml((data.finalized_at || '').slice(0, 19).replace('T', ' '))}<br>
+        検証日時: ${escapeHtml((data.verified_at || '').slice(0, 19).replace('T', ' '))}
+      </div>
+      ${tsaInfo}
+      <div class="hash-info">
+        <div><strong>保存ハッシュ：</strong>${escapeHtml(data.content_hash)}</div>
+        <div style="margin-top:4px"><strong>再計算ハッシュ：</strong>${escapeHtml(data.recomputed_hash)}</div>
+        <div style="margin-top:4px"><strong>チェーン番号：</strong>#${data.chain_index || '—'}</div>
+      </div>
+    </div>
+  `;
+  // タイトル
+  html += `
+    <div class="card">
+      <div class="doc-section" style="border-top:none;padding-top:0;margin-top:0">
+        <h3>タイトル</h3>
+        <div class="v">${escapeHtml(data.title || '')}</div>
+      </div>
+  `;
+  // content_snapshot がある場合（トークン一致時のみ表示）
+  if (data.content_snapshot) {
+    html += renderContentSection(data.doc_kind, data.content_snapshot);
+  } else {
+    html += '<div class="alert warn">文書の本文はトークン認証付きQRからアクセスした場合のみ表示されます。</div>';
+  }
+  html += '</div>';
+  // 署名履歴
+  if (data.attestations && data.attestations.length) {
+    html += '<div class="card"><h3 style="margin:0 0 12px;font-size:14px">署名履歴（改ざん不可・ハッシュチェーン）</h3><div class="signature-list">';
+    data.attestations.forEach(a => {
+      html += `
+        <div class="signature-item">
+          <div class="role">${escapeHtml(roleLabels[a.role] || a.role)}</div>
+          <div class="time">${escapeHtml((a.attested_at || '').slice(0, 19).replace('T', ' '))}</div>
+          <div style="font-family:monospace;font-size:10px;color:#94a3b8;margin-top:4px">HASH: ${escapeHtml((a.event_hash || '').slice(0, 32))}...</div>
+        </div>
+      `;
+    });
+    html += '</div></div>';
+  } else {
+    html += '<div class="card"><div class="alert warn">まだ署名が記録されていません。</div></div>';
+  }
+  // 法的根拠
+  html += `
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:13px;color:#64748b">法的根拠</h3>
+      <div style="font-size:11px;color:#64748b;line-height:1.8">
+        本文書は e-文書法・電子署名法および厚労省「医療情報システムの安全管理に関するガイドライン」に基づき電子発行されています。SHA-256 ハッシュチェーンによる改ざん検知が可能です。<br>
+        （認定タイムスタンプ統合は Phase 9 で対応予定）
+      </div>
+    </div>
+  `;
+  document.getElementById('content').innerHTML = html;
+}
+
+function renderContentSection(docKind, snapshot) {
+  let html = '';
+  try {
+    const c = typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot;
+    if (docKind === 'consent_form') {
+      const cf = c.consent_form || c;
+      const typeMap = { 'acupuncture': 'はり・きゅう', 'massage': 'あマ指（あん摩・マッサージ・指圧）', 'both': 'はり・きゅう＋あマ指' };
+      html += `
+        <div class="doc-section"><h3>施術種別</h3><div class="v">${escapeHtml(typeMap[cf.consent_type] || cf.consent_type || '')}</div></div>
+        <div class="doc-section"><h3>同意年月日</h3><div class="v">${escapeHtml(cf.consent_date || '')}</div></div>
+        <div class="doc-section"><h3>有効期限</h3><div class="v">${escapeHtml((cf.expires_at || '').slice(0, 10))}（${cf.validity_months || 6}か月）</div></div>
+      `;
+      if (cf.disease_names) {
+        let diseases = cf.disease_names;
+        if (typeof diseases === 'string') {
+          try { diseases = JSON.parse(diseases); } catch(e) { diseases = []; }
+        }
+        if (Array.isArray(diseases) && diseases.length) {
+          html += '<div class="doc-section"><h3>傷病名</h3><div class="v">';
+          diseases.forEach(d => {
+            html += `・${escapeHtml(d.name || d)}${d.onset_date ? '（発症日: ' + escapeHtml(d.onset_date) + '）' : ''}<br>`;
+          });
+          html += '</div></div>';
+        }
+      }
+    } else if (docKind === 'joint_guidance_record') {
+      html += `
+        <div class="doc-section"><h3>通知タイトル</h3><div class="v">${escapeHtml(c.title || '')}</div></div>
+        <div class="doc-section"><h3>メモ</h3><div class="v" style="white-space:pre-wrap">${escapeHtml(c.memo || '')}</div></div>
+        <div class="doc-section"><h3>発行日時</h3><div class="v">${escapeHtml((c.issued_at || '').slice(0, 19).replace('T', ' '))}</div></div>
+      `;
+    } else if (docKind === 'org_nda') {
+      html += `
+        <div class="doc-section"><h3>NDA種別</h3><div class="v">${escapeHtml(c.nda_type || 'standard')}</div></div>
+        <div class="doc-section"><h3>署名者</h3><div class="v">${escapeHtml(c.signer_name || '')}${c.signer_role ? '（' + escapeHtml(c.signer_role) + '）' : ''}</div></div>
+        <div class="doc-section"><h3>署名日時</h3><div class="v">${escapeHtml((c.signed_at || '').slice(0, 19).replace('T', ' '))}</div></div>
+      `;
+    } else {
+      html += `<div class="doc-section"><h3>文書内容</h3><div class="v" style="font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all">${escapeHtml(JSON.stringify(c, null, 2).slice(0, 1000))}</div></div>`;
+    }
+  } catch (e) {
+    html += `<div class="doc-section"><h3>文書内容</h3><div class="v" style="color:#dc2626">スナップショットの解析に失敗しました</div></div>`;
+  }
+  return html;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+loadDocument();
+</script>
+</body>
+</html>

@@ -598,6 +598,21 @@ async function handleRequest(request, env, json, err) {
   if (!currentUser) return err('ユーザーが見つかりません', 401);
   const currentEmail = currentUser.email;
 
+  // ── GET /auth/me ─────────────────────────────────────────
+  // 現在のユーザー情報を返す（鍼灸師ポータル等のクライアントが使用）
+  if (path === '/auth/me' && method === 'GET') {
+    return json({
+      user: {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name || '',
+        role: currentUser.role || '',
+        org_id: currentUser.org_id || null,
+        org_type: currentUser.org_type || null
+      }
+    });
+  }
+
   // ── v8: GET /notifications/unread ────────────────────────
   if (path === '/notifications/unread' && method === 'GET') {
     let count = 0;
@@ -2346,7 +2361,55 @@ async function handleRequest(request, env, json, err) {
       JSON.stringify({ report_date, content, treatment_minutes: Number(treatment_minutes) || 0 }),
       currentUser.id, now
     ).run();
+    // v13: 施術報告書も改ざん防止基盤に登録
+    try {
+      await env.DB.prepare(`INSERT INTO signed_documents (
+        id, doc_kind, doc_id, org_id, patient_id, title,
+        content_snapshot, content_hash, prev_hash, chain_index,
+        tsa_status, verify_token, qr_payload, claim_status,
+        created_at, finalized_at, created_by
+      ) VALUES (?, 'acupuncture_report', ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, 'not_claimed', ?, ?, ?)`).bind(
+        'SD-' + genUuid(),
+        docId,
+        currentUser.org_id || currentUser.id,
+        cf.patient_id,
+        `施術報告書 ${report_date}`,
+        JSON.stringify({ doc_id: docId, consent_form_id: cfId, report_date, content, treatment_minutes }),
+        await sha256Hex(`${docId}|${cfId}|${report_date}|${content}|${treatment_minutes||0}`),
+        null,
+        null,
+        crypto.randomUUID().replace(/-/g, ''),
+        `${new URL(request.url).origin}/verify/document/SD-${docId}`,
+        now,
+        now,
+        currentUser.id
+      ).run();
+    } catch (e) { console.warn('signed_documents auto-register failed:', e?.message); }
     return json({ ok: true, document_id: docId });
+  }
+
+  // ── GET /consent/reports/my（鍼灸師：自分が投稿した施術報告書一覧）─
+  if (path === '/consent/reports/my' && method === 'GET') {
+    if (currentUser.role !== 'med_acupuncturist' && currentUser.role !== 'admin') {
+      return err('施術報告書一覧は med_acupuncturist ロールのみ閲覧できます', 403);
+    }
+    const rows = await env.DB.prepare(
+      `SELECT * FROM documents WHERE doc_type='acupuncture_report' AND created_by=? ORDER BY created DESC LIMIT 200`
+    ).bind(currentUser.id).all();
+    const items = (rows?.results || []).map(r => {
+      let parsed = {};
+      try { parsed = JSON.parse(r.content || '{}'); } catch (e) {}
+      return {
+        id: r.id,
+        consent_form_id: r.related_id,
+        patient_id: r.patient_id,
+        session_date: parsed.report_date || '',
+        treatment_content: parsed.content || '',
+        duration_minutes: parsed.treatment_minutes || 0,
+        created_at: r.created
+      };
+    });
+    return json({ ok: true, items });
   }
 
   // ════════════════════════════════════════════════════════════
