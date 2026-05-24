@@ -1,4 +1,6 @@
 // ｍやるゼ！ API Worker v7
+// v12追加: Phase 8 マッサージ同意書（consent_forms / treatment_plans / signature_events / hash_chain）
+// v11追加: 退院通知 PDF 保存 / meeting_url
 // v9追加: NDA管理・退院通知・アクセス権限制御
 // v8追加: モジュール権限チェック・通知・クーポン
 // v6追加: /auth/reset で login_id にも対応
@@ -1912,7 +1914,444 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true, events });
   }
 
+  // ════════════════════════════════════════════════════════════
+  // Phase 8: マッサージ同意書（v4.2 設計書 §41〜§47 / v4.3 確定）
+  // ════════════════════════════════════════════════════════════
+
+  // ── POST /consent/create ────────────────────────────────────
+  if (path === '/consent/create' && method === 'POST') {
+    if (!['med_clinic', 'org_staff', 'org_admin', 'admin'].includes(currentUser.role)) {
+      return err('同意書を作成する権限がありません', 403);
+    }
+    const body = await request.json().catch(() => ({}));
+    const {
+      patient_id, consent_type, disease_names, notes, consent_date,
+      validity_months, visit_plan, difficulty_reasons, treatment_plan
+    } = body;
+    if (!patient_id || !consent_type || !disease_names || !consent_date) {
+      return err('必須項目が不足しています（patient_id / consent_type / disease_names / consent_date）');
+    }
+    if (!['acupuncture', 'massage', 'both'].includes(consent_type)) {
+      return err('consent_type は acupuncture / massage / both のいずれか');
+    }
+    // 患者の存在 + 同医療機関配下確認
+    const orgId = currentUser.org_id || currentUser.id;
+    const patient = await env.DB.prepare('SELECT * FROM patients WHERE id=? AND owner_email=?').bind(patient_id, currentEmail).first();
+    if (!patient) {
+      // owner_email が一致しない場合でも同 org の登録患者なら許可
+      const altPatient = await env.DB.prepare('SELECT p.* FROM patients p JOIN users u ON u.id=p.owner_email WHERE p.id=? AND u.org_id=?').bind(patient_id, orgId).first();
+      if (!altPatient) return err('患者が見つかりません', 404);
+    }
+    const months = Number(validity_months) || 6;
+    const expiresAt = computeExpiresAt(consent_date, months);
+    const cfId = 'CF-' + genUuid();
+    const tpId = 'TP-' + genUuid();
+    const now = new Date().toISOString();
+    const diseaseJson = typeof disease_names === 'string' ? disease_names : JSON.stringify(disease_names);
+    const difficultyJson = difficulty_reasons ? (typeof difficulty_reasons === 'string' ? difficulty_reasons : JSON.stringify(difficulty_reasons)) : '';
+    // doctor_user_id：med_clinic 本人 or org_staff から作成する場合は同 org 内の med_clinic を採用
+    let doctorUserId = currentUser.id;
+    if (currentUser.role !== 'med_clinic') {
+      const doc = await env.DB.prepare("SELECT id FROM users WHERE org_id=? AND role='med_clinic' AND status='active' ORDER BY created LIMIT 1").bind(orgId).first();
+      if (doc) doctorUserId = doc.id;
+    }
+    // batch で consent_forms + treatment_plans を 1 トランザクション化（罠 §47-2）
+    const stmts = [
+      env.DB.prepare(`INSERT INTO consent_forms (
+        id, org_id, patient_id, doctor_user_id, consent_type, disease_names, notes,
+        consent_date, validity_months, expires_at, visit_plan, difficulty_reasons,
+        status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`).bind(
+        cfId, orgId, patient_id, doctorUserId, consent_type, diseaseJson, notes || '',
+        consent_date, months, expiresAt, visit_plan || '年2回（6か月に1回）', difficultyJson, now, now
+      ),
+    ];
+    if (treatment_plan && treatment_plan.visit_frequency && treatment_plan.evaluation_frequency) {
+      stmts.push(env.DB.prepare(`INSERT INTO treatment_plans (
+        id, consent_form_id, org_id, patient_id, doctor_user_id,
+        visit_frequency, evaluation_frequency, goals, treatment_method, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        tpId, cfId, orgId, patient_id, doctorUserId,
+        treatment_plan.visit_frequency, treatment_plan.evaluation_frequency,
+        treatment_plan.goals || '', treatment_plan.treatment_method || '', now, now
+      ));
+    }
+    await env.DB.batch(stmts);
+    return json({ ok: true, consent_form_id: cfId, treatment_plan_id: treatment_plan ? tpId : null });
+  }
+
+  // ── GET /consent/list ───────────────────────────────────────
+  if (path === '/consent/list' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    let rows;
+    if (['med_clinic', 'org_admin', 'org_staff', 'admin'].includes(currentUser.role)) {
+      // 自院の同意書
+      rows = await env.DB.prepare('SELECT * FROM consent_forms WHERE org_id=? ORDER BY created_at DESC LIMIT 200').bind(orgId).all();
+    } else if (currentUser.role === 'med_acupuncturist') {
+      // 自分に共有された同意書
+      rows = await env.DB.prepare('SELECT * FROM consent_forms WHERE shared_to_user_id=? ORDER BY shared_at DESC LIMIT 200').bind(currentUser.id).all();
+    } else if (currentUser.role === 'patient') {
+      // 自分が患者として紐付くもの
+      rows = await env.DB.prepare('SELECT cf.* FROM consent_forms cf JOIN patients p ON p.id=cf.patient_id WHERE p.owner_email=? ORDER BY cf.created_at DESC LIMIT 200').bind(currentEmail).all();
+    } else {
+      return err('同意書を閲覧する権限がありません', 403);
+    }
+    const list = (rows?.results || []).map(r => ({
+      id: r.id, patient_id: r.patient_id, consent_type: r.consent_type,
+      consent_date: r.consent_date, expires_at: r.expires_at, status: r.status,
+      shared_to_user_id: r.shared_to_user_id, created_at: r.created_at, updated_at: r.updated_at
+    }));
+    return json({ ok: true, items: list });
+  }
+
+  // ── GET /consent/:id ─────────────────────────────────────────
+  const consentGetMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)$/);
+  if (consentGetMatch && method === 'GET') {
+    const cfId = consentGetMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const access = await checkConsentAccess(env, cf, currentUser, currentEmail);
+    if (!access.allowed) return err(access.reason || '閲覧権限がありません', 403);
+    const tp = await env.DB.prepare('SELECT * FROM treatment_plans WHERE consent_form_id=?').bind(cfId).first();
+    const sigsRow = await env.DB.prepare('SELECT * FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cfId).all();
+    return json({ ok: true, consent_form: cf, treatment_plan: tp || null, signatures: sigsRow?.results || [] });
+  }
+
+  // ── PUT /consent/:id ─────────────────────────────────────────
+  const consentPutMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)$/);
+  if (consentPutMatch && method === 'PUT') {
+    const cfId = consentPutMatch[1];
+    if (!['org_staff', 'med_clinic', 'org_admin', 'admin'].includes(currentUser.role)) {
+      return err('編集権限がありません', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (cf.org_id !== orgId) return err('他医療機関の同意書は編集できません', 403);
+    if (cf.status !== 'draft') return err('下書き状態でないため編集できません', 400);
+    const body = await request.json().catch(() => ({}));
+    const updates = [];
+    const params = [];
+    const fields = ['consent_type', 'disease_names', 'notes', 'consent_date', 'validity_months', 'visit_plan', 'difficulty_reasons'];
+    for (const f of fields) {
+      if (f in body) {
+        updates.push(`${f}=?`);
+        if (f === 'disease_names' || f === 'difficulty_reasons') {
+          params.push(typeof body[f] === 'string' ? body[f] : JSON.stringify(body[f]));
+        } else {
+          params.push(body[f]);
+        }
+      }
+    }
+    if ('consent_date' in body || 'validity_months' in body) {
+      const cd = body.consent_date || cf.consent_date;
+      const vm = Number(body.validity_months ?? cf.validity_months) || 6;
+      updates.push('expires_at=?');
+      params.push(computeExpiresAt(cd, vm));
+    }
+    if (!updates.length) return err('更新項目がありません', 400);
+    updates.push('updated_at=?');
+    params.push(new Date().toISOString());
+    params.push(cfId);
+    await env.DB.prepare(`UPDATE consent_forms SET ${updates.join(', ')} WHERE id=?`).bind(...params).run();
+    return json({ ok: true });
+  }
+
+  // ── POST /consent/:id/sign-doctor ───────────────────────────
+  const signDocMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/sign-doctor$/);
+  if (signDocMatch && method === 'POST') {
+    const cfId = signDocMatch[1];
+    if (currentUser.role !== 'med_clinic' && currentUser.role !== 'admin') {
+      return err('医師署名は med_clinic ロールのみ実行できます', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    if (cf.status !== 'draft') return err('下書き状態でないため署名できません（現状態: ' + cf.status + '）', 400);
+    const body = await request.json().catch(() => ({}));
+    const { signature_method, signature_data } = body;
+    if (!signature_method || !['electronic_seal', 'handwritten_image', 'typed_name'].includes(signature_method)) {
+      return err('signature_method は electronic_seal / handwritten_image / typed_name のいずれか');
+    }
+    const now = new Date().toISOString();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const ua = request.headers.get('User-Agent') || '';
+    const prevSig = await env.DB.prepare('SELECT event_hash FROM signature_events WHERE consent_form_id=? ORDER BY signed_at DESC LIMIT 1').bind(cfId).first();
+    const prevEventHash = prevSig?.event_hash || '';
+    const seId = 'SE-' + genUuid();
+    const eventHash = await sha256Hex(`${seId}|${cfId}|${currentUser.id}|doctor|${signature_method}|${signature_data || ''}|${now}|${prevEventHash}`);
+    await env.DB.prepare(`INSERT INTO signature_events (
+      id, consent_form_id, signer_user_id, signer_role, signature_method, signature_data,
+      signed_at, signed_ip, signed_user_agent, event_hash, prev_event_hash, created_at
+    ) VALUES (?, ?, ?, 'doctor', ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      seId, cfId, currentUser.id, signature_method, signature_data || null,
+      now, ip, ua, eventHash, prevEventHash || null, now
+    ).run();
+    await appendHashChain(env, 'signature_event', seId, eventHash);
+    await env.DB.prepare("UPDATE consent_forms SET status='signed_by_doctor', updated_at=? WHERE id=?").bind(now, cfId).run();
+    return json({ ok: true, signature_event_id: seId, event_hash: eventHash });
+  }
+
+  // ── POST /consent/:id/sign-patient ──────────────────────────
+  const signPatMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/sign-patient$/);
+  if (signPatMatch && method === 'POST') {
+    const cfId = signPatMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    if (cf.status !== 'signed_by_doctor') return err('医師署名が完了していません（現状態: ' + cf.status + '）', 400);
+    // 患者本人 or 同医療機関の代理署名
+    const orgId = currentUser.org_id || currentUser.id;
+    let allowedAsPatient = false;
+    if (currentUser.role === 'patient') {
+      const p = await env.DB.prepare('SELECT id FROM patients WHERE id=? AND owner_email=?').bind(cf.patient_id, currentEmail).first();
+      allowedAsPatient = !!p;
+    }
+    const allowedAsProxy = (cf.org_id === orgId) && ['med_clinic', 'org_staff', 'org_admin', 'admin'].includes(currentUser.role);
+    if (!allowedAsPatient && !allowedAsProxy) return err('患者署名の権限がありません', 403);
+    const body = await request.json().catch(() => ({}));
+    const { signature_method, signature_data } = body;
+    if (!signature_method || !['electronic_seal', 'handwritten_image', 'typed_name'].includes(signature_method)) {
+      return err('signature_method は electronic_seal / handwritten_image / typed_name のいずれか');
+    }
+    const now = new Date().toISOString();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const ua = request.headers.get('User-Agent') || '';
+    const prevSig = await env.DB.prepare('SELECT event_hash FROM signature_events WHERE consent_form_id=? ORDER BY signed_at DESC LIMIT 1').bind(cfId).first();
+    const prevEventHash = prevSig?.event_hash || '';
+    const seId = 'SE-' + genUuid();
+    const eventHash = await sha256Hex(`${seId}|${cfId}|${currentUser.id}|patient|${signature_method}|${signature_data || ''}|${now}|${prevEventHash}`);
+    await env.DB.prepare(`INSERT INTO signature_events (
+      id, consent_form_id, signer_user_id, signer_role, signature_method, signature_data,
+      signed_at, signed_ip, signed_user_agent, event_hash, prev_event_hash, created_at
+    ) VALUES (?, ?, ?, 'patient', ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      seId, cfId, currentUser.id, signature_method, signature_data || null,
+      now, ip, ua, eventHash, prevEventHash || null, now
+    ).run();
+    await appendHashChain(env, 'signature_event', seId, eventHash);
+    // content_hash 確定（全フィールド + 全署名）
+    const allSigs = await env.DB.prepare('SELECT event_hash FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cfId).all();
+    const sigConcat = (allSigs?.results || []).map(s => s.event_hash).join('|');
+    const contentHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
+    const chainRow = await appendHashChain(env, 'consent_form', cfId, contentHash);
+    await env.DB.prepare("UPDATE consent_forms SET status='signed_by_patient', content_hash=?, prev_hash=?, chain_index=?, updated_at=? WHERE id=?")
+      .bind(contentHash, chainRow.prev_chain_hash, chainRow.chain_index, now, cfId).run();
+    return json({ ok: true, signature_event_id: seId, content_hash: contentHash, chain_index: chainRow.chain_index });
+  }
+
+  // ── POST /consent/:id/share ─────────────────────────────────
+  const shareMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/share$/);
+  if (shareMatch && method === 'POST') {
+    const cfId = shareMatch[1];
+    if (!['org_staff', 'med_clinic', 'org_admin', 'patient', 'admin'].includes(currentUser.role)) {
+      return err('共有権限がありません', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    if (cf.status !== 'signed_by_patient' && cf.status !== 'shared') {
+      return err('患者署名完了後にのみ共有できます（現状態: ' + cf.status + '）', 400);
+    }
+    const body = await request.json().catch(() => ({}));
+    const { acupuncturist_user_id } = body;
+    if (!acupuncturist_user_id) return err('acupuncturist_user_id が必要です');
+    const ac = await env.DB.prepare("SELECT id, role FROM users WHERE id=?").bind(acupuncturist_user_id).first();
+    if (!ac) return err('共有先ユーザーが見つかりません', 404);
+    if (ac.role !== 'med_acupuncturist') return err('共有先が med_acupuncturist ロールではありません', 400);
+    const now = new Date().toISOString();
+    await env.DB.prepare("UPDATE consent_forms SET status='shared', shared_to_user_id=?, shared_at=?, updated_at=? WHERE id=?")
+      .bind(acupuncturist_user_id, now, now, cfId).run();
+    return json({ ok: true, shared_to_user_id: acupuncturist_user_id, shared_at: now });
+  }
+
+  // ── POST /consent/:id/revoke ────────────────────────────────
+  const revokeMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/revoke$/);
+  if (revokeMatch && method === 'POST') {
+    const cfId = revokeMatch[1];
+    if (currentUser.role !== 'med_clinic' && currentUser.role !== 'admin') {
+      return err('取消しは med_clinic ロールのみ実行できます', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    if (cf.status === 'revoked') return err('既に取消し済みです', 400);
+    const body = await request.json().catch(() => ({}));
+    const reason = body.reason || '';
+    const now = new Date().toISOString();
+    const revokeHash = await sha256Hex(`revoke|${cfId}|${currentUser.id}|${reason}|${now}`);
+    await env.DB.prepare("UPDATE consent_forms SET status='revoked', revoked_at=?, revoked_reason=?, updated_at=? WHERE id=?")
+      .bind(now, reason, now, cfId).run();
+    await appendHashChain(env, 'revocation', cfId, revokeHash);
+    return json({ ok: true, revoked_at: now });
+  }
+
+  // ── POST /consent/:id/renew ─────────────────────────────────
+  const renewMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/renew$/);
+  if (renewMatch && method === 'POST') {
+    const cfId = renewMatch[1];
+    if (currentUser.role !== 'med_clinic' && currentUser.role !== 'admin') {
+      return err('再同意発行は med_clinic ロールのみ実行できます', 403);
+    }
+    const oldCf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!oldCf) return err('元同意書が見つかりません', 404);
+    const body = await request.json().catch(() => ({}));
+    const consentDate = body.consent_date || new Date().toISOString().slice(0, 10);
+    const months = Number(body.validity_months) || oldCf.validity_months || 6;
+    const expiresAt = computeExpiresAt(consentDate, months);
+    const newCfId = 'CF-' + genUuid();
+    const now = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE consent_forms SET status='renewed', updated_at=? WHERE id=?").bind(now, cfId),
+      env.DB.prepare(`INSERT INTO consent_forms (
+        id, org_id, patient_id, doctor_user_id, consent_type, disease_names, notes,
+        consent_date, validity_months, expires_at, visit_plan, difficulty_reasons,
+        status, renewed_from, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`).bind(
+        newCfId, oldCf.org_id, oldCf.patient_id, oldCf.doctor_user_id,
+        oldCf.consent_type, oldCf.disease_names, oldCf.notes,
+        consentDate, months, expiresAt, oldCf.visit_plan, oldCf.difficulty_reasons,
+        cfId, now, now
+      ),
+    ]);
+    return json({ ok: true, new_consent_form_id: newCfId, renewed_from: cfId });
+  }
+
+  // ── GET /consent/:id/verify ─────────────────────────────────
+  // 認証スキップで誰でも検証可能（QR / トークン URL 用）。token クエリで HMAC 検証も可能
+  const verifyMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/verify$/);
+  if (verifyMatch && method === 'GET') {
+    const cfId = verifyMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const sigs = await env.DB.prepare('SELECT * FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cfId).all();
+    const sigConcat = (sigs?.results || []).map(s => s.event_hash).join('|');
+    const recomputedHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
+    const valid = cf.content_hash ? (recomputedHash === cf.content_hash) : false;
+    return json({
+      valid,
+      consent_form_id: cfId,
+      content_hash: cf.content_hash,
+      recomputed_hash: recomputedHash,
+      chain_index: cf.chain_index,
+      status: cf.status,
+      signatures: (sigs?.results || []).map(s => ({
+        role: s.signer_role, signed_at: s.signed_at, event_hash: s.event_hash, signature_method: s.signature_method
+      })),
+      tsa_acquired_at: cf.tsa_acquired_at || null,
+      verified_at: new Date().toISOString()
+    });
+  }
+
+  // ── GET /consent/:id/pdf ────────────────────────────────────
+  const pdfMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/pdf$/);
+  if (pdfMatch && method === 'GET') {
+    const cfId = pdfMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const access = await checkConsentAccess(env, cf, currentUser, currentEmail);
+    if (!access.allowed) return err(access.reason || 'PDF を取得する権限がありません', 403);
+    if (!cf.pdf_data) return err('PDF がまだ生成されていません', 404);
+    return json({ ok: true, pdf_data: cf.pdf_data, pdf_filename: cf.pdf_filename || `consent_${cfId}.pdf` });
+  }
+
+  // ── POST /consent/:id/pdf-upload（クライアント側で生成した PDF を保存）
+  const pdfUploadMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/pdf-upload$/);
+  if (pdfUploadMatch && method === 'POST') {
+    const cfId = pdfUploadMatch[1];
+    if (!['med_clinic', 'org_staff', 'org_admin', 'admin'].includes(currentUser.role)) {
+      return err('PDF アップロード権限がありません', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (cf.org_id !== orgId) return err('他医療機関の同意書は更新できません', 403);
+    const body = await request.json().catch(() => ({}));
+    const { pdf_data, pdf_filename } = body;
+    if (!pdf_data) return err('pdf_data が必要です');
+    const now = new Date().toISOString();
+    await env.DB.prepare('UPDATE consent_forms SET pdf_data=?, pdf_filename=?, updated_at=? WHERE id=?')
+      .bind(pdf_data, pdf_filename || `consent_${cfId}.pdf`, now, cfId).run();
+    return json({ ok: true });
+  }
+
+  // ── POST /consent/:id/report（鍼灸師による施術報告書）──────
+  const reportMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/report$/);
+  if (reportMatch && method === 'POST') {
+    const cfId = reportMatch[1];
+    if (currentUser.role !== 'med_acupuncturist' && currentUser.role !== 'admin') {
+      return err('施術報告は med_acupuncturist ロールのみ実行できます', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    if (cf.shared_to_user_id !== currentUser.id && currentUser.role !== 'admin') {
+      return err('共有されていない同意書には施術報告できません', 403);
+    }
+    const body = await request.json().catch(() => ({}));
+    const { report_date, content, treatment_minutes } = body;
+    if (!report_date || !content) return err('report_date と content が必要です');
+    // documents テーブルに記録（既存スキーマ流用・罠 §37-15 回避）
+    const docId = 'DOC-' + genUuid();
+    const now = new Date().toISOString();
+    await env.DB.prepare(`INSERT INTO documents (
+      id, patient_id, related_id, owner_email, doc_type, title, content, created_by, created
+    ) VALUES (?, ?, ?, ?, 'acupuncture_report', ?, ?, ?, ?)`).bind(
+      docId, cf.patient_id, cfId, currentEmail,
+      `施術報告書 ${report_date}`,
+      JSON.stringify({ report_date, content, treatment_minutes: Number(treatment_minutes) || 0 }),
+      currentUser.id, now
+    ).run();
+    return json({ ok: true, document_id: docId });
+  }
+
   return err('Not found', 404);
+}
+
+// ════════════════════════════════════════════════════════════
+// Phase 8 ヘルパー
+// ════════════════════════════════════════════════════════════
+
+// SHA-256 16進文字列を返す
+async function sha256Hex(text) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 有効期限算出（consent_date + validity_months）
+function computeExpiresAt(consentDateStr, months) {
+  const d = new Date(consentDateStr);
+  d.setMonth(d.getMonth() + Number(months || 6));
+  return d.toISOString();
+}
+
+// hash_chain に追加し、entity_hash / prev_chain_hash / chain_hash を返す
+async function appendHashChain(env, entityType, entityId, entityHash) {
+  const HASH_CHAIN_GENESIS = '0000000000000000000000000000000000000000000000000000000000000000';
+  const prevRow = await env.DB.prepare('SELECT chain_hash FROM hash_chain ORDER BY chain_index DESC LIMIT 1').first();
+  const prevChainHash = prevRow?.chain_hash || HASH_CHAIN_GENESIS;
+  const now = new Date().toISOString();
+  const chainHash = await sha256Hex(`${entityHash}|${prevChainHash}|${now}`);
+  const result = await env.DB.prepare(
+    'INSERT INTO hash_chain (entity_type, entity_id, entity_hash, prev_chain_hash, chain_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(entityType, entityId, entityHash, prevChainHash, chainHash, now).run();
+  const chainIndex = result?.meta?.last_row_id || null;
+  return { chain_index: chainIndex, entity_hash: entityHash, prev_chain_hash: prevChainHash, chain_hash: chainHash };
+}
+
+// 同意書アクセス権限判定
+async function checkConsentAccess(env, cf, currentUser, currentEmail) {
+  if (currentUser.role === 'admin') return { allowed: true };
+  const orgId = currentUser.org_id || currentUser.id;
+  // 自院
+  if (cf.org_id === orgId && ['med_clinic', 'org_admin', 'org_staff'].includes(currentUser.role)) {
+    return { allowed: true };
+  }
+  // 共有先鍼灸師
+  if (currentUser.role === 'med_acupuncturist' && cf.shared_to_user_id === currentUser.id) {
+    return { allowed: true };
+  }
+  // 患者本人
+  if (currentUser.role === 'patient') {
+    const p = await env.DB.prepare('SELECT id FROM patients WHERE id=? AND owner_email=?').bind(cf.patient_id, currentEmail).first();
+    if (p) return { allowed: true };
+  }
+  return { allowed: false, reason: 'この同意書へのアクセス権限がありません' };
 }
 
 // ── ログインID生成 ──────────────────────────────────────────

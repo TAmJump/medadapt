@@ -515,6 +515,45 @@ body {
 <!-- ─── STATS BAR ─── -->
 
 
+<!-- ─── MEDICAL SUPERVISOR (v4.3 §48) ─── -->
+<section class="supervisor-section" id="supervisor">
+  <h2 class="supervisor-title">医監修パートナー</h2>
+  <div class="supervisor-card">
+    <div class="supervisor-photo">
+      <img src="assets/img/dr_goto_motoharu.jpg" alt="後藤 基温 先生" onerror="this.style.display='none'; this.parentElement.classList.add('placeholder');">
+    </div>
+    <div class="supervisor-info">
+      <p class="furigana">ごとう もとはる</p>
+      <h3 class="name">後藤 基温 先生</h3>
+      <p class="role">医療法人社団コンパス 理事長<br>コンパスメディカルグループ 代表理事</p>
+      <ul class="career">
+        <li>東京医科大学医学部 卒業 / 地域医療指導教授</li>
+        <li>在宅医療 20年以上の経験</li>
+        <li>訪問診療 累計 850 施設・7.7 万人</li>
+        <li>へき地医療.jp チームGREEN アドバイザリーボード</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<style>
+  .supervisor-section { padding: 60px 20px; background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); }
+  .supervisor-title { text-align: center; font-size: 28px; color: #0369a1; margin: 0 0 40px; position: relative; }
+  .supervisor-title::after { content: ''; display: block; width: 60px; height: 3px; background: #0369a1; margin: 12px auto 0; }
+  .supervisor-card { display: flex; gap: 32px; max-width: 800px; margin: 0 auto; padding: 32px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); align-items: center; }
+  .supervisor-photo { flex: 0 0 auto; }
+  .supervisor-photo img { width: 200px; height: 200px; object-fit: cover; border-radius: 50%; border: 4px solid #e0f2fe; display: block; }
+  .supervisor-photo.placeholder { width: 200px; height: 200px; border-radius: 50%; border: 4px solid #e0f2fe; background: #f0f9ff url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%230369a1%22><path d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/></svg>') center / 60% no-repeat; }
+  .supervisor-info .furigana { font-size: 12px; color: #64748b; margin: 0; }
+  .supervisor-info .name { font-size: 24px; margin: 4px 0 8px; color: #0f172a; }
+  .supervisor-info .role { font-size: 14px; color: #475569; margin: 0 0 16px; line-height: 1.6; }
+  .supervisor-info .career { padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.8; margin: 0; }
+  @media (max-width: 768px) {
+    .supervisor-card { flex-direction: column; text-align: center; }
+    .supervisor-info .career { text-align: left; }
+  }
+</style>
+
+
 <!-- ─── PROBLEMS ─── -->
 <section class="sec problems" id="problems">
   <div class="problems-layout">
