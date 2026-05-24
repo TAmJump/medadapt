@@ -178,4 +178,4 @@ await api('/signed-docs/finalize', {method:'POST', body:JSON.stringify({
 
 ---
 
-最新 HEAD：medadapt `{push 後に確認}`
+最新 HEAD：medadapt `e08d19f`
