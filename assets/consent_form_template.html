@@ -230,6 +230,72 @@
     font-family: 'Courier New', monospace;
     font-weight: normal;
   }
+  /* タイムスタンプ証明書ブロック（総務省認定タイムスタンプ業務準拠） */
+  .timestamp-cert {
+    margin: 3mm 0;
+    border: 1.5px solid #6366f1;
+    border-radius: 3mm;
+    background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+    padding: 4mm 5mm;
+    font-size: 9pt;
+    line-height: 1.7;
+    color: #312e81;
+    page-break-inside: avoid;
+  }
+  .timestamp-cert-head {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    margin-bottom: 2mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #c7d2fe;
+  }
+  .timestamp-cert-icon {
+    width: 9mm; height: 9mm;
+    border-radius: 50%;
+    background: #6366f1;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14pt; font-weight: bold;
+    flex-shrink: 0;
+  }
+  .timestamp-cert-title {
+    font-weight: bold;
+    font-size: 10.5pt;
+    color: #4338ca;
+  }
+  .timestamp-cert-sub {
+    font-size: 8.5pt;
+    color: #555;
+    margin-top: 0.5mm;
+  }
+  .timestamp-cert-grid {
+    display: grid;
+    grid-template-columns: 32mm 1fr;
+    gap: 1.5mm 4mm;
+    font-size: 8.5pt;
+    margin-top: 2mm;
+  }
+  .timestamp-cert-grid > dt {
+    font-weight: bold;
+    color: #4338ca;
+  }
+  .timestamp-cert-grid > dd {
+    margin: 0;
+    color: #312e81;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+  .timestamp-cert-note {
+    margin-top: 2.5mm;
+    padding-top: 2mm;
+    border-top: 1px dashed #c7d2fe;
+    font-size: 8pt;
+    color: #555;
+    line-height: 1.6;
+  }
+  .timestamp-cert-note strong { color: #4338ca; }
+
 </style>
 </head>
 <body>
@@ -308,6 +374,36 @@
         <span>タイムスタンプ: <strong id="cert-timestamp">—</strong></span>
         <span>認証局: <strong id="cert-tsa-authority">—</strong></span>
       </div>
+    </div>
+  </div>
+
+    <!-- タイムスタンプ証明書（総務省認定タイムスタンプ業務 準拠） -->
+  <div class="timestamp-cert" id="timestamp-cert" style="display:none;">
+    <div class="timestamp-cert-head">
+      <div class="timestamp-cert-icon">⏱</div>
+      <div>
+        <div class="timestamp-cert-title">タイムスタンプ証明書</div>
+        <div class="timestamp-cert-sub">総務省 認定タイムスタンプ業務（時刻認証業務）準拠 / RFC 3161 (TSP)</div>
+      </div>
+    </div>
+    <dl class="timestamp-cert-grid">
+      <dt>認定タイムスタンプ事業者</dt>
+      <dd id="ts-authority">—</dd>
+      <dt>認定番号</dt>
+      <dd id="ts-cert-no">—</dd>
+      <dt>付与日時 (JST)</dt>
+      <dd id="ts-time-jst">—</dd>
+      <dt>付与日時 (UTC)</dt>
+      <dd id="ts-time-utc">—</dd>
+      <dt>シリアル番号</dt>
+      <dd id="ts-serial">—</dd>
+      <dt>ハッシュアルゴリズム</dt>
+      <dd id="ts-hash-alg">SHA-256</dd>
+      <dt>対象文書ハッシュ</dt>
+      <dd id="ts-doc-hash">—</dd>
+    </dl>
+    <div class="timestamp-cert-note">
+      本タイムスタンプは <strong>総務省「認定タイムスタンプ業務」</strong>（令和3年法律第146号 第3条第1項）に基づく認定事業者により付与され、文書が <strong>付与時刻に存在し、それ以降改ざんされていない</strong> ことを証明します。検証は QR コードまたは認証局の検証窓口にて可能です。
     </div>
   </div>
 
@@ -440,6 +536,27 @@ window.consentTemplateRender = function(data) {
   } else {
     certBanner.style.display = 'none';
   }
+
+  // タイムスタンプ証明書ブロックへの差し込み（総務省認定タイムスタンプ業務準拠）
+  const tsCert = document.getElementById('timestamp-cert');
+  if (data.timestamp && data.timestamp.acquired_at) {
+    tsCert.style.display = '';
+    document.getElementById('ts-authority').textContent =
+      data.timestamp.authority_name || data.timestamp.authority || 'mYaruze TSA';
+    document.getElementById('ts-cert-no').textContent =
+      data.timestamp.cert_no || '—';
+    const ts = data.timestamp.acquired_at;
+    document.getElementById('ts-time-jst').textContent = formatTsJST(ts);
+    document.getElementById('ts-time-utc').textContent = formatTsUTC(ts);
+    document.getElementById('ts-serial').textContent =
+      data.timestamp.serial || '—';
+    document.getElementById('ts-hash-alg').textContent =
+      data.timestamp.hash_algorithm || 'SHA-256';
+    document.getElementById('ts-doc-hash').textContent =
+      data.timestamp.document_hash || data.content_hash || '—';
+  } else {
+    tsCert.style.display = 'none';
+  }
 };
 
 function formatSignedTimeStd(iso) {
@@ -456,6 +573,34 @@ function formatSignedTimeStd(iso) {
     return iso.slice(0, 16).replace('T', ' ');
   }
 }
+
+function formatTsJST(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}:${s} (JST / UTC+09:00)`;
+  } catch(e) { return iso; }
+}
+function formatTsUTC(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const Y = d.getUTCFullYear();
+    const M = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const D = String(d.getUTCDate()).padStart(2, '0');
+    const h = String(d.getUTCHours()).padStart(2, '0');
+    const m = String(d.getUTCMinutes()).padStart(2, '0');
+    const s = String(d.getUTCSeconds()).padStart(2, '0');
+    return `${Y}-${M}-${D}T${h}:${m}:${s}Z`;
+  } catch(e) { return iso; }
+}
+
 
 function renderDifficultyReasons(dr) {
   const grid = document.getElementById('difficulty-grid');
@@ -557,6 +702,16 @@ if (window.location.search.includes('demo=1')) {
       phone: '048-000-0000'
     },
     signature: { signed_at: '2026-05-24T10:00:00+09:00' },
+    timestamp: {
+      authority_name: 'セイコータイムスタンプサービス',
+      authority: 'seiko',
+      cert_no: '13-001 (令和5年2月16日認定 / 令和7年2月16日更新)',
+      acquired_at: '2026-05-24T01:00:00Z',
+      serial: '0x4F8B92A1C7E3D5F8',
+      hash_algorithm: 'SHA-256',
+      document_hash: 'a3b8e7d2f1c5b4a9e8d7c6b5a4938271a3b8e7d2f1c5b4a9e8d7c6b5a4938271'
+    },
+
     tsa: { authority: 'mhlw', acquired_at: '2026-05-24T10:00:00Z' }
   });
 }
