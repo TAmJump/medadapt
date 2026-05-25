@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-25（v4.18 / 退院通知詳細の連続API call pending pileup を根絶）
+**最終更新**: 2026-05-25（v4.19 / リリース前緊急修正：同意書発行/PDF読込ループ/ネットワーク再試行）
 
 **現状 HEAD**:
-- medadapt: `540c15b`（v4.18 / 自動確定/PDF/詳細取得すべてに loading guard と楽観的UI更新を追加）
+- medadapt: `7b964ec`（v4.19 / 同意書発行前/sync同期・PDF DOM再検索・api自動リトライ・toast dedup）
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -20,6 +20,20 @@
 
 ➡ **本ファイル（HANDOVER.md）を新規 chat 冒頭で読み込み、設計書最新版と合わせて全文把握すること。**
 ➡ **作業ごとに HANDOVER.md と DESIGN_yaruze_v*.html を必ず更新してから commit する。** これは恒久的なルール。
+
+### v4.19 セッションでの追加完了事項（2026-05-25 同日連続・リリース前緊急修正）
+
+大下スクショ2点で判明した複数の致命的問題への一括対応:
+
+1. **同意書発行 /consent/create 404「発行に失敗しました」** ─ 患者がlocalStorageの`D.patients`にあるがD1の`patients`テーブルに未同期だったため、Worker側で`patient_id`が見つからず404。修正: 発行ボタン押下時に`/consent/create`の前に必ず`/sync` POSTをawaitして患者をD1にupsertしてから本処理。
+
+2. **PDF が一瞬表示されて消える / 「PDFを読み込み中...」のまま** ─ 退院通知詳細で rr() のたびに `pdfSection` が DOM から外れ、クロージャでキャプチャした古い参照に対する renderPdf が無効化されていた。修正: `pdfSection` に id (`pdf-section-:noticeId`) を付与、renderPdf 完了時に `document.getElementById` で生きてる要素を再取得 + `.isConnected` で DOM から外れていたら描画スキップ。
+
+3. **ERR_CONNECTION_CLOSED で連続エラー** ─ Worker接続が稀に切れる際リトライなし。修正: `api()` にネットワークエラー時の1回自動リトライ（500ms後）。
+
+4. **同じエラートーストの連続表示** ─ `toast()` 重複表示でユーザ混乱。修正: 同じメッセージが3秒以内に再度出るのを抑制する dedup ロジック追加。表示時間も 1.2秒→1.8秒。
+
+残存する Worker 不安定は インフラ側（Cloudflare D1/Worker のレート制限・コールドスタート等）の可能性が高いため、別途調査が必要。
 
 ### v4.18 セッションでの追加完了事項（2026-05-25 同日連続・退院通知詳細の致命バグ修正）
 
