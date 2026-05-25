@@ -102,41 +102,110 @@ body {
 .nav-overlay { display:none; }
 
 /* ─── Hero ─── */
+/* ─── Hero (v4.9 写真背景型) ─── */
 .hero {
-  min-height:100vh; display:flex; align-items:center; padding-top:64px;
-  position:relative; overflow:hidden;
-  background:#fff;
+  position: relative; overflow: hidden;
+  min-height: 720px; height: 92vh; max-height: 880px;
+  padding: 64px 0 0;
+  display: flex; align-items: stretch;
+  background: #fff;
 }
 .hero::before {
-  content:''; position:absolute; display:none;
+  content: ''; position: absolute; inset: 0;
+  background-image: url('assets/img/generated/v2/team_yaruze.jpg');
+  background-size: cover; background-position: center 35%;
+  z-index: 0;
 }
+/* 文字可読性のためのグラデーション・オーバーレイ */
 .hero::after {
-  content:''; position:absolute; display:none;
-  background:linear-gradient(135deg, #06b6d4, #22d3ee); opacity:.08;
-  border-radius:60% 40% 30% 70%/50% 60% 40% 50%;
-  animation:blob 15s ease-in-out infinite 3s; z-index:0;
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background:
+    linear-gradient(100deg,
+      rgba(15,23,42,.88) 0%,
+      rgba(15,23,42,.78) 28%,
+      rgba(15,23,42,.55) 48%,
+      rgba(15,23,42,.20) 68%,
+      rgba(15,23,42,.05) 100%
+    ),
+    linear-gradient(180deg,
+      rgba(15,23,42,.15) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(15,23,42,.50) 100%
+    );
 }
 .hero-inner {
-  display:grid; grid-template-columns:1.3fr 0.7fr; gap:48px;
-  align-items:center; position:relative; z-index:2;
+  display: block;
+  position: relative; z-index: 2;
+  width: 100%;
+  padding: 80px 0 64px;
+}
+.hero-text-block {
+  max-width: 640px;
+  color: #fff;
 }
 .hero-badge {
-  display:inline-flex; align-items:center; gap:8px;
-  background:var(--blue-l); color:var(--blue);
-  padding:6px 18px; border-radius:var(--r-pill);
-  font-size:.72rem; font-weight:700; margin-bottom:24px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.18);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.28);
+  color: #fff;
+  padding: 7px 18px; border-radius: var(--r-pill);
+  font-size: .72rem; font-weight: 700; margin-bottom: 28px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.25);
 }
-.hero-badge-dot { width:7px; height:7px; background:var(--blue); border-radius:50%; animation:bounce 2s infinite; }
+.hero-badge-dot { width: 7px; height: 7px; background: #06b6d4; border-radius: 50%; animation: bounce 2s infinite; box-shadow: 0 0 8px #06b6d4; }
 .hero-title {
-  font-size:clamp(1.7rem,3.6vw,2.5rem); font-weight:800;
-  line-height:1.4; margin-bottom:22px;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 900; line-height: 1.3;
+  color: #fff; margin-bottom: 24px;
+  text-shadow: 0 2px 18px rgba(0,0,0,.45), 0 1px 4px rgba(0,0,0,.6);
+  letter-spacing: -.01em;
 }
 .hero-title .highlight {
-  background:var(--grad); -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent; background-clip:text;
+  color: #67e8f9;
+  text-shadow: 0 2px 14px rgba(6,182,212,.55), 0 1px 4px rgba(0,0,0,.6);
 }
-.hero-desc { font-size:.92rem; color:var(--ink-l); line-height:2; margin-bottom:32px; max-width:460px; }
-.hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
+.hero-desc {
+  font-size: 1rem; line-height: 2;
+  color: rgba(255,255,255,.95);
+  margin-bottom: 36px; max-width: 560px;
+  text-shadow: 0 1px 6px rgba(0,0,0,.4);
+}
+.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero-actions .btn-primary {
+  background: #fff;
+  color: var(--blue-d) !important;
+  -webkit-text-fill-color: var(--blue-d) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.25);
+  font-weight: 800;
+}
+.hero-actions .btn-primary:hover {
+  background: #f0fdfa; transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(0,0,0,.30);
+}
+
+@media (max-width:980px) {
+  .hero { min-height: 640px; height: auto; }
+  .hero::before { background-position: center 25%; }
+  .hero::after {
+    background:
+      linear-gradient(180deg,
+        rgba(15,23,42,.40) 0%,
+        rgba(15,23,42,.75) 100%
+      );
+  }
+  .hero-inner { padding: 80px 0 64px; }
+  .hero-text-block { max-width: 100%; }
+}
+@media (max-width:600px) {
+  .hero { min-height: 560px; padding-top: 80px; }
+  .hero-title { font-size: 1.85rem; line-height: 1.35; }
+  .hero-desc { font-size: .9rem; line-height: 1.9; margin-bottom: 28px; }
+  .hero-badge { font-size: .68rem; padding: 6px 14px; margin-bottom: 20px; }
+  .hero-actions .btn-primary { padding: 14px 26px; font-size: .9rem; }
+}
+
 .btn-primary {
   display:inline-flex; align-items:center; gap:8px;
   background:var(--grad); color:#fff;
@@ -154,60 +223,6 @@ body {
   border:2px solid var(--blue-l); transition:all .25s;
 }
 .btn-secondary:hover { border-color:var(--blue); background:var(--blue-xl); }
-
-/* Hero Phone */
-.hero-visual { position:relative; display:flex; justify-content:center; }
-.hero-phone {
-  width:250px; height:520px;
-  background:#fff; border-radius:36px;
-  box-shadow:0 20px 60px rgba(0,0,0,.08), 0 0 0 8px var(--border);
-  overflow:hidden; position:relative;
-  animation:float 6s ease-in-out infinite;
-}
-.hero-phone-notch {
-  position:absolute; top:0; left:50%; transform:translateX(-50%);
-  width:90px; height:22px; background:#1e293b; border-radius:0 0 16px 16px; z-index:2;
-}
-.hero-phone-screen {
-  padding:34px 14px 14px; height:100%;
-  background:#fff;
-}
-.phone-header { text-align:center; margin-bottom:12px; }
-.phone-header-title { font-size:.68rem; font-weight:800; color:var(--blue); }
-.phone-header-sub { font-size:.56rem; color:var(--ink-m); margin-top:2px; }
-.phone-card {
-  background:#fff; border-radius:14px; padding:10px;
-  margin-bottom:7px; box-shadow:0 2px 8px rgba(0,0,0,.05);
-}
-.phone-card-label { font-size:.54rem; color:var(--ink-m); font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:4px; }
-.phone-card-label .dot { width:5px; height:5px; border-radius:50%; display:inline-block; background:var(--blue); }
-.phone-card-value { font-size:.62rem; font-weight:700; }
-.phone-check-list { list-style:none; display:flex; flex-direction:column; gap:4px; }
-.phone-check-item { display:flex; align-items:center; gap:5px; font-size:.56rem; color:var(--ink-l); }
-.phone-check-box {
-  width:14px; height:14px; border-radius:4px;
-  border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0;
-}
-.phone-check-box.checked { background:var(--blue); border-color:var(--blue); }
-.phone-check-box.checked::after { content:'✓'; color:#fff; font-size:.45rem; font-weight:800; }
-.phone-status-bar {
-  display:flex; justify-content:space-between; align-items:center;
-  margin-top:7px; padding:7px 10px; background:var(--border-l); border-radius:10px;
-}
-.phone-status-text { font-size:.52rem; font-weight:700; color:var(--blue); }
-.phone-status-badge { font-size:.48rem; background:var(--grad); color:#fff; padding:3px 10px; border-radius:var(--r-pill); font-weight:700; }
-
-/* Hero Floats */
-.hero-float {
-  position:absolute; background:#fff;
-  border-radius:var(--r-pill); padding:8px 16px;
-  box-shadow:var(--shadow-m);
-  font-size:.7rem; font-weight:700; display:flex; align-items:center; gap:6px; white-space:nowrap;
-  color:var(--blue);
-}
-.hero-float-1 { top:40px; right:-15px; animation:float 5s ease-in-out infinite .5s; }
-.hero-float-2 { bottom:90px; left:-25px; animation:float 5s ease-in-out infinite 1.5s; }
-.hero-float-3 { top:150px; left:-10px; animation:float 5s ease-in-out infinite 2.5s; }
 
 /* ─── Stats Bar ─── */
 
@@ -431,7 +446,6 @@ body {
   .hero-inner { grid-template-columns:1fr; text-align:center; }
   .hero-desc { margin:0 auto 32px; }
   .hero-actions { justify-content:center; }
-  .hero-visual { margin-top:32px; }
   .problems-layout { grid-template-columns:1fr; }
   .problems-left { border-radius:0; padding:36px 28px; }
   .problems-right { padding:28px; }
@@ -481,7 +495,6 @@ body {
 @media (max-width:600px) {
   .sec { padding:64px 0; }
   .effects-grid { grid-template-columns:1fr; }
-  .hero-phone { width:210px; height:440px; }
 
   /* Hero モバイル横はみ出し修正 */
   .hero { padding-top:80px; min-height:auto; overflow:hidden; }
@@ -492,9 +505,7 @@ body {
   .hero-badge { font-size:.65rem; padding:5px 14px; margin-bottom:18px; }
   .hero-actions .btn-primary,
   .hero-actions .btn-secondary { padding:12px 24px; font-size:.85rem; }
-  .hero-visual { margin-top:24px; max-width:100%; width:100%; }
   /* フロート要素はモバイルでは非表示（はみ出し原因のため） */
-  .hero-float { display:none !important; }
 
   /* sec-title をさらに縮小 */
   .sec-title { font-size:1.25rem; }
@@ -539,7 +550,7 @@ body {
 <section class="hero" id="hero">
   <div class="container">
     <div class="hero-inner">
-      <div>
+      <div class="hero-text-block">
         <div class="hero-badge anim-up">
           <span class="hero-badge-dot"></span>
           ｍやるゼ！/ 医療介護連携OS
@@ -548,42 +559,11 @@ body {
           退院調整・会議・書類、<br><span class="highlight">ぜんぶｍやるゼ！</span>
         </h1>
         <p class="hero-desc anim-up anim-up-d2">
-          日程調整、アセスメント、サービス担当者会議、<br>NDA・同意書、モニタリング、退院通知、<br>記録自動生成。<br>病院と施設のやりとり、もう疲れない。
+          日程調整、アセスメント、サービス担当者会議、<br>NDA・同意書、モニタリング、退院通知、<br>記録生成支援まで。<br>病院と施設のやりとり、もう疲れない。
         </p>
         <div class="hero-actions anim-up anim-up-d3">
           <a href="app.html#signup" class="btn-primary">会員登録して始める →</a>
         </div>
-      </div>
-      <div class="hero-visual anim-up anim-up-d4">
-        <div class="hero-phone">
-          <div class="hero-phone-notch"></div>
-          <div class="hero-phone-screen">
-            <div class="phone-header">
-              <div class="phone-header-title">ｍやるゼ！</div>
-              <div class="phone-header-sub">共同指導ダッシュボード</div>
-            </div>
-            <div class="phone-card">
-              <div class="phone-card-label"><span class="dot green"></span> 患者・利用者</div>
-              <div class="phone-card-value">田中 タムジ 様　入居前</div>
-            </div>
-            <div class="phone-card">
-              <div class="phone-card-label"><span class="dot blue"></span> 退院調整ケース</div>
-              <ul class="phone-check-list">
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>アセスメント完了</li>
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>電子同意取得済み</li>
-                <li class="phone-check-item"><div class="phone-check-box checked"></div>オンライン通話済み</li>
-                <li class="phone-check-item"><div class="phone-check-box"></div>退院時共同指導書</li>
-              </ul>
-            </div>
-            <div class="phone-status-bar">
-              <span class="phone-status-text">監査ログ：自動保存中</span>
-              <span class="phone-status-badge">PDF出力</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-float hero-float-1">自動日程調整</div>
-        <div class="hero-float hero-float-2">記録を自動生成</div>
-        <div class="hero-float hero-float-3">OCR取り込み</div>
       </div>
     </div>
   </div>
@@ -919,8 +899,8 @@ body {
         </div>
         <div class="ba-body">
           <div class="ba-eyebrow">RECORDING</div>
-          <h3 class="ba-title">手書き→PDF化 → タブレットで完成</h3>
-          <p class="ba-desc">退院カンファレンス記録・サービス担当者会議記録を、会議終了と同時に自動生成。書き直し・押印・スキャン全て不要。</p>
+          <h3 class="ba-title">手書き → タブレットでテンプレ入力</h3>
+          <p class="ba-desc">退院カンファレンス記録・サービス担当者会議記録を、テンプレに沿って入力すれば PDF を即時出力。書き直し・押印・スキャンの手間を大幅に減らせます。</p>
         </div>
       </div>
 
@@ -973,8 +953,8 @@ body {
         </div>
         <div class="ba-body">
           <div class="ba-eyebrow">AUDIT TRAIL</div>
-          <h3 class="ba-title">監査前夜の徹夜 → ワンクリック証跡</h3>
-          <p class="ba-desc">「誰が・いつ・何を」操作したか、QR1枚で第三者検証可能。医療保険算定の返戻対策・指導対応にも即時対応。</p>
+          <h3 class="ba-title">紙ベース監査準備 → QR検証で即時提示</h3>
+          <p class="ba-desc">「誰が・いつ・何を」操作したか、QR コード1枚で第三者検証可能。医療保険算定の返戻対策・指導対応時の証跡として活用できます。</p>
         </div>
       </div>
 
@@ -1009,14 +989,14 @@ body {
       <div class="step-card">
         <div class="step-number">1</div>
         <h3 class="step-title">日程調整・連携自動化</h3>
-        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">電話調整ゼロ。全員の予定を自動確定</p>
+        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">電話の往復を最小化、候補日時を投票で確定</p>
         <ul class="core-list">
-          <li>病院・施設・家族の空き時間自動取得</li>
-          <li>移行前面談・サービス担当者会議・モニタリングを自動調整</li>
-          <li>リスケもワンタップ</li>
+          <li>病院・施設・家族の空き時間共有</li>
+          <li>移行前面談・サービス担当者会議・モニタリングを一覧調整</li>
+          <li>リスケもアプリ上で完結</li>
           <li>通話URL自動生成</li>
         </ul>
-        <p class="core-tagline">「調整地獄」から解放</p>
+        <p class="core-tagline">「調整地獄」を軽減</p>
       </div>
       <div class="step-card">
         <div class="step-number">2</div>
@@ -1029,7 +1009,7 @@ body {
           <li>写真・診療情報読み取り</li>
           <li>チェック式で誰でも同品質</li>
         </ul>
-        <p class="core-tagline">受入ミス・聞き漏れゼロ</p>
+        <p class="core-tagline">受入ミス・聞き漏れを抑止</p>
       </div>
       <div class="step-card">
         <div class="step-number">3</div>
@@ -1040,45 +1020,45 @@ body {
           <li>服薬・生活指導</li>
           <li>家族説明</li>
           <li>訪看・施設同席</li>
-          <li>記録自動生成（算定対応）</li>
+          <li>記録のテンプレ化（算定対応）</li>
         </ul>
-        <p class="core-tagline">移動ゼロで加算対応</p>
+        <p class="core-tagline">移動を抑えて算定対応</p>
       </div>
       <div class="step-card">
         <div class="step-number">4</div>
         <h3 class="step-title">サービス担当者会議・モニタリング</h3>
-        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">利用開始後の会議・状態確認も全てオンライン</p>
+        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">利用開始後の会議・状態確認もオンラインで</p>
         <ul class="core-list">
           <li>サービス担当者会議</li>
           <li>月次モニタリング</li>
           <li>状態変化共有</li>
           <li>家族同席可</li>
-          <li>全履歴自動保存</li>
+          <li>履歴をシステムに保存</li>
         </ul>
-        <p class="core-tagline">電話・FAX文化終了</p>
+        <p class="core-tagline">電話・FAX依存からの脱却</p>
       </div>
       <div class="step-card">
         <div class="step-number">5</div>
-        <h3 class="step-title">電子同意・記録自動生成</h3>
-        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">紙・ハンコ・手書き終了</p>
+        <h3 class="step-title">電子同意・記録テンプレ化</h3>
+        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">紙・ハンコ・手書きを減らす</p>
         <ul class="core-list">
           <li>オンライン同意取得</li>
           <li>電子署名</li>
           <li>タイムスタンプ</li>
-          <li>PDF自動生成</li>
-          <li>退院共同指導記録自動</li>
+          <li>PDF即時出力</li>
+          <li>退院共同指導記録テンプレ</li>
         </ul>
-        <p class="core-tagline">監査書類完成済</p>
+        <p class="core-tagline">監査書類のテンプレ化</p>
       </div>
       <div class="step-card">
         <div class="step-number">6</div>
-        <h3 class="step-title">監査ログ・証跡100％</h3>
-        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">指導・監査で慌てない</p>
+        <h3 class="step-title">監査ログ・操作証跡</h3>
+        <p class="step-desc" style="font-weight:700;margin-bottom:8px;">指導・監査時に証跡をすぐ提示</p>
         <ul class="core-list">
           <li>誰が・いつ・何を</li>
           <li>同意したか</li>
           <li>会議参加者</li>
-          <li>全自動保存</li>
+          <li>履歴をシステムに保存</li>
         </ul>
         <p class="core-tagline">監査・返戻・事故対策</p>
       </div>
@@ -1273,7 +1253,7 @@ body {
     <div class="fh-grid">
       <!-- 退院通知 -->
       <div class="fh-card">
-        <div class="fh-image" style="background-image:url('assets/img/generated/card_discharge_v1.jpg')"></div>
+        <div class="fh-image" style="background-image:url('assets/img/generated/v2/mood_discharge.jpg')"></div>
         <div class="fh-body">
           <span class="fh-eyebrow">DISCHARGE NOTICE</span>
           <h3 class="fh-title">退院通知・退院時共同指導 <span class="fh-badge">B004 算定対応</span></h3>
@@ -1288,7 +1268,7 @@ body {
 
       <!-- NDA -->
       <div class="fh-card">
-        <div class="fh-image" style="background-image:url('assets/img/generated/card_nda_v1.jpg')"></div>
+        <div class="fh-image" style="background-image:url('assets/img/generated/v2/card_nda.png')"></div>
         <div class="fh-body">
           <span class="fh-eyebrow">NDA MANAGEMENT</span>
           <h3 class="fh-title">法人間 NDA・改ざん防止</h3>
@@ -1303,7 +1283,7 @@ body {
 
       <!-- 同意書 -->
       <div class="fh-card">
-        <div class="fh-image" style="background-image:url('assets/img/generated/card_consent_v1.jpg')"></div>
+        <div class="fh-image" style="background-image:url('assets/img/generated/v2/consent_signing.jpg')"></div>
         <div class="fh-body">
           <span class="fh-eyebrow">DIGITAL CONSENT</span>
           <h3 class="fh-title">同意書・指示書 改ざん不可 <span class="fh-badge">B013 算定対応</span></h3>
@@ -1318,7 +1298,7 @@ body {
 
       <!-- 訪問鍼灸マッサージ -->
       <div class="fh-card">
-        <div class="fh-image" style="background-image:url('assets/img/generated/card_massage_v1.jpg')"></div>
+        <div class="fh-image" style="background-image:url('assets/img/generated/v2/treatment_acu.jpg')"></div>
         <div class="fh-body">
           <span class="fh-eyebrow">HOME-VISIT ACUPUNCTURE</span>
           <h3 class="fh-title">訪問鍼灸・あん摩マッサージ 連携</h3>
@@ -1338,27 +1318,27 @@ body {
       <p class="fh-icons-sub">すべての帳票が、改ざん不可の同じ仕組みで守られます。</p>
       <div class="fh-icons-grid">
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_discharge_v1.png" alt="退院通知">
+          <img src="assets/img/generated/v2/icon_discharge.png" alt="退院通知">
           <div class="lbl">退院通知</div>
         </div>
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_nda_v1.png" alt="NDA">
+          <img src="assets/img/generated/v2/icon_nda.png" alt="NDA">
           <div class="lbl">法人間 NDA</div>
         </div>
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_match_v1.png" alt="マッチング">
+          <img src="assets/img/generated/v2/icon_match.png" alt="マッチング">
           <div class="lbl">受入マッチング</div>
         </div>
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_consent_v1.png" alt="同意書">
+          <img src="assets/img/generated/v2/icon_consent.png" alt="同意書">
           <div class="lbl">電子同意書</div>
         </div>
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_blockchain_v1.png" alt="改ざん防止">
+          <img src="assets/img/generated/v2/icon_blockchain.png" alt="改ざん防止">
           <div class="lbl">改ざん防止<br>チェーン</div>
         </div>
         <div class="fh-icon-item">
-          <img src="assets/img/generated/icon_qr_v1.png" alt="QR検証">
+          <img src="assets/img/generated/v2/icon_qr.png" alt="QR検証">
           <div class="lbl">QR 真正性<br>検証</div>
         </div>
       </div>
@@ -1432,8 +1412,8 @@ body {
         <h3 class="ui-text-title">入院患者一覧から、退院候補を即時抽出。</h3>
         <p class="ui-text-desc">病棟ナースステーションで使う「入院患者一覧」画面。バイタル異常・処置中・退院候補をワンタップで切替表示。退院調整看護師への引継ぎも、その場でアプリ通知。</p>
         <div class="ui-text-stats">
-          <div><div class="ui-stat-num">3分</div><div class="ui-stat-lbl">ラウンド1周</div></div>
-          <div><div class="ui-stat-num">−85%</div><div class="ui-stat-lbl">紙の引継ぎ</div></div>
+          <div><div class="ui-stat-num">ワンタップ</div><div class="ui-stat-lbl">状態別切替</div></div>
+          <div><div class="ui-stat-num">アプリ通知</div><div class="ui-stat-lbl">引継ぎ連絡</div></div>
         </div>
       </div>
       <div class="ui-visual square" style="background-image:url('assets/img/generated/v2/modern_tablet.jpg');"></div>
@@ -1444,11 +1424,11 @@ body {
       <div class="ui-visual square" style="background-image:url('assets/img/generated/v2/solve_tablet.jpg');"></div>
       <div class="ui-text">
         <span class="ui-text-eyebrow">DISCHARGE CONFERENCE</span>
-        <h3 class="ui-text-title">退院カンファレンス記録、その場で自動生成。</h3>
-        <p class="ui-text-desc">医師・看護師・ケアマネ・薬剤師・理学療法士。全参加者の発言と決定事項を、会議終了と同時に PDF 化。退院時共同指導料 B004（1500点）の算定根拠書類として完成します。</p>
+        <h3 class="ui-text-title">退院カンファレンス記録、テンプレ入力で即PDF。</h3>
+        <p class="ui-text-desc">医師・看護師・ケアマネ・薬剤師・理学療法士。参加者・発言・決定事項をテンプレに沿って入力すれば、PDF を即時出力。退院時共同指導料 B004（1500 点）の算定根拠書類として活用できます。</p>
         <div class="ui-text-stats">
-          <div><div class="ui-stat-num">0秒</div><div class="ui-stat-lbl">記録作成</div></div>
-          <div><div class="ui-stat-num">+1500点</div><div class="ui-stat-lbl">算定対応</div></div>
+          <div><div class="ui-stat-num">PDF出力</div><div class="ui-stat-lbl">即時生成</div></div>
+          <div><div class="ui-stat-num">B004対応</div><div class="ui-stat-lbl">1500点</div></div>
         </div>
       </div>
     </div>
@@ -1653,7 +1633,7 @@ body {
     <div>
       <div style="font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--blue);text-transform:uppercase;margin-bottom:12px;">06 — 自動日程調整</div>
       <h3 style="font-size:1.6rem;font-weight:800;line-height:1.4;margin-bottom:16px;">候補を出すだけ。<br>日程は自動で確定。</h3>
-      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">複数の候補日時を提示すると、受信側が○△×で投票。回答期限到達時または全員回答時に、最多希望の日時に自動で確定し面談URLも自動生成します。電話・メール調整ゼロ。</p>
+      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">複数の候補日時を提示すると、受信側が○△×で投票。回答期限到達時または全員回答時に、最多希望の日時に自動で確定し面談URLも自動生成します。電話・メール往復を大幅削減。</p>
     </div>
   </div>
 </section>
