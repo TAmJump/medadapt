@@ -3,9 +3,9 @@
 **最終更新**: 2026-05-25（v4.15 / HERO顔と文字の完全分離・全タスクE/F/G/H・サンプルPDFと解説書）
 
 **現状 HEAD**:
-- medadapt: v4.15 commit（後述）
-- adapt: v4.15 commit（HERO修正のみ）
-- one-touch: v4.15 commit（HERO修正のみ）
+- medadapt: `fa0f142`（v4.15 / タスクE/F/G/H + LP訴求 + 設計書v4.15）
+- adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
+- one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
