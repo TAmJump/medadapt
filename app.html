@@ -158,12 +158,23 @@ let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',sign
 async function api(path,opts={}){
   const headers={'Content-Type':'application/json'};
   if(S.token)headers['Authorization']='Bearer '+S.token;
+  // silent404: 404 をエラー扱いせず null を返す（「該当なし」を期待する API 用）
+  const silent404 = opts.silent404 === true;
+  // sanitize opts before fetch
+  const fetchOpts = {...opts};
+  delete fetchOpts.silent404;
   try{
-    const res=await fetch(API+path,{...opts,headers:{...headers,...(opts.headers||{})}});
+    const res=await fetch(API+path,{...fetchOpts,headers:{...headers,...(fetchOpts.headers||{})}});
     const data=await res.json();
     if(!res.ok){
       if(res.status===401){stopNotifPolling();S.token=null;S.user=null;S.moduleAccess=null;S.unreadCount=0;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}S.scr='login';rr();return null;}
-      toast(data.error||'エラーが発生しました');return null;
+      // 404 は silent404 オプション時はサイレントに（「Not found」バッジ問題対策）
+      if(res.status===404 && silent404){return null;}
+      // エラーメッセージのユーザーフレンドリー化
+      const errMsg = (data.error==='Not found' || data.error==='not_found')
+        ? '対象が見つかりません'
+        : (data.error||'エラーが発生しました');
+      toast(errMsg);return null;
     }
     return data;
   }catch(e){console.error('API error:',e);return null;}
@@ -366,7 +377,7 @@ async function loadCases(pid){const d=await api('/patients/'+pid+'/cases');if(d)
 async function loadConfs(pid){const d=await api('/patients/'+pid+'/conferences');if(d)D.conferences=(D.conferences||[]).filter(c=>c.patient_id!==pid).concat(d.conferences||[]);}
 async function loadMons(pid){const d=await api('/patients/'+pid+'/monitors');if(d)D.monitors=(D.monitors||[]).filter(c=>c.patient_id!==pid).concat(d.monitors||[]);}
 async function loadAssess(pid){const d=await api('/patients/'+pid+'/assessments');if(d)D.assessments=(D.assessments||[]).filter(a=>a.patient_id!==pid).concat(d.assessments||[]);}
-async function loadPendingShares(){const d=await api('/shares/pending');if(d)S.pendingShares=d.shares||[];}
+async function loadPendingShares(){const d=await api('/shares/pending',{silent404:true});if(d)S.pendingShares=d.shares||[];}
 
 function h(t,a,...ch){const e=document.createElement(t);if(a)Object.entries(a).forEach(([k,v])=>{if(v==null)return;if(k==='style'&&typeof v==='object')Object.assign(e.style,v);else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2).toLowerCase(),v);else if(k.startsWith('on'))e.setAttribute(k.toLowerCase(),v);else if(k==='className')e.className=v;else if(k==='innerHTML')e.innerHTML=v;else e.setAttribute(k,v)});ch.flat(9).forEach(c=>{if(c==null||c===false)return;e.appendChild(typeof c==='string'||typeof c==='number'?document.createTextNode(String(c)):c)});return e}
 function btn(t,cls,fn,dis){return h('button',{className:'btn '+cls,onClick:fn,disabled:dis||undefined},t)}
@@ -2819,9 +2830,10 @@ async function finalizeConsentSignedDoc(cfId){
 
 async function previewConsentPDF(cfId){
   // データ取得を先行（同意種別に応じてテンプレを分岐するため）
+  // signed_document は未署名時に 404 を返すため silent404 でサイレント化
   const [detail,sdRes]=await Promise.all([
     api('/consent/'+cfId),
-    api('/signed-docs/by-doc/consent_form/'+cfId)
+    api('/signed-docs/by-doc/consent_form/'+cfId,{silent404:true})
   ]);
   if(!detail?.consent_form){toast('データ取得失敗');return;}
   const cf=detail.consent_form;
@@ -2844,27 +2856,68 @@ async function previewConsentPDF(cfId){
   // difficulty_reasons パース
   let dr={};
   try{dr=typeof cf.difficulty_reasons==='string'?JSON.parse(cf.difficulty_reasons):cf.difficulty_reasons||{}}catch(e){}
-  // 共通の保険医療機関情報（歯科は指示書交付不可のため、保険医療機関名は「医療法人コンパス」のみ）
+  // form_payload パース（v14：症状・施術部位等の構造化フォームデータ）
+  let fp={};
+  try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
+  // 保険医療機関情報：D1 の値を優先、未設定なら「医療法人コンパス」既定値
+  // 歯科は指示書交付不可のため、フル表記ではなく法人名のみ
   const clinicCommon={
-    name:'医療法人コンパス',
-    address:'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',
-    tel:'048-783-2713',
-    fax:'03-6369-4732'
+    name:cf.clinic_name||'医療法人コンパス',
+    address:cf.clinic_address||'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',
+    tel:cf.clinic_tel||'048-783-2713',
+    fax:cf.clinic_fax||'03-6369-4732'
   };
+  // 患者情報：D1 のスナップショットを優先、未設定ならフォーム未入力
+  const patientInfo={
+    name:cf.patient_name||'',
+    address:cf.patient_address||'',
+    phone:''
+  };
+  // 患者生年月日（和暦JSON or ISO の両対応）
+  if(cf.patient_birth){
+    try{
+      const pb=typeof cf.patient_birth==='string' && cf.patient_birth.startsWith('{')
+        ? JSON.parse(cf.patient_birth)
+        : null;
+      if(pb && pb.era){patientInfo.birth=pb;}
+      else if(typeof cf.patient_birth==='string' && cf.patient_birth.includes('-')){
+        const pbd=new Date(cf.patient_birth);
+        // ざっくり昭和=1926-1989 / 平成=1989-2019 / 令和=2019-
+        const y=pbd.getFullYear();
+        let era='R', yearInEra=y-2018;
+        if(y<1989){era='S';yearInEra=y-1925;}
+        else if(y<2019){era='H';yearInEra=y-1988;}
+        patientInfo.birth={era,year:yearInEra,month:pbd.getMonth()+1,day:pbd.getDate()};
+      }
+    }catch(e){}
+  }
   const data={
     sd_id:sd?.id||'未確定',
     content_hash:sd?.content_hash||cf.content_hash||'',
     chain_index:sd?.chain_index||cf.chain_index||0,
     qr_image_base64:'',  // QR は別途生成
     verify_url:sd?.qr_payload||'',
-    addressee:'医療法人コンパス',
+    addressee:cf.clinic_name||'医療法人コンパス',
     visit_plan:cf.visit_plan||'年２回（６か月に１回）',
     difficulty_reasons:dr,
     consent_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     consent_date_jp:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
-    patient:{address:'',name:'',phone:''},
+    exam_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
+    patient:patientInfo,
     clinic:clinicCommon,
-    doctor:{name:'後藤 基温',has_seal:false}
+    doctor:{name:cf.doctor_name||'後藤 基温',has_seal:!!sd},
+    notes:cf.notes||'',
+    // 厚労省様式 V2 用：form_payload から症状・施術部位等を展開
+    symptoms:fp.symptoms,
+    treatments:fp.treatments,
+    visit:fp.visit,
+    disease_name:fp.disease_name||cf.disease_names,
+    diseases:fp.diseases,
+    onset:fp.onset,
+    consent_type:cf.consent_type==='acupuncture'||cf.consent_type==='massage' ? (fp.consent_type||'new') : undefined,
+    signature: sd ? {signed_at:sd.signed_at||sd.created_at||(new Date().toISOString())} : undefined,
+    timestamp: sd?.tsa_payload ? (typeof sd.tsa_payload==='string'?JSON.parse(sd.tsa_payload):sd.tsa_payload) : undefined,
+    tsa: sd?.tsa_authority ? {authority:sd.tsa_authority,acquired_at:sd.tsa_acquired_at} : undefined
   };
   // テンプレートのロード完了を待つ
   win.addEventListener('load',()=>{

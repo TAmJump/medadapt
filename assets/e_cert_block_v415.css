@@ -1,0 +1,74 @@
+/* 電子署名 + タイムスタンプ証明書 共通スタイル v4.15 */
+
+.e-cert-banner {
+  background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 100%);
+  border: 2px solid #0891b2;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin: 14px 0;
+  font-size: 10.5pt;
+  font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+}
+.e-cert-icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: #0891b2;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900;
+  flex-shrink: 0;
+}
+.e-cert-title {
+  font-weight: 800; font-size: 11pt; color: #0e7490;
+  margin-bottom: 4px;
+}
+.e-cert-body strong { color: #0e7490; }
+.e-cert-row {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 9.5pt; color: #475569;
+}
+
+.timestamp-cert {
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+  border: 2px solid #6366f1;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  font-size: 10pt;
+  font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+}
+.timestamp-cert h4 {
+  color: #4f46e5; font-size: 11pt;
+  margin: 0 0 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.timestamp-cert .ts-subtitle {
+  font-size: 9pt; color: #6366f1; margin-bottom: 8px;
+}
+.timestamp-cert .ts-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.timestamp-cert dt {
+  font-weight: 700; color: #4338ca; font-size: 9pt;
+}
+.timestamp-cert dd {
+  margin: 0;
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 9pt;
+  color: #1f2937;
+}
+.timestamp-cert .ts-hash {
+  word-break: break-all;
+}
+.timestamp-cert .ts-note {
+  font-size: 9pt; color: #4338ca;
+  margin-top: 10px; padding-top: 8px;
+  border-top: 1px dashed #c7d2fe;
+  line-height: 1.6;
+}

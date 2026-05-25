@@ -1352,7 +1352,83 @@ body {
   </div>
 </section>
 
-<!-- ─── REAL UI SHOWCASE (v4.8 新設・実機画面の実写) ─── -->
+<!-- ─── TRUST: 電子署名 + タイムスタンプ + ハッシュチェーン（v4.15 新設） ─── -->
+<style>
+.trust-section { padding: 96px 20px; background: linear-gradient(180deg, #fafafa 0%, #ecfeff 100%); }
+.trust-section .container { max-width: 1100px; margin: 0 auto; }
+.trust-eyebrow { display:block; text-align:center; color:var(--blue); font-size:.72rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; margin-bottom:14px; }
+.trust-title { text-align:center; font-size:clamp(1.5rem,3.4vw,2.2rem); font-weight:800; line-height:1.4; margin: 0 0 16px; }
+.trust-sub { text-align:center; font-size:.95rem; color:var(--ink-m); max-width:780px; margin: 0 auto 48px; line-height:1.95; }
+.trust-pillars { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-bottom:40px; }
+.trust-pillar {
+  background:#fff; border:1px solid #e2e8f0; border-radius:18px;
+  padding:28px 24px; box-shadow:0 4px 16px rgba(15,23,42,.04);
+  display:flex; flex-direction:column; gap:14px;
+}
+.trust-pillar-icon { font-size:32px; line-height:1; }
+.trust-pillar-title { font-size:1.05rem; font-weight:800; color:var(--ink); margin:0; }
+.trust-pillar-subtitle { font-size:.78rem; color:var(--blue-d); font-weight:700; letter-spacing:.04em; margin:0; }
+.trust-pillar-desc { font-size:.86rem; color:var(--ink-l); line-height:1.85; margin:0; }
+.trust-pillar-law { font-size:.7rem; color:var(--ink-m); padding:6px 10px; background:#f1f5f9; border-radius:6px; line-height:1.5; }
+.trust-laws { background:#fff; border:1px solid #e2e8f0; border-radius:18px; padding:24px 28px; }
+.trust-laws-title { font-size:.95rem; font-weight:800; color:var(--ink); margin:0 0 14px; display:flex; gap:8px; align-items:center; }
+.trust-laws ul { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(2,1fr); gap:8px 24px; }
+.trust-laws li { font-size:.82rem; color:var(--ink-l); line-height:1.7; padding-left:18px; position:relative; }
+.trust-laws li::before { content:'✓'; position:absolute; left:0; color:var(--blue); font-weight:800; }
+@media (max-width: 820px) {
+  .trust-pillars { grid-template-columns: 1fr; gap:16px; }
+  .trust-laws ul { grid-template-columns: 1fr; }
+}
+</style>
+<section class="trust-section" id="trust">
+  <div class="container">
+    <span class="trust-eyebrow">Trust by Design</span>
+    <h2 class="trust-title">電子署名 ＋ タイムスタンプ ＋ ハッシュチェーン<br>すべての帳票が、誰にも書き換えられない。</h2>
+    <p class="trust-sub">
+      ｍやるゼ！の同意書・指示書・退院通知・NDA は、発行された瞬間に <strong>「誰が・いつ・何を」</strong> が暗号学的に確定します。<br>
+      紙の判子・確定日付・台帳がそれぞれ持っていた役割を、電子の三位一体で担保します。
+    </p>
+
+    <div class="trust-pillars">
+      <!-- 電子署名 -->
+      <div class="trust-pillar">
+        <div class="trust-pillar-icon">🖋️</div>
+        <p class="trust-pillar-subtitle">WHO ─ 誰が</p>
+        <h3 class="trust-pillar-title">電子署名</h3>
+        <p class="trust-pillar-desc">本人にしか作れない秘密鍵で文書ハッシュに署名。<strong>後藤先生の実印</strong>に相当する本人証明と、改ざんすれば即検知される検証可能性を同時に実現。</p>
+        <div class="trust-pillar-law">電子署名法（平成12年法律第102号）/ e-文書法準拠</div>
+      </div>
+      <!-- タイムスタンプ -->
+      <div class="trust-pillar">
+        <div class="trust-pillar-icon">🕒</div>
+        <p class="trust-pillar-subtitle">WHEN ─ いつ</p>
+        <h3 class="trust-pillar-title">タイムスタンプ</h3>
+        <p class="trust-pillar-desc">総務省認定 TSA（時刻認証局）が、原子時計レベルの正確な時刻と文書ハッシュをまとめて封印。<strong>公証役場の確定日付</strong>に相当。後付け改ざんが論理的に不可能。</p>
+        <div class="trust-pillar-law">総務省 認定タイムスタンプ業務（令和3年法律第146号 第3条第1項）/ RFC 3161</div>
+      </div>
+      <!-- ハッシュチェーン -->
+      <div class="trust-pillar">
+        <div class="trust-pillar-icon">🔗</div>
+        <p class="trust-pillar-subtitle">ORDER ─ 時系列で</p>
+        <h3 class="trust-pillar-title">ハッシュチェーン</h3>
+        <p class="trust-pillar-desc">発行済み文書を SHA-256 で時系列に連鎖。1 件でもこっそり差し替えると<strong>チェーン全体が崩れる</strong>。台帳の連番管理を暗号学的に担保。</p>
+        <div class="trust-pillar-law">独自実装（SHA-256 / 各文書に prev_hash + chain_index 付与）</div>
+      </div>
+    </div>
+
+    <div class="trust-laws">
+      <div class="trust-laws-title">📜 法的根拠（同意書・指示書の電子化は法律で認められています）</div>
+      <ul>
+        <li>電子署名法（平成12年法律第102号）</li>
+        <li>e-文書法（平成16年法律第149号）</li>
+        <li>認定タイムスタンプ業務（令和3年法律第146号）</li>
+        <li>保医発第1001002号（療養費同意書様式）</li>
+        <li>厚労省標準様式「別添1別紙1」（はり・きゅう）</li>
+        <li>厚労省標準様式「別添2別紙1」（あマ指）</li>
+      </ul>
+    </div>
+  </div>
+</section>
 <style>
 .ui-showcase { padding: 96px 20px; background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%); }
 .ui-showcase .container { max-width: 1160px; margin: 0 auto; }

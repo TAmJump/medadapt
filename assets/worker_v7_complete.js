@@ -2015,7 +2015,12 @@ async function handleRequest(request, env, json, err) {
     const body = await request.json().catch(() => ({}));
     const {
       patient_id, consent_type, disease_names, notes, consent_date,
-      validity_months, visit_plan, difficulty_reasons, treatment_plan
+      validity_months, visit_plan, difficulty_reasons, treatment_plan,
+      // v14（v4.15）追加: 保険医療機関・保険医・患者スナップショット・構造化フォームデータ
+      clinic_name, clinic_address, clinic_tel, clinic_fax,
+      doctor_name,
+      patient_name, patient_address, patient_birth,
+      form_payload
     } = body;
     if (!patient_id || !consent_type || !disease_names || !consent_date) {
       return err('必須項目が不足しています（patient_id / consent_type / disease_names / consent_date）');
@@ -2038,21 +2043,33 @@ async function handleRequest(request, env, json, err) {
     const now = new Date().toISOString();
     const diseaseJson = typeof disease_names === 'string' ? disease_names : JSON.stringify(disease_names);
     const difficultyJson = difficulty_reasons ? (typeof difficulty_reasons === 'string' ? difficulty_reasons : JSON.stringify(difficulty_reasons)) : '';
+    const formPayloadJson = form_payload ? (typeof form_payload === 'string' ? form_payload : JSON.stringify(form_payload)) : '{}';
     // doctor_user_id：med_clinic 本人 or org_staff から作成する場合は同 org 内の med_clinic を採用
     let doctorUserId = currentUser.id;
     if (currentUser.role !== 'med_clinic') {
       const doc = await env.DB.prepare("SELECT id FROM users WHERE org_id=? AND role='med_clinic' AND status='active' ORDER BY created LIMIT 1").bind(orgId).first();
       if (doc) doctorUserId = doc.id;
     }
+    // v14 デフォルト値: 保険医療機関は「医療法人コンパス」固定（歯科併設のため法人名のみ表記）
+    const cName = clinic_name || '医療法人コンパス';
+    const cAddr = clinic_address || '〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室';
+    const cTel  = clinic_tel || '048-783-2713';
+    const cFax  = clinic_fax || '03-6369-4732';
+    const dName = doctor_name || '後藤 基温';
     // batch で consent_forms + treatment_plans を 1 トランザクション化（罠 §47-2）
     const stmts = [
       env.DB.prepare(`INSERT INTO consent_forms (
         id, org_id, patient_id, doctor_user_id, consent_type, disease_names, notes,
         consent_date, validity_months, expires_at, visit_plan, difficulty_reasons,
+        clinic_name, clinic_address, clinic_tel, clinic_fax, doctor_name,
+        patient_name, patient_address, patient_birth, form_payload,
         status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`).bind(
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`).bind(
         cfId, orgId, patient_id, doctorUserId, consent_type, diseaseJson, notes || '',
-        consent_date, months, expiresAt, visit_plan || '年2回（6か月に1回）', difficultyJson, now, now
+        consent_date, months, expiresAt, visit_plan || '年2回（6か月に1回）', difficultyJson,
+        cName, cAddr, cTel, cFax, dName,
+        patient_name || '', patient_address || '', patient_birth || '', formPayloadJson,
+        now, now
       ),
     ];
     if (treatment_plan && treatment_plan.visit_frequency && treatment_plan.evaluation_frequency) {
