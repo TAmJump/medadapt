@@ -3858,10 +3858,15 @@ function sharedChartPage(){
   }
 
   if(!S.noticeData){
-    api('/discharge/'+S.noticeId).then(res=>{
-      if(res?.id){S.noticeData=res;rr();}
-      else{S.noticeData={error:res?.error||'取得失敗'};rr();}
-    });
+    // v4.18: 同じIDへの連続fetchを防ぐ loading guard
+    if(S._noticeFetching !== S.noticeId){
+      S._noticeFetching = S.noticeId;
+      api('/discharge/'+S.noticeId,{silent404:true}).then(res=>{
+        S._noticeFetching = null;
+        if(res?.id){S.noticeData=res;rr();}
+        else{S.noticeData={error:res?.error||'取得失敗'};rr();}
+      }).catch(()=>{S._noticeFetching=null;S.noticeData={error:'通信エラー'};rr();});
+    }
     w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}},'読み込み中...'));
     return w;
   }
@@ -3987,17 +3992,35 @@ function sharedChartPage(){
       }
     };
 
-    api('/discharge/'+n.id+'/pdf').then(async res=>{
-      if(!res?.data) return;
-      const byteChars=atob(res.data);
-      const pdfBytes=new Uint8Array(byteChars.length);
-      for(let i=0;i<byteChars.length;i++)pdfBytes[i]=byteChars.charCodeAt(i);
-      // コンテナ幅取得後に自動ズーム
-      await new Promise(r=>setTimeout(r,50));
-      const cw=pdfSection.offsetWidth||720;
-      pdfZoom=Math.max(1.0,Math.min(3.0,cw/595*0.92));
-      renderPdf(pdfBytes,pdfZoom).catch(()=>{});
-    }).catch(()=>{});
+    // v4.18: PDF取得は session 中1回のみ（rr() の度に再fetchするとリクエストpileup）
+    if(!S._pdfCache) S._pdfCache = {};
+    const cacheKey = 'pdf_' + n.id;
+    if(S._pdfCache[cacheKey] === 'loading'){
+      // 既に取得中。何もしない。
+    } else if(S._pdfCache[cacheKey] && S._pdfCache[cacheKey] !== 'error'){
+      // キャッシュからレンダリング
+      (async()=>{
+        const pdfBytes = S._pdfCache[cacheKey];
+        await new Promise(r=>setTimeout(r,50));
+        const cw=pdfSection.offsetWidth||720;
+        pdfZoom=Math.max(1.0,Math.min(3.0,cw/595*0.92));
+        renderPdf(pdfBytes,pdfZoom).catch(()=>{});
+      })();
+    } else {
+      S._pdfCache[cacheKey] = 'loading';
+      api('/discharge/'+n.id+'/pdf',{silent404:true}).then(async res=>{
+        if(!res?.data){S._pdfCache[cacheKey]='error';return;}
+        const byteChars=atob(res.data);
+        const pdfBytes=new Uint8Array(byteChars.length);
+        for(let i=0;i<byteChars.length;i++)pdfBytes[i]=byteChars.charCodeAt(i);
+        S._pdfCache[cacheKey] = pdfBytes;
+        // コンテナ幅取得後に自動ズーム
+        await new Promise(r=>setTimeout(r,50));
+        const cw=pdfSection.offsetWidth||720;
+        pdfZoom=Math.max(1.0,Math.min(3.0,cw/595*0.92));
+        renderPdf(pdfBytes,pdfZoom).catch(()=>{});
+      }).catch(()=>{S._pdfCache[cacheKey]='error';});
+    }
   } else {
     w.appendChild(h('div',{style:{background:'#fafafa',border:'1px dashed var(--border)',borderRadius:'8px',padding:'24px',textAlign:'center',color:'var(--ink-l)',marginBottom:'16px',fontSize:'13px'}},'PDFは添付されていません'));
   }
@@ -4196,7 +4219,11 @@ function sharedChartPage(){
     const joinedRecs=recipients.filter(r=>r.joined_at&&!r.declined_at);
     const totalVoters=joinedRecs.length;
     // ─── 自動確定チェック（未確定 & 全員回答 or 期限到達） ───
-    if(!n.confirmed_slot&&!n._autoConfirmRunning){
+    // v4.18: idempotent 化。ノートID毎にグローバルSetで「実行済み」を記録し、
+    // 再レンダリング時の重複実行を完全に防ぐ。フラグをオブジェクトプロパティで持つと
+    // S.noticeData がリセットされた瞬間に false に戻り、無限ループに陥るため。
+    if(!S._autoConfirmedIds) S._autoConfirmedIds = new Set();
+    if(!n.confirmed_slot && !S._autoConfirmedIds.has(n.id)){
       const totalRecips=recipients.length;
       const respondedRecips=recipients.filter(r=>r.joined_at||r.declined_at).length;
       // 期限取得
@@ -4213,14 +4240,26 @@ function sharedChartPage(){
           if(okC>bestCount){bestCount=okC;bestSlot=sl}
         });
         if(bestSlot&&bestCount>0){
-          n._autoConfirmRunning=true;
+          // v4.18: 即座に Set に追加してロック。失敗時のみ削除して再試行可能に。
+          S._autoConfirmedIds.add(n.id);
+          // 楽観的UI更新: confirmed_slot を仮セットして再描画時の二重発火を防ぐ
+          n.confirmed_slot = bestSlot.id;
           const reason=deadlinePassed?'回答期限到達':'全員回答完了';
-          // URL 自動生成 → 確定 API
           (async()=>{
             const url=n.meeting_url||await genCallURL();
             const res=await api('/discharge/'+n.id+'/meeting',{method:'POST',body:JSON.stringify({meeting_url:url,confirmed_slot:bestSlot.id})});
-            if(res?.success){toast(reason+'により自動確定: '+(bestSlot.label||bestSlot.datetime));S.noticeData=null;api('/discharge/'+S.noticeId).then(r=>{S.noticeData=r;rr()})}
-            else{n._autoConfirmRunning=false;toast(res?.error||'自動確定に失敗しました')}
+            if(res?.success){
+              toast(reason+'により自動確定: '+(bestSlot.label||bestSlot.datetime));
+              S.noticeData=null;
+              const r=await api('/discharge/'+S.noticeId,{silent404:true});
+              if(r){S.noticeData=r;rr();}
+            } else {
+              // 失敗時のみ Set から除去（再描画時に再試行可能）。
+              // 楽観的UI更新も巻き戻す
+              S._autoConfirmedIds.delete(n.id);
+              n.confirmed_slot = null;
+              toast(res?.error||'自動確定に失敗しました');
+            }
           })();
         }
       }
