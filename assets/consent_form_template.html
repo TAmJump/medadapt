@@ -184,6 +184,52 @@
     color: #555;
     white-space: nowrap;
   }
+  /* 電子署名・タイムスタンプ認証バナー */
+  .e-cert-banner {
+    margin: 5mm 0 3mm;
+    border: 2px solid #0891b2;
+    border-radius: 3mm;
+    background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 100%);
+    padding: 4mm 5mm;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4mm;
+    align-items: center;
+    page-break-inside: avoid;
+  }
+  .e-cert-icon {
+    width: 14mm; height: 14mm;
+    border-radius: 50%;
+    background: #0891b2;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18pt; font-weight: bold;
+    flex-shrink: 0;
+  }
+  .e-cert-body {
+    font-size: 9.5pt;
+    line-height: 1.7;
+    color: #0c4a6e;
+  }
+  .e-cert-title {
+    font-weight: bold;
+    font-size: 10.5pt;
+    color: #0891b2;
+    margin-bottom: 1mm;
+  }
+  .e-cert-row {
+    display: flex;
+    gap: 4mm;
+    flex-wrap: wrap;
+    font-size: 8.5pt;
+    margin-top: 1mm;
+  }
+  .e-cert-row > span { color: #555; }
+  .e-cert-row > span > strong {
+    color: #0c4a6e;
+    font-family: 'Courier New', monospace;
+    font-weight: normal;
+  }
 </style>
 </head>
 <body>
@@ -249,6 +295,20 @@
     <div class="clinic-name">医療法人社団コンパス　コンパス内科歯科クリニック大宮</div>
     <div>〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室</div>
     <div>TEL：048-783-2713　　FAX：03-6369-4732</div>
+  </div>
+
+  <!-- 電子署名・タイムスタンプ認証バナー -->
+  <div class="e-cert-banner" id="e-cert-banner" style="display:none;">
+    <div class="e-cert-icon">✓</div>
+    <div class="e-cert-body">
+      <div class="e-cert-title">電子署名＋タイムスタンプ済</div>
+      <div>本書面は <strong>e-文書法・電子署名法</strong> に準拠した電子署名と、第三者機関のタイムスタンプを付与した上で、<strong>SHA-256 ハッシュチェーン</strong> に登録された原本性保証付き文書です。</div>
+      <div class="e-cert-row">
+        <span>署名者: <strong id="cert-signer">—</strong></span>
+        <span>タイムスタンプ: <strong id="cert-timestamp">—</strong></span>
+        <span>認証局: <strong id="cert-tsa-authority">—</strong></span>
+      </div>
+    </div>
   </div>
 
   <!-- フッタ QR（改ざん検証用） -->
@@ -365,7 +425,37 @@ window.consentTemplateRender = function(data) {
     document.getElementById('tsa-authority').textContent = data.tsa.authority.toUpperCase();
     document.getElementById('tsa-acquired').textContent = data.tsa.acquired_at ? '@' + data.tsa.acquired_at.slice(0, 10) : '';
   }
+
+  // 電子署名＋タイムスタンプ認証バナーへの値差し込み
+  const certBanner = document.getElementById('e-cert-banner');
+  if (data.signature && data.signature.signed_at) {
+    certBanner.style.display = '';
+    const signerLabel = (data.patient && data.patient.name)
+      ? data.patient.name + ' 様（依頼者）'
+      : '依頼者';
+    document.getElementById('cert-signer').textContent = signerLabel;
+    document.getElementById('cert-timestamp').textContent = formatSignedTimeStd(data.signature.signed_at);
+    document.getElementById('cert-tsa-authority').textContent =
+      (data.tsa && data.tsa.authority) ? data.tsa.authority.toUpperCase() : 'mYaruze TSA';
+  } else {
+    certBanner.style.display = 'none';
+  }
 };
+
+function formatSignedTimeStd(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}`;
+  } catch(e) {
+    return iso.slice(0, 16).replace('T', ' ');
+  }
+}
 
 function renderDifficultyReasons(dr) {
   const grid = document.getElementById('difficulty-grid');
@@ -465,7 +555,9 @@ if (window.location.search.includes('demo=1')) {
       address: '埼玉県さいたま市大宮区桜木町4-1-1',
       name: '田中 タムジ',
       phone: '048-000-0000'
-    }
+    },
+    signature: { signed_at: '2026-05-24T10:00:00+09:00' },
+    tsa: { authority: 'mhlw', acquired_at: '2026-05-24T10:00:00Z' }
   });
 }
 </script>
