@@ -251,7 +251,7 @@ async function loadSquareSdk(){
   }
   SQ.loading=true;SQ.error=null;
   try{
-    const cfg=await api('/billing/sdk-config',{method:'GET'});
+    const cfg=await api('/billing/sdk-config',{method:'GET',silent404:true});
     if(!cfg||!cfg.application_id||!cfg.location_id)throw new Error('SQUARE_APP_ID または SQUARE_LOCATION_ID が未設定');
     SQ.cfg=cfg;
     if(!window.Square){
@@ -265,7 +265,7 @@ async function loadSquareSdk(){
 }
 
 async function refreshBillingInfo(){
-  try{const r=await api('/billing/info',{method:'GET'});SQ.info=r;SQ.infoLoaded=true;return r;}catch(e){SQ.infoLoaded=true;return null;}
+  try{const r=await api('/billing/info',{method:'GET',silent404:true});SQ.info=r;SQ.infoLoaded=true;return r;}catch(e){SQ.infoLoaded=true;return null;}
 }
 
 // v29 Phase 4: zipcloud で郵便番号→住所自動補完
@@ -477,14 +477,36 @@ async function loadNotifications(){
   if(!S.token)return;
   try{
     const res=await fetch(API+'/notifications/unread',{headers:{'Authorization':'Bearer '+S.token}});
-    if(res.ok){const d=await res.json();const prev=S.unreadCount;S.unreadCount=d.count||0;if(S.unreadCount!==prev)rr();}
-  }catch(e){}
+    if(res.ok){
+      const d=await res.json();
+      const prev=S.unreadCount;
+      S.unreadCount=d.count||0;
+      if(S.unreadCount!==prev)rr();
+      S._notifFailCount = 0;  // 成功時にリセット
+      return true;
+    }
+    return false;
+  }catch(e){
+    // v4.20: ERR_CONNECTION_CLOSED 等の連続失敗をカウント
+    S._notifFailCount = (S._notifFailCount||0) + 1;
+    return false;
+  }
 }
 let _notifTimer=null;
 function startNotifPolling(){
   if(_notifTimer)clearInterval(_notifTimer);
+  S._notifFailCount = 0;
   loadNotifications();
-  _notifTimer=setInterval(loadNotifications,30000);
+  // v4.20: 連続失敗が5回を超えたらポーリングを止める（ユーザ操作で再開可）
+  const tick = async () => {
+    if((S._notifFailCount||0) >= 5){
+      console.warn('Notification polling stopped after 5 consecutive failures');
+      stopNotifPolling();
+      return;
+    }
+    await loadNotifications();
+  };
+  _notifTimer=setInterval(tick,30000);
 }
 function stopNotifPolling(){if(_notifTimer){clearInterval(_notifTimer);_notifTimer=null;}}
 
@@ -513,6 +535,8 @@ async function loadFromCloud(){
       const data=await res.json();
       if(data){
         // クラウドにデータがある場合のみ上書き（空の場合はlocalStorageを保持）
+        const cloudHasData = (data.patients?.length||0) + (data.cases?.length||0) + (data.conferences?.length||0) + (data.monitors?.length||0) > 0;
+        const localHasData = (D.patients?.length||0) + (D.cases?.length||0) + (D.conferences?.length||0) + (D.monitors?.length||0) > 0;
         if(data.patients&&data.patients.length)D.patients=data.patients;
         if(data.cases&&data.cases.length)D.cases=data.cases;
         if(data.conferences&&data.conferences.length)D.conferences=data.conferences;
@@ -520,6 +544,17 @@ async function loadFromCloud(){
         if(data.assessments&&data.assessments.length)D.assessments=data.assessments;
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
+        // v4.20: ローカルにデータがあってクラウドが空の場合、初回ログイン or D1リセット後と判断して
+        // ローカルデータをクラウドへ即push（同意書発行等の前提条件を整える）
+        if(localHasData && !cloudHasData){
+          try{
+            await fetch(API+'/sync',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},
+              body:JSON.stringify(D)
+            });
+          }catch(e){console.warn('initial sync push failed:',e);}
+        }
       }
     }
   }catch(e){}
@@ -527,6 +562,16 @@ async function loadFromCloud(){
 async function saveDocument(docType,title,patientId,relatedId,content){
   if(!S.token)return null;
   try{
+    // v4.20: 関連患者がD1に存在することを保証するため、書類保存前に /sync を実行
+    if(patientId){
+      try{
+        await fetch(API+'/sync',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},
+          body:JSON.stringify(D)
+        });
+      }catch(e){console.warn('sync before saveDocument failed:',e);}
+    }
     const res=await fetch(API+'/documents',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},body:JSON.stringify({docType,title,patientId,relatedId,content,createdBy:S.user?.name||''})});
     if(res.ok)return await res.json();
   }catch(e){}
@@ -2719,7 +2764,7 @@ function consentPage(){
     '厚労省標準様式準拠（はり・きゅう／あマ指）＋コンパス独自の依頼書様式。発行時に SHA-256 ハッシュチェーンに登録され、QRコードで第三者から真正性検証が可能です。保険医療機関名は「医療法人コンパス」で発行されます。'
   ));
   if(!S.consentList){
-    api('/consent/list').then(res=>{S.consentList=res?.items||[];rr()}).catch(()=>{S.consentList=[]});
+    api('/consent/list',{silent404:true}).then(res=>{S.consentList=res?.items||[];rr()}).catch(()=>{S.consentList=[]});
     w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}},'読み込み中...'));
     return w;
   }
@@ -3327,7 +3372,7 @@ function ndaPage(){
   ));
 
   if(!S.ndaList){
-    api('/nda/list').then(res=>{S.ndaList=res?.ndas||[];rr()});
+    api('/nda/list',{silent404:true}).then(res=>{S.ndaList=res?.ndas||[];rr()});
     w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}},'読み込み中...'));
     return w;
   }
@@ -3485,7 +3530,7 @@ function dischargePage(){
   ));
 
   if(!S.dischargeList){
-    api('/discharge/list').then(res=>{S.dischargeList=res;rr()});
+    api('/discharge/list',{silent404:true}).then(res=>{S.dischargeList=res;rr()});
     w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'var(--ink-l)'}}),'読み込み中...');
     return w;
   }
@@ -3663,7 +3708,7 @@ function dischargeNewPage(){
 
   if(!S.ndaList){
     ndaBox.appendChild(h('div',{style:{color:'var(--ink-l)',fontSize:'12px'}},'読み込み中...'));
-    api('/nda/list').then(res=>{S.ndaList=res?.ndas||[];rr()});
+    api('/nda/list',{silent404:true}).then(res=>{S.ndaList=res?.ndas||[];rr()});
   } else {
     const myOrgId=S.user?.org_id||S.user?.id;
     // 自分自身を除外 + 重複除去（同じ相手との複数NDAをまとめる）
@@ -4031,9 +4076,21 @@ function sharedChartPage(){
     // v4.18: PDF取得は session 中1回のみ（rr() の度に再fetchするとリクエストpileup）
     if(!S._pdfCache) S._pdfCache = {};
     const cacheKey = 'pdf_' + n.id;
+    // v4.20: タイムアウト処理ヘルパ ─ 10秒経ってもloading状態のままなら error 扱いに
+    const showError = (msg) => {
+      const liveSection = document.getElementById(pdfSectionId);
+      if(!liveSection || !liveSection.isConnected) return;
+      while(liveSection.children.length>1) liveSection.removeChild(liveSection.lastChild);
+      liveSection.appendChild(h('div',{style:{padding:'24px',textAlign:'center',color:'var(--red)',background:'#fff2f0',borderRadius:'8px',border:'1px solid #fecaca',fontSize:'13px'}},
+        h('div',{style:{fontWeight:'700',marginBottom:'6px'}},'PDF を読み込めませんでした'),
+        h('div',{style:{fontSize:'11px',color:'var(--ink-l)'}},msg||'時間をおいて再読み込みしてください')
+      ));
+    };
     if(S._pdfCache[cacheKey] === 'loading'){
       // 既に取得中。何もしない。
-    } else if(S._pdfCache[cacheKey] && S._pdfCache[cacheKey] !== 'error'){
+    } else if(S._pdfCache[cacheKey] === 'error'){
+      showError('サーバから PDF データが取得できませんでした');
+    } else if(S._pdfCache[cacheKey]){
       // キャッシュからレンダリング
       (async()=>{
         const pdfBytes = S._pdfCache[cacheKey];
@@ -4044,18 +4101,29 @@ function sharedChartPage(){
       })();
     } else {
       S._pdfCache[cacheKey] = 'loading';
+      // 10秒タイムアウト
+      const timeoutId = setTimeout(()=>{
+        if(S._pdfCache[cacheKey] === 'loading'){
+          S._pdfCache[cacheKey] = 'error';
+          showError('読み込みに10秒以上かかったため中断しました');
+        }
+      },10000);
       api('/discharge/'+n.id+'/pdf',{silent404:true}).then(async res=>{
-        if(!res?.data){S._pdfCache[cacheKey]='error';return;}
+        clearTimeout(timeoutId);
+        if(!res?.data){S._pdfCache[cacheKey]='error';showError('PDFデータが空です');return;}
         const byteChars=atob(res.data);
         const pdfBytes=new Uint8Array(byteChars.length);
         for(let i=0;i<byteChars.length;i++)pdfBytes[i]=byteChars.charCodeAt(i);
         S._pdfCache[cacheKey] = pdfBytes;
-        // コンテナ幅取得後に自動ズーム
         await new Promise(r=>setTimeout(r,50));
         const cw=pdfSection.offsetWidth||720;
         pdfZoom=Math.max(1.0,Math.min(3.0,cw/595*0.92));
         renderPdf(pdfBytes,pdfZoom).catch(()=>{});
-      }).catch(()=>{S._pdfCache[cacheKey]='error';});
+      }).catch(()=>{
+        clearTimeout(timeoutId);
+        S._pdfCache[cacheKey]='error';
+        showError('通信エラーが発生しました');
+      });
     }
   } else {
     w.appendChild(h('div',{style:{background:'#fafafa',border:'1px dashed var(--border)',borderRadius:'8px',padding:'24px',textAlign:'center',color:'var(--ink-l)',marginBottom:'16px',fontSize:'13px'}},'PDFは添付されていません'));
@@ -4702,7 +4770,7 @@ if(info&&info.has_subscription){
   const toggleBtn=h('button',{type:'button',style:{background:'none',border:'none',color:'#0891b2',fontSize:'12px',cursor:'pointer',padding:'4px 0',fontFamily:'inherit',fontWeight:'600'},onClick:async()=>{
     SQ.historyOpen=!SQ.historyOpen;
     if(SQ.historyOpen&&!SQ.historyLoaded){
-      try{const r=await api('/billing/history',{method:'GET'});if(r&&r.ok){SQ.history=r.events||[];SQ.historyLoaded=true;}else{SQ.historyError=r?.error||'履歴の取得に失敗しました';}}catch(e){SQ.historyError='履歴の取得に失敗しました';}
+      try{const r=await api('/billing/history',{method:'GET',silent404:true});if(r&&r.ok){SQ.history=r.events||[];SQ.historyLoaded=true;}else{SQ.historyError=r?.error||'履歴の取得に失敗しました';}}catch(e){SQ.historyError='履歴の取得に失敗しました';}
     }
     rr();
   }},(SQ.historyOpen?'▼ ':'▶ ')+'契約履歴を表示');
