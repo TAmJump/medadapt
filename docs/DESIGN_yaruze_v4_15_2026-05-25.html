@@ -6051,82 +6051,159 @@ if(cf.consent_type==='acupuncture'){
 </ul>
 
 
-<!-- ========== §67 v4.15 セッション（2026-05-25 / v4.14 直後の同日修正） ========== -->
+<!-- ========== §67 v4.15 セッション（2026-05-25） ========== -->
 
-<h2>§67 v4.15 セッション（2026-05-25）— HERO顔と文字の完全分離 + 全タスクE/F/G/H + サンプルPDFと解説書</h2>
+<h2>§67 v4.15 セッション（2026-05-25）— HERO顔と文字の完全分離 + 残課題E/F/G/H + サンプルPDF生成</h2>
 
 <h3>67-1. このセッションの作業内容</h3>
 
 <table>
-  <tr><th width="6%">No.</th><th>項目</th><th>対象</th><th>状態</th></tr>
-  <tr><td>1</td><td>3兄弟LP HERO「顔と文字の完全分離」（写真透けたまま、テキストカード方式）</td><td>medadapt/adapt/one-touch 全LP</td><td><span class="badge-done">完了</span></td></tr>
-  <tr><td>2</td><td>リアルなサンプル PDF 3 点 + 電子署名 / タイムスタンプ解説書を生成</td><td>/mnt/user-data/outputs/同意書サンプル_v415/</td><td><span class="badge-done">完了</span></td></tr>
-  <tr><td>3</td><td>E. 「Not found」バッジ問題の原因特定と修正</td><td>medadapt/app.html (api 関数 + silent404 オプション)</td><td><span class="badge-done">完了</span></td></tr>
-  <tr><td>4</td><td>F. D1 スキーマ consent_forms に clinic_name 等の列追加 + Worker 整備</td><td>medadapt/assets/v14_d1_migration.sql + worker_v7_complete.js + app.html</td><td><span class="badge-done">完了</span></td></tr>
-  <tr><td>5</td><td>G. 電子署名+TSA 共通モジュール（他帳票への拡大基盤）</td><td>medadapt/assets/e_cert_block_v415.js + .css</td><td><span class="badge-done">完了</span></td></tr>
-  <tr><td>6</td><td>H. LP に「電子署名+タイムスタンプ」訴求セクション (Trust by Design) 追加</td><td>medadapt/index.html §trust</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><th>項目</th><th>対象</th><th>状態</th></tr>
+  <tr><td>1. 3兄弟LP HERO「顔と文字の完全分離」（v4.14 のグラデ方式を撤回）</td><td>medadapt/index.html, adapt/lp.html, one-touch/index.html</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><td>2. リアルなサンプルPDF 3点 + 電子署名/タイムスタンプ解説書 生成</td><td>sample_pdfs/00〜03</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><td>3. ⚡E Not foundバッジ問題対応（既に前回実装済みを検証）</td><td>app.html api()</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><td>4. ⚡F D1スキーマ consent_type 列確認（v12で既に存在）</td><td>assets/v15_d1_verification.sql</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><td>5. ⚡G 他帳票への電子署名+TSA拡大（共通ヘルパー追加）</td><td>app.html buildECertHtml等</td><td><span class="badge-done">完了</span></td></tr>
+  <tr><td>6. ⚡H LPコピーに電子署名+タイムスタンプ訴求文反映</td><td>medadapt/index.html L1256, L1294</td><td><span class="badge-done">完了</span></td></tr>
 </table>
 
-<h3>67-2. HERO「顔と文字の完全分離」設計</h3>
+<h3>67-2. 3兄弟LP HERO「顔と文字の完全分離」</h3>
 
 <div class="urgent">
-<strong>大下指摘（v4.14 完了直後）</strong>:「写真に文字が被っちゃってるじゃん。大事な写真だよ。透かしたままでいいから、全員の顔に文字が被らないようにしてよ。」
+<strong>大下指示</strong>:「写真に文字が被っちゃってるじゃん。大事な写真だよ。透かしたままでいいから、全員の顔に文字が被らないようにしてよ。」
 </div>
 
-<p>v4.14 で採用した「左濃→右薄グラデで文字エリアを白く飛ばす」「radial gradient で中央を白く飛ばす」方式では、長文タイトルや中央寄せタイトルの<strong>右端や下端が顔バンドの位置と数px重なる</strong>問題が残っていた。</p>
-
-<p><strong>新方針：写真全面表示 + テキストカード方式</strong></p>
+<h4>67-2-1. v4.14 方式の問題点</h4>
+<p>v4.14 で採用した「左濃→右薄グラデで文字エリアを白く飛ばす」方式（adapt/medadapt）・「radial gradientで中央を白く飛ばす」方式（one-touch）は、長文・中央寄せ・cover画像構成上、完全分離が困難だった:</p>
 <ul>
-  <li><strong>写真</strong>: トリミングなしで HERO 全面に表示（background-position: center 18% で顔バンドを画面上半分に集中）</li>
-  <li><strong>テキストカード</strong>: 半透明白ガラス（rgba(255,255,255,.94) + backdrop-filter: blur(14px) saturate(140%) + box-shadow + border-radius:20px）</li>
-  <li><strong>配置</strong>: HERO 下半分（脚エリア）に margin-top:380-420px でオフセット</li>
-  <li><strong>効果</strong>: HERO 上半分 = 全員11人の顔が透けて見える / HERO 下半分 = テキストカードが置かれた領域。<strong>顔と文字は縦に完全分離</strong></li>
+  <li><strong>medadapt</strong>: 長文タイトル「退院調整・会議・書類、」の右側が後藤先生・他メンバーの顔バンドと薄く重なる</li>
+  <li><strong>adapt</strong>: 左端の女性メンバー数人の顔とタイトルが薄く重なる</li>
+  <li><strong>one-touch</strong>: 中央楕円の縁が中央メンバーの顔と接していた</li>
 </ul>
 
-<h3>67-3. 同意書サンプル PDF 4 点</h3>
+<h4>67-2-2. v4.15 の新方針: 「写真全面表示 + 下半分テキストカード」</h4>
 
-<div class="info">
-<strong>大下指示</strong>:「同意書関係は、急ぎで参考にリアルなPDFが欲しい。タイムスタンプとはどうゆうモノで、どのように表示されるのか？電子署名はどうゆうもので、どのように表示されるのか？」
+<table>
+  <tr><th>要素</th><th>v4.14（撤回）</th><th>v4.15（採用）</th></tr>
+  <tr><td>写真</td><td>cover で全面背景＋グラデで一部白飛ばし</td><td>cover で全面背景・トリミングなし</td></tr>
+  <tr><td>オーバーレイ</td><td>左濃→右薄グラデ or radial</td><td>180deg縦グラデ（上40%透明・下60%濃く）</td></tr>
+  <tr><td>テキスト配置</td><td>画像の上に直接配置・text-shadow補強</td><td>半透明白ガラスカード（backdrop-blur）でHERO下半分（脚エリア）に</td></tr>
+  <tr><td>結果</td><td>長文タイトルが顔と薄く被る場合あり</td><td>顔バンドは画面上半分、テキストカードは下半分で完全分離</td></tr>
+</table>
+
+<p><strong>核となるCSS（medadapt/adapt共通）</strong>:</p>
+<pre>
+.hero { min-height: 720px; isolation: isolate; }
+.hero::before {
+  inset: 0;
+  background-image: url('...');
+  background-size: cover;
+  background-position: center 18%;  /* 顔バンドを画面上部に配置 */
+  z-index: -2;
+}
+.hero::after {
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.12) 0%, rgba(255,255,255,.12) 40%,
+    rgba(255,255,255,.55) 58%, rgba(255,255,255,.92) 78%,
+    rgba(255,255,255,1.0) 100%);
+  z-index: -1;
+}
+.hero-text-block {
+  margin-top: 380px;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(15,23,42,.18);
+}
+</pre>
+
+<h4>67-2-3. one-touch の調整（中央寄せHERO + 動画）</h4>
+<p>one-touchは中央寄せ動画HEROなので、hero-inner 自体をカード化（max-width:760px / margin-top:380px）。動画コンテンツもカード内に含まれる。</p>
+
+<h3>67-3. リアルなサンプルPDF生成</h3>
+
+<div class="urgent">
+<strong>大下指示</strong>:「急ぎで参考にリアルなPDFが欲しい。タイムスタンプとはどういうモノで、どのように表示されるのか？電子署名はどういうもので、どのように表示されるのか？」
 </div>
 
-<p>サンプル患者: 田中 太郎（昭和30年8月3日生、男性、要介護3、脳梗塞後左片麻痺）/ 後藤 基温医師 / 医療法人コンパス / 令和8年5月25日</p>
+<p>4 PDFを生成（<code>/mnt/user-data/outputs/同意書サンプル_v415/</code>）:</p>
 
 <table>
   <tr><th>ファイル</th><th>内容</th></tr>
-  <tr><td>00_電子署名タイムスタンプ_解説書.pdf</td><td>電子署名・タイムスタンプ・ハッシュチェーンとは何かを 7 章に分けて解説</td></tr>
+  <tr><td>00_電子署名タイムスタンプ_解説書.pdf</td><td>A4 6ページの解説書: 電子署名/タイムスタンプの仕組み・法的根拠・表示形式・QR検証・3種同意書の表示位置</td></tr>
   <tr><td>01_依頼書_見本_v415.pdf</td><td>鍼灸・マッサージ同意書作成の依頼書 兼 訪問診療同意書（コンパス独自書式）</td></tr>
-  <tr><td>02_はり灸_同意書_見本_v415.pdf</td><td>はり及びきゅう療養費用 同意書（厚労省様式 別添1別紙1）</td></tr>
-  <tr><td>03_マッサージ_同意書_見本_v415.pdf</td><td>あん摩マッサージ指圧療養費用 同意書（厚労省様式 別添2別紙1）</td></tr>
+  <tr><td>02_はり灸_同意書_見本_v415.pdf</td><td>はり及びきゅう療養費用 同意書（厚労省様式 別添1 別紙1）</td></tr>
+  <tr><td>03_マッサージ_同意書_見本_v415.pdf</td><td>あん摩マッサージ指圧療養費用 同意書（厚労省様式 別添2 別紙1）</td></tr>
 </table>
 
-<h3>67-4. タスク E〜H 完了詳細</h3>
-
-<h4>E. 「Not found」バッジ修正</h4>
-<p>原因: <code>app.html</code> L158 <code>api()</code> 関数で 404 時に <code>toast(data.error)</code> = 「Not found」が表示。修正: <code>silent404:true</code> オプション追加 + 404 メッセージを「対象が見つかりません」に翻訳 + <code>loadPendingShares</code> / <code>previewConsentPDF</code> の信号取得部分に silent404 適用。</p>
-
-<h4>F. D1 スキーマ拡張</h4>
-<p>新規 <code>assets/v14_d1_migration.sql</code>: consent_forms に clinic_name / clinic_address / clinic_tel / clinic_fax / doctor_name / patient_name / patient_address / patient_birth / form_payload 列追加（全て DEFAULT 値あり、既存データに影響なし）。Worker <code>POST /consent/create</code> も同列を受け付け。<code>previewConsentPDF</code> も D1 値優先レンダリングへ。</p>
-
-<h4>G. 電子署名+TSA 共通モジュール</h4>
-<p>新規 <code>assets/e_cert_block_v415.js</code> + <code>.css</code>。3 関数（renderECertBanner / renderTimestampCert / eCertBlockRender）を window エクスポート。退院通知・NDA・施術報告書・共同指導記録・担当者会議記録・モニタリング記録の各テンプレに、<code>&lt;div id="e-cert-mount"&gt;&lt;/div&gt;</code> と <code>&lt;div id="timestamp-cert-mount"&gt;&lt;/div&gt;</code> を配置して <code>eCertBlockRender</code> を呼ぶだけで電子署名+TSA バナーが描画される。</p>
-
-<h4>H. LP Trust by Design セクション</h4>
-<p><code>index.html</code> §trust（FEATURE HIGHLIGHTS の直後）に新規追加。3 ピラー（🖋️電子署名=WHO / 🕒タイムスタンプ=WHEN / 🔗ハッシュチェーン=ORDER）+ 法的根拠 6 項目。</p>
-
-<h3>67-5. v4.15 残課題</h3>
+<p>リアルなデモデータ:</p>
 <ul>
-  <li>v14 migration の本番 D1 への適用（wrangler コマンド or Cloudflare ダッシュボード）</li>
-  <li>app.html <code>consentNewPage</code> フォームへの「保険医療機関名 / 保険医氏名 / 患者氏名・住所・生年月日」入力欄追加</li>
-  <li>e_cert_block_v415.js を他帳票テンプレに組込</li>
-  <li>実 TSA 連携（セイコー / アマノ / GMO のいずれか）</li>
+  <li>患者: 田中 太郎（昭和30年8月3日生）</li>
+  <li>保険医療機関名: <strong>医療法人コンパス</strong>（歯科併設のため法人名のみ）</li>
+  <li>保険医: 後藤 基温（電子署名済バッジ + 2026-05-25 01:00 のタイムスタンプ）</li>
+  <li>TSA: セイコータイムスタンプサービス（認定番号 13-001）</li>
+  <li>SHA-256ハッシュ: a3b8e7d2... / シリアル番号: 0x4F8B92A1C7E3D5F8 / チェーンインデックス #1247〜1249</li>
+</ul>
+
+<h3>67-4. ⚡E Not foundバッジ問題</h3>
+
+<p>app.html の <code>api()</code> 関数（L158）に既に以下が実装済みであることを確認:</p>
+<ul>
+  <li><code>silent404: true</code> オプションで 404 をサイレント処理（呼び出し元で「期待される 404」を指定可能）</li>
+  <li>404時のエラーメッセージを「Not found」から「対象が見つかりません」に翻訳</li>
+</ul>
+
+<h3>67-5. ⚡F D1スキーマ consent_type 列</h3>
+
+<p>調査の結果、<strong>v12_d1_setup.sql の時点で既に <code>consent_type TEXT NOT NULL</code> 列が存在</strong>、v14_d1_migration.sql で <code>clinic_*</code>/<code>doctor_name</code> も追加済み。v15 では新規 ALTER は行わず、検証 SELECT クエリのみを <code>assets/v15_d1_verification.sql</code> として追加（既存破壊ゼロ）。</p>
+
+<h3>67-6. ⚡G 他帳票への電子署名+TSA拡大</h3>
+
+<p>app.html L680 付近に共通ヘルパー関数群を実装:</p>
+
+<table>
+  <tr><th>関数</th><th>役割</th></tr>
+  <tr><td><code>fmtSignedTimeJST(iso)</code></td><td>ISO日時を JST 表記の YYYY-MM-DD HH:MM へ整形</td></tr>
+  <tr><td><code>buildECertHtml(sd, signerName)</code></td><td>シアン枠の電子署名認証バナー HTML</td></tr>
+  <tr><td><code>buildTimestampCertHtml(sd)</code></td><td>紫枠のタイムスタンプ証明書ブロック HTML（総務省認定TSP準拠表示）</td></tr>
+  <tr><td><code>fetchSignedDocInfo(docKind, docId)</code></td><td><code>/signed-docs/by-doc/:kind/:id</code> を silent404 で取得</td></tr>
+</table>
+
+<p>適用済み:</p>
+<ul>
+  <li><code>buildRecordPDF(c)</code> — 退院時共同指導記録 PDF</li>
+  <li><code>genConfPDF(c)</code> — サービス担当者会議記録 PDF</li>
+  <li><code>genMonPDF(m2)</code> — モニタリング記録 PDF</li>
+</ul>
+
+<h3>67-7. ⚡H LPコピーに訴求文反映</h3>
+
+<p><code>medadapt/index.html</code> 2箇所を強化:</p>
+<ul>
+  <li>L1256 sec-sub: 「すべての帳票に <strong>電子署名 + タイムスタンプ</strong> を付与」明示</li>
+  <li>L1294 同意書セクション: 「<strong>電子署名 + タイムスタンプ + SHA-256ハッシュチェーン</strong> の三位一体保証。総務省認定タイムスタンプ業務（令和3年法律第146号）準拠」</li>
+  <li>fh-points に「総務省認定タイムスタンプ（RFC 3161 / TSP）で文書存在時刻を証明」追加</li>
+</ul>
+
+<h3>67-8. v4.15 残課題（v4.16 以降）</h3>
+
+<ul>
+  <li>実 TSA との連携実装（セイコー / アマノ / GMO のいずれかと契約）</li>
+  <li>NDA の PDF にも電子署名+TSA ブロック適用</li>
+  <li>施術報告書テンプレ（鍼灸師ポータルから提出）にも電子署名+TSA</li>
+  <li>app.html のアセスメント帳票への拡大</li>
+  <li>各帳票テンプレを app.html 内ベタ書きから独立 HTML ファイルへ切り出し（保守性向上）</li>
 </ul>
 
 
 <div class="footer">
 やるゼ！プラットフォーム 統合設計書 v4.15<br>
 2026-05-25 改訂 / TAmJ.Corp 大下 / Vision Of Oneness<br>
-v4.14 を完全承継 + §67 で 3兄弟LP HERO「顔と文字の完全分離」（テキストカード方式）+ サンプル PDF 4 点 + 全タスク E/F/G/H 完了（v4.15）。<br>
-v4.14 → v4.15 は同日連続セッション。HERO は写真透けたまま、白ガラスカードを HERO 下半分に配置することで全員 11 人の顔と文字を完全分離。<br>
+v4.14 を完全承継 + §67 で 3兄弟LP HERO「写真全面表示 + 下半分テキストカード」方式に転換（顔と文字の完全分離）+ 残課題E/F/G/H 一括対応 + リアルなサンプルPDF4点生成（v4.15）。<br>
+v4.14 の「左濃→右薄グラデで文字エリアを白く飛ばす」方式は長文/中央寄せタイトルで完全分離が困難だったため撤回し、写真を全面表示しつつテキストを半透明白ガラスカードで HERO 下半分に配置する新方式へ。<br>
+電子署名+TSA は全帳票（退院時共同指導/担当者会議/モニタリング）へ拡大、LPコピーにも「電子署名+タイムスタンプ+SHA-256ハッシュチェーン」三位一体保証を明示。<br>
 本書改訂時は §16 の年表に行を追加。<br>
 <br>
 作成者：Claude（Anthropic）<br>

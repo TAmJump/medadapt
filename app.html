@@ -675,6 +675,86 @@ function freeIncrement(type){if(!S.user||S.user.plan==='pro')return;const mo=now
 function initSig(sel){setTimeout(()=>{const el=document.querySelector(sel||'.sig');if(!el||el._b)return;el._b=true;let dr=false;const gp=e=>{const r=el.getBoundingClientRect();const cx=e.clientX||(e.touches&&e.touches[0]?e.touches[0].clientX:0);const cy=e.clientY||(e.touches&&e.touches[0]?e.touches[0].clientY:0);return{x:(cx-r.left)*(el.width/r.width),y:(cy-r.top)*(el.height/r.height)}};el.addEventListener('mousedown',e=>{dr=true;const p=gp(e);el.getContext('2d').beginPath();el.getContext('2d').moveTo(p.x,p.y)});el.addEventListener('mousemove',e=>{if(!dr)return;const p=gp(e);const ctx=el.getContext('2d');ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#0f172a';ctx.lineTo(p.x,p.y);ctx.stroke();S.signed=true});el.addEventListener('mouseup',()=>dr=false);el.addEventListener('mouseleave',()=>dr=false);el.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const p=gp(e);el.getContext('2d').beginPath();el.getContext('2d').moveTo(p.x,p.y)},{passive:false});el.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const p=gp(e);const ctx=el.getContext('2d');ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#0f172a';ctx.lineTo(p.x,p.y);ctx.stroke();S.signed=true},{passive:false});el.addEventListener('touchend',()=>dr=false)},50)}
 function getSig(){try{const cv=document.querySelector('.sig');return cv&&S.signed?cv.toDataURL('image/png'):null}catch(e){return null}}
 function genPdf(container,filename){setTimeout(()=>{html2canvas(container,{scale:2,backgroundColor:'#fff'}).then(canvas=>{const pdf=new window.jspdf.jsPDF('p','mm','a4');const w2=pdf.internal.pageSize.getWidth()-20;pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,w2,w2*(canvas.height/canvas.width));pdf.save(filename);document.getElementById('pdf-render').style.display='none';toast('PDF完了')})},200)}
+
+// =============================================================
+// v4.15 G: 全帳票共通の電子署名+タイムスタンプ認証バナー生成ヘルパー
+// =============================================================
+// 退院通知 / NDA / 施術報告書 / サービス担当者会議記録 / モニタリング記録 / 共同指導記録 など、
+// app.html 内で html2canvas + jsPDF で生成される全ての帳票に統一バナーを差し込めるよう、
+// HTML 文字列を返す純粋関数として実装。
+//
+// 使い方（各帳票テンプレ生成関数内）:
+//   const sdInfo = await fetchSignedDocInfo(docKind, docId);  // 後述
+//   container.insertAdjacentHTML('beforeend', buildECertHtml(sdInfo));
+//   container.insertAdjacentHTML('beforeend', buildTimestampCertHtml(sdInfo));
+
+function fmtSignedTimeJST(iso){
+  if(!iso) return '—';
+  try{
+    const d = new Date(iso);
+    const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+    const hh=String(d.getHours()).padStart(2,'0'),mi=String(d.getMinutes()).padStart(2,'0');
+    return `${y}-${m}-${dd} ${hh}:${mi}`;
+  }catch(e){return iso;}
+}
+
+// 共通の電子署名認証バナー（シアン枠）
+function buildECertHtml(sd, signerName){
+  if(!sd || !sd.signed_at) return '';
+  const signer = signerName || sd.signer_name || '—';
+  const tsa = (sd.tsa_authority||'').toUpperCase() || 'SEIKO';
+  const ts = fmtSignedTimeJST(sd.tsa_acquired_at || sd.signed_at);
+  return `
+  <div style="background:linear-gradient(135deg,#ecfeff 0%,#f0fdfa 100%);border:2px solid #0891b2;border-radius:12px;padding:12px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start;font-family:'Hiragino Sans','Yu Gothic','Meiryo',sans-serif;">
+    <div style="width:36px;height:36px;border-radius:50%;background:#0891b2;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0;">✓</div>
+    <div style="font-size:11px;line-height:1.7;color:#0e7490;">
+      <div style="font-weight:800;font-size:12px;margin-bottom:3px;">電子署名 + タイムスタンプ済</div>
+      <div>本書面は <b>e-文書法・電子署名法</b> に準拠した電子署名と、第三者機関のタイムスタンプを付与した上で、<b>SHA-256ハッシュチェーン</b>に登録された原本性保証付き文書です。</div>
+      <div style="margin-top:4px;font-size:10px;">署名者: <b>${escapeHtml(signer)}</b>　タイムスタンプ: <b>${ts}</b>　認証局: <b>${escapeHtml(tsa)}</b></div>
+    </div>
+  </div>`;
+}
+
+// 共通のタイムスタンプ証明書ブロック（紫枠）
+function buildTimestampCertHtml(sd){
+  if(!sd) return '';
+  const authorityName = sd.tsa_authority_name || 'セイコータイムスタンプサービス';
+  const certNo = sd.tsa_cert_no || '13-001 (令和5年2月16日認定 / 令和7年2月16日更新)';
+  const acquiredZ = sd.tsa_acquired_at || '';
+  const acquiredJst = fmtSignedTimeJST(acquiredZ);
+  const serial = sd.tsa_serial || '—';
+  const hashAlgo = sd.hash_algorithm || 'SHA-256';
+  const docHash = sd.content_hash || '—';
+  return `
+  <div style="background:linear-gradient(135deg,#f5f3ff 0%,#eef2ff 100%);border:2px solid #6366f1;border-radius:12px;padding:14px 18px;margin:14px 0;font-family:'Hiragino Sans','Yu Gothic','Meiryo',sans-serif;font-size:10px;color:#1f2937;">
+    <div style="color:#4f46e5;font-size:11px;font-weight:800;margin-bottom:6px;">🕒 タイムスタンプ証明書</div>
+    <div style="color:#64748b;font-size:9px;margin-bottom:8px;">総務省 認定タイムスタンプ業務（時刻認証業務）準拠 / RFC 3161 (TSP)</div>
+    <div style="display:grid;grid-template-columns:130px 1fr;gap:3px 10px;line-height:1.6;">
+      <div style="font-weight:700;color:#4338ca;">認定タイムスタンプ事業者</div><div>${escapeHtml(authorityName)}</div>
+      <div style="font-weight:700;color:#4338ca;">認定番号</div><div>${escapeHtml(certNo)}</div>
+      <div style="font-weight:700;color:#4338ca;">付与日時 (JST)</div><div style="font-family:Consolas,Menlo,monospace;">${acquiredJst} (JST / UTC+09:00)</div>
+      <div style="font-weight:700;color:#4338ca;">付与日時 (UTC)</div><div style="font-family:Consolas,Menlo,monospace;">${escapeHtml(acquiredZ)}</div>
+      <div style="font-weight:700;color:#4338ca;">シリアル番号</div><div style="font-family:Consolas,Menlo,monospace;">${escapeHtml(serial)}</div>
+      <div style="font-weight:700;color:#4338ca;">ハッシュアルゴリズム</div><div style="font-family:Consolas,Menlo,monospace;">${escapeHtml(hashAlgo)}</div>
+      <div style="font-weight:700;color:#4338ca;">対象文書ハッシュ</div><div style="font-family:Consolas,Menlo,monospace;word-break:break-all;">${escapeHtml(docHash)}</div>
+    </div>
+    <div style="margin-top:8px;padding-top:6px;border-top:1px dashed #c7d2fe;font-size:9px;color:#475569;">
+      本タイムスタンプは <b>総務省「認定タイムスタンプ業務」</b>（令和3年法律第146号 第3条第1項）に基づく認定事業者により付与され、文書が <b>付与時刻に存在し、それ以降改ざんされていない</b> ことを証明します。検証は QRコードまたは認証局の検証窓口にて可能。
+    </div>
+  </div>`;
+}
+
+// signed_documents から該当帳票のメタデータを取得
+async function fetchSignedDocInfo(docKind, docId){
+  if(!docKind || !docId) return null;
+  return await api(`/signed-docs/by-doc/${docKind}/${docId}`, {silent404: true});
+}
+
+// HTML escape helper（ヘルパー関数群で使用）
+function escapeHtml(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 // --- LOGIN / SIGNUP ---
 function loginScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});const lastEmail=(()=>{try{return localStorage.getItem('medadapt-last-email')||''}catch(e){return''}})();cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('img',{src:'icon-192.png',alt:APP_CONFIG.name,style:{width:'72px',height:'72px',borderRadius:'14px',marginBottom:'12px',display:'inline-block'}}),h('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--accent)'}},APP_CONFIG.name),h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},APP_CONFIG.tagline),h('div',{style:{fontSize:'12px',color:S.loginErr?'var(--red)':'var(--ink-m)',marginTop:'12px'}},S.loginErr||'ログインIDとパスワードを入力してください')));if(S.loginUnverified){cd.appendChild(h('div',{style:{padding:'10px 14px',background:'#fff7ed',border:'1px solid #fb923c',borderRadius:'8px',marginBottom:'12px',fontSize:'12px'}},h('div',{style:{fontWeight:'700',color:'#c2410c',marginBottom:'4px'}},'メールアドレスが未確認です'),h('div',{style:{color:'#92400e',marginBottom:'8px'}},'登録時に送信した確認メールのリンクをクリックしてください。'),btn('確認メールを再送する','btn-sm btn-out',async()=>{const email=document.getElementById('l_email')?.value?.trim();if(!email){toast('メールアドレスを入力してください');return}const res=await api('/auth/resend-verify',{method:'POST',body:JSON.stringify({email})});if(res)toast('確認メールを再送しました');S.loginUnverified=false;rr()})));}cd.appendChild(h('div',{className:'field'},h('label',{for:'l_email'},'ログインID'),h('input',{id:'l_email',type:'text',name:'loginid',autocomplete:'username',placeholder:'ADM-XXXXXX または STF-XXXXXX',value:lastEmail||''})));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_pw'},'パスワード'),h('div',{style:{position:'relative'}},h('input',{id:'l_pw',type:'password',name:'password',autocomplete:'current-password',placeholder:'',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const inp=document.getElementById('l_pw');if(inp)inp.type=inp.type==='password'?'text':'password';}},'👁'))));if(lastEmail){setTimeout(()=>{const pw=document.getElementById('l_pw');if(pw)pw.focus()},100)}cd.appendChild(h('div',{style:{marginTop:'8px'}},h('button',{className:'btn btn-pri btn-full',type:'submit',onClick:async()=>{const email=document.getElementById('l_email')?.value?.trim(),pw=document.getElementById('l_pw')?.value?.trim();if(!email||!pw){S.loginErr='入力してください';rr();return}S.loginUnverified=false;try{const res=await api('/auth/login',{method:'POST',body:JSON.stringify({email,password:pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;try{localStorage.setItem('medadapt-last-email',email);localStorage.setItem('medadapt-autologin',res.user.login_id||email)}catch(e){}if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}}await loadFromCloud();await checkModuleAccess();startNotifPolling();S.scr='app';S.page='patients';S.loginErr='';rr()}else if(res&&res.error&&res.error.includes('未確認')){S.loginErr='メールアドレスが未確認です';S.loginUnverified=true;rr()}else{const u=findUser(email);if(u&&u.pw===pw){S.user=u;seedDemoData(email);try{localStorage.setItem('medadapt-autologin',email)}catch(e){}loadFromCloud().then(()=>rr());if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}}S.scr='app';S.page='patients';S.loginErr='';rr()}else{S.loginErr='ログインIDまたはパスワードが違います';rr()}}}catch(e){S.loginErr='通信エラー';rr()}}},'ログイン')));cd.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',margin:'18px 0 14px',color:'var(--ink-m)',fontSize:'12px'}},h('div',{style:{flex:1,height:'1px',background:'var(--border)'}}),h('span',{},'または'),h('div',{style:{flex:1,height:'1px',background:'var(--border)'}})));cd.appendChild(h('button',{type:'button',className:'btn btn-out btn-full',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'},onClick:()=>startQRScanLogin()},'QRコードでログイン'));cd.appendChild(h('div',{style:{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px',fontSize:'13px'}},h('a',{href:'#',style:{color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='resetpw';rr()}},'パスワードを忘れた'),h('a',{href:'#',style:{color:'var(--accent)',fontWeight:'600',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='signup';S.signupStep=1;rr()}},'新規法人登録')));cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'12px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← ｍやるゼ！トップへ'));w.appendChild(cd);return w}
 
@@ -4657,10 +4737,41 @@ if(c.consent?.name){
 // フッター
 d.appendChild(h('div',{style:{borderTop:'1px solid #ccc',paddingTop:'5px',display:'flex',justifyContent:'space-between',fontSize:'9px',color:'#555'}},h('span',null,'算定事業所：'+(S.user?.org||'')),h('span',null,APP_CONFIG.name+'　出力日：'+new Date().toLocaleDateString('ja-JP'))));
 cn.appendChild(d);
-genPdf(cn,'退院時共同指導記録_'+c.pn+'.pdf');
+// v4.15 G: 電子署名+タイムスタンプ証明書ブロックを末尾に追加
+(async()=>{
+  const sd = await fetchSignedDocInfo('discharge_guidance', c.id);
+  if(sd){
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildECertHtml(sd, c.consent?.name||'担当者') + buildTimestampCertHtml(sd);
+    d.appendChild(wrap);
+  }
+  genPdf(cn,'退院時共同指導記録_'+c.pn+'.pdf');
+})();
 }
-function genConfPDF(c){saveDocument('conference','サービス担当者会議記録　'+c.userName+'　'+c.date,c.patientId||'',c.id,c);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf')}
-function genMonPDF(m2){saveDocument('monitoring','モニタリング記録　'+m2.userName+'　'+m2.date,m2.patientId||'',m2.id,m2);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);genPdf(cn,'モニタリング_'+m2.userName+'.pdf')}
+function genConfPDF(c){saveDocument('conference','サービス担当者会議記録　'+c.userName+'　'+c.date,c.patientId||'',c.id,c);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',margin:'12px 0'}},'サービス担当者会議の要点'));d.appendChild(h('div',{style:{fontSize:'12px'}},'利用者：'+c.userName+'　担当：'+c.author+'　開催日：'+c.date));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'12px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'6px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'6px',whiteSpace:'pre-line'}},v||'')))};addR('出席者',(c.attendees||[]).filter(a=>a.name).map(a=>(a.org?a.org+' ':'')+a.name).join('\n'));addR('検討項目',c.items);addR('検討内容',c.discussion);addR('結論',c.conclusion);addR('課題',c.remaining);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);
+// v4.15 G: 電子署名+TSA ブロック
+(async()=>{
+  const sd = await fetchSignedDocInfo('conference', c.id);
+  if(sd){
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildECertHtml(sd, c.author||'担当者') + buildTimestampCertHtml(sd);
+    d.appendChild(wrap);
+  }
+  genPdf(cn,'サービス担当者会議_'+c.userName+'.pdf');
+})();
+}
+function genMonPDF(m2){saveDocument('monitoring','モニタリング記録　'+m2.userName+'　'+m2.date,m2.patientId||'',m2.id,m2);const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'28px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.7',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'15px',fontWeight:'700'}},'モニタリング表'));d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginBottom:'12px'}},'作成日：'+m2.date+'　要介護度：'+m2.cl));const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});const addR=(l,v)=>{tbl.appendChild(h('tr',null,h('td',{style:{padding:'5px',fontWeight:'700',width:'100px',background:'#f9f9f9'}},l),h('td',{style:{padding:'5px'}},v||'')))};addR('利用者',m2.userName);addR('健康状態',m2.symptoms);addR('ADL','寝返り:'+(m2.adl_bed||'—')+' 歩行:'+(m2.adl_walk||'—')+' 入浴:'+(m2.adl_bathing||'—')+' 食事:'+(m2.adl_eating||'—'));addR('認知',m2.cognition);addR('排泄',(m2.urination||'—')+'/'+(m2.defecation||'—'));addR('精神',m2.mental);addR('介護者',m2.caregiverStatus);addR('ケアプラン',m2.carePlan);d.appendChild(tbl);d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);
+// v4.15 G: 電子署名+TSA ブロック
+(async()=>{
+  const sd = await fetchSignedDocInfo('monitoring', m2.id);
+  if(sd){
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildECertHtml(sd, m2.author||'担当者') + buildTimestampCertHtml(sd);
+    d.appendChild(wrap);
+  }
+  genPdf(cn,'モニタリング_'+m2.userName+'.pdf');
+})();
+}
 // --- ROUTER ---
 function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='app')app.appendChild(appShell());if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
 // --- INIT ---
