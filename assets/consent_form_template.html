@@ -312,7 +312,7 @@
 
   <!-- 宛先（医療機関名） -->
   <div class="addressee" id="addressee-name">
-    コンパス内科歯科クリニック大宮　宛
+    医療法人コンパス　宛
   </div>
 
   <!-- 計画 -->
@@ -358,7 +358,7 @@
 
   <!-- 医療機関情報（コンパス書式準拠） -->
   <div class="clinic-block" id="clinic-block">
-    <div class="clinic-name">医療法人社団コンパス　コンパス内科歯科クリニック大宮</div>
+    <div class="clinic-name">医療法人コンパス</div>
     <div>〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室</div>
     <div>TEL：048-783-2713　　FAX：03-6369-4732</div>
   </div>
@@ -466,7 +466,7 @@
  *     name: '田中 タムジ',
  *     phone: '048-xxx-xxxx'
  *   },
- *   clinic: { name, address, tel, fax } | null  // null 時はコンパスクリニック既定値
+ *   clinic: { name, address, tel, fax } | null  // null 時は医療法人コンパス既定値
  * }
  */
 window.consentTemplateRender = function(data) {
@@ -688,7 +688,7 @@ if (window.location.search.includes('demo=1')) {
     content_hash: 'a3b8e7d2f1c5b4a9e8d7c6b5a4938271a3b8e7d2f1c5b4a9e8d7c6b5a4938271',
     chain_index: 1,
     qr_image_base64: '',
-    addressee: 'コンパス内科歯科クリニック大宮',
+    addressee: '医療法人コンパス',
     visit_plan: '年２回（６か月に１回）',
     difficulty_reasons: {
       変形性膝関節症: 'both',

@@ -748,7 +748,7 @@ w.appendChild(cd);return w;}
 function changepwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワード変更'),h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'8px'}},'初回ログインのため、パスワードを変更してください')));cd.appendChild(fld('新しいパスワード','c_newpw','',()=>{},{type:'password',ph:'8文字以上'}));cd.appendChild(fld('確認','c_newpw2','',()=>{},{type:'password',ph:'もう一度入力'}));cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('変更して利用開始','btn-pri btn-full',async()=>{const pw=document.getElementById('c_newpw')?.value?.trim(),pw2=document.getElementById('c_newpw2')?.value?.trim();if(!pw||pw.length<8){toast('8文字以上');return}if(pw!==pw2){toast('パスワードが一致しません');return}const res=await api('/auth/change-password',{method:'POST',body:JSON.stringify({newPassword:pw})});if(res&&res.success){S.user.must_change_pw=0;await loadPatients();S.scr='app';S.page='patients';toast('パスワード変更完了');rr()}})));w.appendChild(cd);return w}
 // --- APP SHELL ---
 function appShell(){const u=S.user,shell=h('div',{className:'app-shell'});const sb=h('div',{className:'sidebar'});const logoLink=h('a',{href:'index.html',style:{textDecoration:'none',color:'var(--yellow)'},className:'sidebar-logo'},APP_CONFIG.name);sb.appendChild(logoLink);const nav=h('div',{className:'sidebar-nav'});
-[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'consent',l:'同意書'},{id:'claims',l:'加算管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
+[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'consent',l:'同意書（訪問診療）'},{id:'acu_massage',l:'マッサージ・鍼灸'},{id:'claims',l:'加算管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
 sb.appendChild(nav);
 // 今月の使用状況ウィジェット（中央の空白部分）
 if(u.plan==='free'){
@@ -827,6 +827,7 @@ else if(S.page==='nda'){main.appendChild(ndaPage())}
 else if(S.page==='consent'){main.appendChild(consentPage())}
 else if(S.page==='consent_new'){main.appendChild(consentNewPage())}
 else if(S.page==='consent_detail'&&S.consentId){main.appendChild(consentDetailPage())}
+else if(S.page==='acu_massage'){main.appendChild(acuMassagePage())}
 else if(S.page==='claims'){main.appendChild(claimsPage())}
 else{main.appendChild(patientsPage())}
 shell.appendChild(main);
@@ -2536,7 +2537,7 @@ function consentPage(){
     btn('+ 同意書を発行する','btn-pri btn-sm',()=>{S.page='consent_new';rr()})
   ));
   w.appendChild(h('div',{style:{padding:'12px 14px',background:'#eff6ff',borderLeft:'4px solid #3b82f6',borderRadius:'4px',fontSize:'13px',color:'#1e40af',marginBottom:'16px'}},
-    '厚労省様式準拠（保医発第1001002号・コンパスクリニック書式）。発行時に SHA-256 ハッシュチェーン化され、QRコードで第三者から真正性検証が可能です。'
+    '厚労省標準様式準拠（はり・きゅう／あマ指）＋コンパス独自の依頼書様式。発行時に SHA-256 ハッシュチェーンに登録され、QRコードで第三者から真正性検証が可能です。保険医療機関名は「医療法人コンパス」で発行されます。'
   ));
   if(!S.consentList){
     api('/consent/list').then(res=>{S.consentList=res?.items||[];rr()}).catch(()=>{S.consentList=[]});
@@ -2817,10 +2818,7 @@ async function finalizeConsentSignedDoc(cfId){
 }
 
 async function previewConsentPDF(cfId){
-  // 別タブで PDF テンプレートを開きデータを差し込む
-  const win=window.open('assets/consent_form_template.html','_blank');
-  if(!win){toast('ポップアップがブロックされました');return;}
-  // データ取得
+  // データ取得を先行（同意種別に応じてテンプレを分岐するため）
   const [detail,sdRes]=await Promise.all([
     api('/consent/'+cfId),
     api('/signed-docs/by-doc/consent_form/'+cfId)
@@ -2828,28 +2826,50 @@ async function previewConsentPDF(cfId){
   if(!detail?.consent_form){toast('データ取得失敗');return;}
   const cf=detail.consent_form;
   const sd=sdRes?.signed_document;
+  // テンプレ選択: 厚労省様式の医師交付同意書（はり・きゅう / マッサージ） or コンパス依頼書（既定）
+  let tplPath='assets/consent_form_template.html';
+  let renderFn='consentTemplateRender';
+  if(cf.consent_type==='acupuncture'){
+    tplPath='assets/consent_form_acupuncture_template.html';
+    renderFn='consentAcupunctureTemplateRender';
+  }else if(cf.consent_type==='massage'){
+    tplPath='assets/consent_form_massage_template.html';
+    renderFn='consentMassageTemplateRender';
+  }
+  const win=window.open(tplPath,'_blank');
+  if(!win){toast('ポップアップがブロックされました');return;}
   // 和暦変換
   const d=new Date(cf.consent_date);
   const reiwaYear=d.getFullYear()-2018;
   // difficulty_reasons パース
   let dr={};
   try{dr=typeof cf.difficulty_reasons==='string'?JSON.parse(cf.difficulty_reasons):cf.difficulty_reasons||{}}catch(e){}
+  // 共通の保険医療機関情報（歯科は指示書交付不可のため、保険医療機関名は「医療法人コンパス」のみ）
+  const clinicCommon={
+    name:'医療法人コンパス',
+    address:'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',
+    tel:'048-783-2713',
+    fax:'03-6369-4732'
+  };
   const data={
     sd_id:sd?.id||'未確定',
     content_hash:sd?.content_hash||cf.content_hash||'',
     chain_index:sd?.chain_index||cf.chain_index||0,
     qr_image_base64:'',  // QR は別途生成
     verify_url:sd?.qr_payload||'',
-    addressee:'コンパス内科歯科クリニック大宮',
+    addressee:'医療法人コンパス',
     visit_plan:cf.visit_plan||'年２回（６か月に１回）',
     difficulty_reasons:dr,
+    consent_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     consent_date_jp:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
-    patient:{address:'',name:'',phone:''}
+    patient:{address:'',name:'',phone:''},
+    clinic:clinicCommon,
+    doctor:{name:'後藤 基温',has_seal:false}
   };
   // テンプレートのロード完了を待つ
   win.addEventListener('load',()=>{
-    if(win.consentTemplateRender){
-      win.consentTemplateRender(data);
+    if(win[renderFn]){
+      win[renderFn](data);
       // QR を qrcode ライブラリで生成（CDN 動的読込）
       if(sd?.qr_payload){
         const script=win.document.createElement('script');
@@ -2860,7 +2880,7 @@ async function previewConsentPDF(cfId){
           new win.QRCode(qrDiv,{text:sd.qr_payload,width:120,height:120});
           setTimeout(()=>{
             const img=qrDiv.querySelector('img');
-            if(img)win.document.getElementById('qr-image').src=img.src;
+            if(img&&win.document.getElementById('qr-image'))win.document.getElementById('qr-image').src=img.src;
             qrDiv.remove();
           },300);
         };
@@ -2868,6 +2888,65 @@ async function previewConsentPDF(cfId){
       }
     }
   });
+}
+
+// ===========================================================
+// マッサージ・鍼灸ハブページ（v4.14）
+// 訪問マッサージ・訪問鍼灸の医療保険療養費に関する各機能をまとめて表示
+// 該当する保険医療機関名は「医療法人コンパス」（歯科併設の正式クリニック名ではなく法人名で統一）
+// ===========================================================
+function acuMassagePage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 8px'}},'マッサージ・鍼灸（医療保険療養費）'));
+  w.appendChild(h('div',{style:{fontSize:'13px',color:'#64748b',marginBottom:'18px',lineHeight:'1.7'}},
+    '訪問マッサージ・訪問鍼灸は医療保険の療養費として算定します。',h('br'),
+    '医師の同意書（はり・きゅう／あマ指）は厚労省標準様式準拠で発行できます。',h('br'),
+    '※ 保険医療機関名は ',h('strong',null,'「医療法人コンパス」'),' として発行されます（歯科は指示書交付不可のため法人名のみ表示）。'
+  ));
+  // メイン3枚カード
+  const grid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'14px',marginBottom:'24px'}});
+  // カード1: 医師交付同意書（はり・きゅう / あマ指）
+  const card1=h('div',{
+    style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+    onClick:()=>{S.page='consent_new';rr()}
+  });
+  card1.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'① 医師交付同意書を発行'));
+  card1.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'はり・きゅう／あマ指（あん摩・マッサージ・指圧）の医師交付同意書を発行します。厚労省様式準拠・有効期間 6か月（変形徒手は 1か月）。'));
+  card1.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'発行する →'));
+  grid.appendChild(card1);
+  // カード2: 発行済み同意書一覧
+  const card2=h('div',{
+    style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+    onClick:()=>{S.page='consent';rr()}
+  });
+  card2.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'② 発行済み同意書を見る'));
+  card2.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'これまでに発行した同意書（はり・きゅう／あマ指／訪問診療）の一覧・PDFプレビュー・QR検証を確認します。'));
+  card2.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'一覧を開く →'));
+  grid.appendChild(card2);
+  // カード3: 加算管理（療養費同意書交付料 B013）
+  const card3=h('div',{
+    style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+    onClick:()=>{S.page='claims';rr()}
+  });
+  card3.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'③ 療養費同意書交付料を算定'));
+  card3.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'B013 療養費同意書交付料（100点）の算定対象一覧を確認し、月次集計を取得します。'));
+  card3.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'加算管理を開く →'));
+  grid.appendChild(card3);
+  w.appendChild(grid);
+
+  // 参考情報セクション
+  const infoBox=h('div',{style:{padding:'16px 18px',background:'#f8fafc',border:'1px solid #e5e7eb',borderRadius:'10px',fontSize:'12px',color:'#475569',lineHeight:'1.85'}});
+  infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0f172a',marginBottom:'6px',fontSize:'13px'}},'医療保険適用の仕組み'));
+  infoBox.appendChild(h('div',null,'・訪問マッサージ／訪問鍼灸は ',h('strong',null,'医療保険の療養費'),'（介護保険ではない）'));
+  infoBox.appendChild(h('div',null,'・鍼灸の対象6疾患：神経痛 / リウマチ / 頸腕症候群 / 五十肩 / 腰痛症 / 頸椎捻挫後遺症 ＋ その他'));
+  infoBox.appendChild(h('div',null,'・あマ指（あん摩・マッサージ・指圧）の対象：筋麻痺 / 筋萎縮 / 関節拘縮（症状ベース）'));
+  infoBox.appendChild(h('div',null,'・訪問条件：歩行困難または通院困難'));
+  infoBox.appendChild(h('div',null,'・同意書有効期間：6か月（変形徒手矯正術は 1か月）'));
+  infoBox.appendChild(h('div',null,'・再同意は ',h('strong',null,'対面診察必須'),'（電話再同意は不可）'));
+  infoBox.appendChild(h('div',{style:{marginTop:'8px',paddingTop:'8px',borderTop:'1px dashed #cbd5e1'}},'参考: ',h('a',{href:'https://www.mhlw.go.jp/bunya/iryouhoken/iryouhoken13/01.html',target:'_blank',rel:'noopener',style:{color:'#0891b2',textDecoration:'none'}},'厚労省 療養費の改定等について')));
+  w.appendChild(infoBox);
+
+  return w;
 }
 
 // ===========================================================
