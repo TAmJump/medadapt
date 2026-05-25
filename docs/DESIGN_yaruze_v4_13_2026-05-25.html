@@ -5788,12 +5788,86 @@ parameter 2 is not of type 'Object'.
 </ul>
 <p>3兄弟がそれぞれのデザイン性を保ちながら、共通の「やるゼ！Tシャツチーム」をブランドアイデンティティとして共有する形が完成した。</p>
 
+<!-- ========== §65 次回chat対応事項（大下さん明示指示） ========== -->
+<h2 id="s65">§65. 次回 chat 対応事項（大下さん明示指示・最優先）</h2>
+
+<h3>65-1. 経緯</h3>
+<p>v4.13 完了直後、大下さんが本番LPを確認して以下の4点の修正指示を残した:</p>
+<blockquote>
+引き継ぎ書を更新して、新規chatで再開する。<br>
+・特に、ｍやるゼ！のマッサージ系のページの導線が分からない。項目が見つけられない。<br>
+・親もｔもLPページの写真の顔に文字が重なってる。画像が透き通ってるのはOKだけど。ｍも透き通ってていい。<br>
+どちらにせよ、新規chatで修正するから記載しておいて
+</blockquote>
+
+<h3>65-2. ⚡A. ｍやるゼ！ app.html のマッサージ系ページ導線改善</h3>
+<p><strong>症状</strong>: 大下さん本人が app.html でマッサージ系（療養費・同意書・施術報告書）のページに辿り着けない。項目が見つけられない。</p>
+<p><strong>調査ポイント</strong>:</p>
+<ul>
+  <li>app.html のサイドバーメニュー（L751 付近）: <code>patients / admin / staff / discharge / nda / consent / claims / settings</code></li>
+  <li>v4.10 で新規作成した acupuncture / massage 同意書テンプレへのリンクが UI から辿れない可能性</li>
+  <li>consent メニュー内に「医師交付同意書（はり・きゅう / マッサージ）」のサブメニュー or 切り替えが存在しない</li>
+  <li>鍼灸師ポータル（acupuncturist-portal.html）への導線も要確認</li>
+</ul>
+<p><strong>対応案</strong>:</p>
+<ol>
+  <li>サイドバーに「マッサージ・鍼灸」専用メニューを新設</li>
+  <li>または既存「同意書」メニュー内に「種別: 依頼書 / はり・きゅう / マッサージ」のタブ追加</li>
+  <li>「加算管理」または別途「療養費」メニューも検討</li>
+  <li>関連帳票（施術報告書、療養費支給申請書、B013 算定）への導線も整理</li>
+</ol>
+
+<h3>65-3. ⚡B. やるゼ！親LP（adapt）の HERO 文字と顔の重なり修正</h3>
+<p><strong>症状</strong>: 「面倒なこと、全部やるゼ！」の「面倒」「全部」が中央〜右の顔と重なっている。</p>
+<p><strong>ユーザー方針</strong>: 画像が透き通っているのは OK、顔と文字の重なりは NG。</p>
+<p><strong>対応案</strong>:</p>
+<ol>
+  <li><code>background-position: center 28%</code> を調整して顔エリアを画面の上か下に追いやる</li>
+  <li><code>.lp-hero::after</code> の白オーバーレイをグラデで右端まで濃くして顔エリアを白く飛ばす</li>
+  <li>タイトルを左寄せに強制 + 顔が右半分に集まるよう background-position 調整</li>
+</ol>
+<p>該当ファイル: <code>adapt/lp.html</code> の <code>.lp-hero::after</code> + <code>.lp-hero::before</code>。該当コミット: adapt HEAD <code>a9a93f2</code>。</p>
+
+<h3>65-4. ⚡C. ｔやるゼ！(one-touch) LP の HERO 文字と顔の重なり修正</h3>
+<p><strong>症状</strong>: 「24時間の/何でも屋、卒業する。」が中央の顔と重なっている。</p>
+<p><strong>対応案</strong>:</p>
+<ol>
+  <li><code>background-position: center 25%</code> を <code>center 15%</code>（顔を上端）or <code>center 75%</code>（顔を下端）に変更</li>
+  <li><code>.hero::after</code> の白オーバーレイ濃度を上げる（現状 78%→100%）</li>
+  <li>テキストの背後に白い半透明ボックスを敷く</li>
+</ol>
+<p>該当ファイル: <code>one-touch/index.html</code> の <code>.hero::before</code> / <code>.hero::after</code>。該当コミット: one-touch HEAD <code>bfb326a</code>。</p>
+
+<h3>65-5. ⚡D. ｍやるゼ！(medadapt) HEROも「写真透ける」スタイルに揃える</h3>
+<p><strong>症状</strong>: 現状の medadapt は「上540pxチーム写真完全表示 + 下白背景テキスト帯」の完全分離型。</p>
+<p><strong>ユーザー方針</strong>: 「ｍも透き通ってていい」 = adapt / one-touch と同じ「写真背景 + 白オーバーレイで透ける」スタイルに統一したい。</p>
+<p><strong>対応案</strong>:</p>
+<ol>
+  <li>medadapt の <code>.hero</code> を全面写真背景化（v4.10〜v4.11 で慎重に避けていた構造に戻す）</li>
+  <li>v4.11 で苦労した「後藤先生・大下さんの顔と文字の重なり」を再発させないよう、白オーバーレイの濃度設計を入念に</li>
+  <li>adapt の左濃94%→右薄40%対角グラデ方式を移植するのが安全</li>
+  <li>または HERO テキスト位置を左半分固定、写真の顔エリアが右半分に来るよう <code>background-position</code> 調整</li>
+</ol>
+<p>該当ファイル: <code>medadapt/index.html</code> L106 付近の <code>.hero</code> CSS。該当コミット: medadapt HEAD <code>c7b9cb4</code>。</p>
+<p>注意: v4.9 → v4.11 で何度か HERO レイアウト試行錯誤があったため、この変更を「v4.14 HEROスタイル統一」として丁寧に扱う。</p>
+
+<h3>65-6. 新規 chat 開始時の作業順</h3>
+<ol>
+  <li>HANDOVER.md と本設計書（DESIGN_yaruze_v4_13）を全文確認</li>
+  <li>大下さんから PAT を再共有してもらう</li>
+  <li><code>git clone</code> で 3 リポジトリを取得（medadapt / adapt / one-touch）</li>
+  <li>⚡A（医療マッサージ導線）から着手 — UI 変更で大下さん本人の業務効率が直接改善する</li>
+  <li>続いて ⚡B → ⚡C → ⚡D（HERO 顔被り修正、写真透けスタイル統一）</li>
+  <li>各修正ごとに commit & push、最後に設計書 v4.14 / HANDOVER.md 更新</li>
+</ol>
+
 <!-- ========== Final Footer ========== -->
 <div class="footer">
 やるゼ！プラットフォーム 統合設計書 v4.13<br>
 2026-05-25 改訂 / TAmJ.Corp 大下 / Vision Of Oneness<br>
 v4.12 を完全承継 + §64 で 3兄弟LP全てにチーム写真 team3/team4 を統一適用（v4.13）。<br>
 重要な調査結果として、リポジトリ名と CNAME のミスマッチを発見・記録: adapt = yaruze.tamjump.com（やるゼ!親LP）/ one-touch = tyaruze.tamjump.com（ｔやるゼ!LP）。今後のセッションでは CNAME ファイルを真として扱う。<br>
+§65 で大下さん指摘の次回 chat 対応事項を明文化（マッサージ導線 + 3LP の HERO 顔被り修正 + medadapt の写真透けスタイル統一）。<br>
 本書改訂時は §16 の年表に行を追加。<br>
 <br>
 作成者：Claude（Anthropic）<br>
