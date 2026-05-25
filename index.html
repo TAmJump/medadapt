@@ -211,43 +211,107 @@ body {
 
 /* ─── Stats Bar ─── */
 
-/* ─── Problems ─── */
+/* ─── Problems (v4.9 写真メイン型タイル) ─── */
 .problems { background:var(--white); overflow:hidden; }
-.problems-layout { display:grid; grid-template-columns:420px 1fr; gap:0; min-height:500px; }
+.problems-layout { display:grid; grid-template-columns: 360px 1fr; gap:48px; min-height:auto; padding:0 28px; max-width: 1280px; margin: 0 auto; }
 .problems-left {
-  position:relative; display:flex; flex-direction:column;
-  justify-content:center; padding:48px 40px;
-  background:#fff; border-radius:0;
-  color:var(--ink);
+  position:sticky; top:90px;
+  display:flex; flex-direction:column; justify-content:flex-start;
+  padding: 8px 0; background:#fff; color:var(--ink);
+  align-self: start;
 }
-.problems-left::before {
-  display:none;
-}
+.problems-left::before { display:none; }
 .problems-left-inner { position:relative; z-index:1; }
 .problems-left-label { font-size:.6rem; font-weight:700; letter-spacing:.25em; text-transform:uppercase; color:var(--blue); margin-bottom:18px; }
 .problems-left-title { font-size:clamp(1.8rem,3vw,2.2rem); font-weight:800; line-height:1.35; margin-bottom:18px; color:var(--ink); }
 .problems-left-desc { font-size:.85rem; line-height:1.9; color:var(--ink-l); max-width:340px; }
-.problems-right { display:flex; flex-direction:column; padding:40px 0 40px 48px; }
-.problems-list { display:flex; flex-direction:column; gap:0; flex:1; }
-.prob-row {
-  display:flex; align-items:flex-start; gap:18px;
-  padding:22px 0; border-bottom:1px solid var(--border);
+
+.problems-right { padding: 8px 0 8px 0; }
+.problems-list {
+  display:grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: 140px;
+  gap: 16px;
 }
-.prob-row:last-child { border-bottom:none; }
-.prob-num { flex-shrink:0; width:32px; font-size:1.3rem; font-weight:800; color:var(--blue); line-height:1.6; }
-.prob-content { flex:1; min-width:0; }
-.prob-heading { font-size:1rem; font-weight:800; margin-bottom:5px; }
-.prob-text { font-size:.8rem; color:var(--ink-m); line-height:1.75; }
-.prob-thumb {
-  flex-shrink:0; width:84px; height:84px;
-  border-radius:14px; overflow:hidden;
-  background:#f1f5f9 center/cover no-repeat;
-  box-shadow:0 2px 8px rgba(15,23,42,.08);
-  filter:saturate(.9);
+/* タイル基本 */
+.prob-tile {
+  position:relative; overflow:hidden;
+  border-radius: 16px;
+  background:#0f172a center/cover no-repeat;
+  box-shadow: 0 4px 18px rgba(15,23,42,.10);
+  transition: transform .35s ease, box-shadow .35s ease;
+  cursor: default;
 }
-@media (max-width: 720px) {
-  .prob-thumb { width:64px; height:64px; border-radius:10px; }
+.prob-tile:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(15,23,42,.18); }
+.prob-tile::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(15,23,42,.05) 0%, rgba(15,23,42,.25) 45%, rgba(15,23,42,.85) 100%);
+  z-index: 1;
+  transition: background .35s ease;
 }
+.prob-tile:hover::after { background: linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(8,145,178,.35) 45%, rgba(8,145,178,.92) 100%); }
+
+.prob-tile-num {
+  position:absolute; top:14px; left:16px; z-index:2;
+  font-size: 36px; font-weight: 900; color:#fff;
+  line-height: 1; letter-spacing: -.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,.35);
+  font-family: 'Nunito', sans-serif;
+}
+.prob-tile-num::before {
+  content: ''; display:block; width:24px; height:3px;
+  background: #fff; margin-bottom: 6px; opacity:.9;
+  border-radius: 2px;
+}
+.prob-tile-body {
+  position:absolute; left:16px; right:16px; bottom:14px; z-index:2;
+  color:#fff;
+}
+.prob-tile-heading {
+  font-size: 14.5px; font-weight: 800; line-height: 1.35;
+  margin: 0 0 4px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+.prob-tile-text {
+  font-size: 11.5px; line-height: 1.7; opacity: .92;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* グリッド配置：7枚 → 大小ミックスで動きを出す */
+/* row1: [大2x2][小1x1][小1x1] + [大2x2] = 6cols / 2rows */
+/* row3: [小1x1][大2x2][小1x1][小1x1][小1x1] = 6cols / 2rows */
+.prob-tile.tile-l { grid-column: span 2; grid-row: span 2; }
+.prob-tile.tile-m { grid-column: span 2; grid-row: span 1; }
+.prob-tile.tile-s { grid-column: span 1; grid-row: span 1; }
+
+/* 1番（大）にはアクセント */
+.prob-tile.accent::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background: var(--grad); z-index: 3;
+}
+
+/* tablet */
+@media (max-width: 1100px) {
+  .problems-layout { grid-template-columns: 1fr; gap: 32px; }
+  .problems-left { position: static; padding: 8px 0 0; }
+  .problems-list { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 130px; }
+  .prob-tile.tile-l { grid-column: span 2; grid-row: span 2; }
+  .prob-tile.tile-m { grid-column: span 2; grid-row: span 1; }
+  .prob-tile.tile-s { grid-column: span 2; grid-row: span 1; }
+}
+@media (max-width: 640px) {
+  .problems-layout { padding: 0 16px; }
+  .problems-list { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 150px; gap: 12px; }
+  .prob-tile.tile-l, .prob-tile.tile-m, .prob-tile.tile-s {
+    grid-column: span 1; grid-row: span 1;
+  }
+  .prob-tile-num { font-size: 28px; top:12px; left:14px; }
+  .prob-tile-heading { font-size: 13px; }
+  .prob-tile-text { font-size: 10.5px; -webkit-line-clamp: 2; }
+}
+
 
 /* ─── Solution Steps ─── */
 .solution-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:48px; }
@@ -712,61 +776,61 @@ body {
     </div>
     <div class="problems-right">
       <div class="problems-list">
-        <div class="prob-row">
-          <div class="prob-num">1</div>
-          <div class="prob-content">
-            <div class="prob-heading">日程調整の電話地獄</div>
-            <div class="prob-text">退院1件あたり平均3〜5時間。電話往復・日程調整だけで数日消える。</div>
+        <!-- 1: 大タイル (2x2) -->
+        <div class="prob-tile tile-l accent" style="background-image:url('assets/img/generated/v2/pain_phone.jpg');">
+          <div class="prob-tile-num">01</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">日程調整の電話地獄</div>
+            <div class="prob-tile-text">退院1件あたり平均3〜5時間。電話往復・日程調整だけで数日消える。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_phone.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">2</div>
-          <div class="prob-content">
-            <div class="prob-heading">移動コスト・時間</div>
-            <div class="prob-text">月20件の退院対応で施設・訪看は月40時間以上を移動に消費。</div>
+        <!-- 2: 中タイル (2x1) -->
+        <div class="prob-tile tile-m" style="background-image:url('assets/img/generated/v2/pain_travel.jpg');">
+          <div class="prob-tile-num">02</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">移動コスト・時間</div>
+            <div class="prob-tile-text">月20件で施設・訪看は月40時間以上を移動に消費。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_travel.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">3</div>
-          <div class="prob-content">
-            <div class="prob-heading">記録作成が重い</div>
-            <div class="prob-text">会議後に手書き記録。書き直し・押印・PDF化でさらに1時間。</div>
+        <!-- 3: 中タイル (2x1) -->
+        <div class="prob-tile tile-m" style="background-image:url('assets/img/generated/v2/pain_paperwork.jpg');">
+          <div class="prob-tile-num">03</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">記録作成が重い</div>
+            <div class="prob-tile-text">会議後に手書き記録。書き直し・押印・PDF化でさらに1時間。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_paperwork.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">4</div>
-          <div class="prob-content">
-            <div class="prob-heading">情報バラバラ</div>
-            <div class="prob-text">受入条件の誤認・情報漏れがクレーム・事故の原因に。</div>
+        <!-- 4: 小タイル (1x1) -->
+        <div class="prob-tile tile-s" style="background-image:url('assets/img/generated/v2/pain_scattered.jpg');">
+          <div class="prob-tile-num">04</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">情報バラバラ</div>
+            <div class="prob-tile-text">受入条件の誤認が事故源。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_scattered.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">5</div>
-          <div class="prob-content">
-            <div class="prob-heading">同意取得の煩雑さ</div>
-            <div class="prob-text">家族説明・署名取得・原本管理。紛失・未回収リスク。</div>
+        <!-- 5: 中タイル (2x1) -->
+        <div class="prob-tile tile-m" style="background-image:url('assets/img/generated/v2/pain_consent.jpg');">
+          <div class="prob-tile-num">05</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">同意取得の煩雑さ</div>
+            <div class="prob-tile-text">家族説明・署名取得・原本管理。紛失・未回収リスク。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_consent.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">6</div>
-          <div class="prob-content">
-            <div class="prob-heading">監査不安</div>
-            <div class="prob-text">「誰が・いつ・何を」説明できない。監査で指摘・返戻リスク。</div>
+        <!-- 6: 小タイル (1x1) -->
+        <div class="prob-tile tile-s" style="background-image:url('assets/img/generated/v2/pain_audit.jpg');">
+          <div class="prob-tile-num">06</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">監査不安</div>
+            <div class="prob-tile-text">「誰が・いつ・何を」<br>説明できない。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_audit.jpg');"></div>
         </div>
-        <div class="prob-row">
-          <div class="prob-num">7</div>
-          <div class="prob-content">
-            <div class="prob-heading">出入り感染リスク</div>
-            <div class="prob-text">多職種出入りが感染経路に。クラスターで受入停止の可能性。</div>
+        <!-- 7: 中タイル (2x1) -->
+        <div class="prob-tile tile-m" style="background-image:url('assets/img/generated/v2/pain_infection.jpg');">
+          <div class="prob-tile-num">07</div>
+          <div class="prob-tile-body">
+            <div class="prob-tile-heading">出入り感染リスク</div>
+            <div class="prob-tile-text">多職種出入りが感染経路に。クラスターで受入停止の可能性。</div>
           </div>
-          <div class="prob-thumb" style="background-image:url('assets/img/generated/v2/pain_infection.jpg');"></div>
         </div>
       </div>
     </div>
