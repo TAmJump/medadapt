@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-25（v4.17 / 致命バグ修正：/patient/list 404無限ループ根絶）
+**最終更新**: 2026-05-25（v4.18 / 退院通知詳細の連続API call pending pileup を根絶）
 
 **現状 HEAD**:
-- medadapt: `59ca3f9`（v4.17 / /patient/list 404無限ループ修正）
+- medadapt: `540c15b`（v4.18 / 自動確定/PDF/詳細取得すべてに loading guard と楽観的UI更新を追加）
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -20,6 +20,23 @@
 
 ➡ **本ファイル（HANDOVER.md）を新規 chat 冒頭で読み込み、設計書最新版と合わせて全文把握すること。**
 ➡ **作業ごとに HANDOVER.md と DESIGN_yaruze_v*.html を必ず更新してから commit する。** これは恒久的なルール。
+
+### v4.18 セッションでの追加完了事項（2026-05-25 同日連続・退院通知詳細の致命バグ修正）
+
+大下スクショで判明: 退院通知詳細画面で Network タブに pdf / meeting / dn_xxx のリクエストが (pending) のまま積み上がり、301 requests / 8.4MB transferred の異常状態。「全員回答完了により自動確定」トーストが出続けていた = 自動確定ロジックが多重発火。
+
+**3つの根本原因と修正**:
+
+1. **自動確定ロジック** ─ `n._autoConfirmRunning` フラグが `S.noticeData=null` でリセットされた瞬間に false に戻り再実行されていた。
+   - 修正: モジュールスコープ Set (`S._autoConfirmedIds`) で実行済みIDを管理 + 楽観的UI更新で `n.confirmed_slot` を即セット → 二重ガード。
+
+2. **PDF取得** ─ `api('/discharge/:id/pdf')` を rr() のたびに発火していた。
+   - 修正: `S._pdfCache` でセッション中1回のみ取得、loading 状態管理。
+
+3. **/discharge/:id 詳細取得** ─ fetch中の rr() で同じ条件を満たして再 fetch していた。
+   - 修正: `S._noticeFetching = noticeId` の loading guard で同一IDの連続 fetch をブロック。
+
+これにより既存退院通知（テスト①等）を開いても、最初に必要なリクエストのみ実行され、再レンダリング時の重複fetch は完全停止する。
 
 ### v4.17 セッションでの追加完了事項（2026-05-25 同日連続・緊急修正）
 
