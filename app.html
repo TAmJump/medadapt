@@ -165,9 +165,26 @@ async function api(path,opts={}){
   // sanitize opts before fetch
   const fetchOpts = {...opts};
   delete fetchOpts.silent404;
+  // v4.19: ネットワーク失敗時に1回だけ自動リトライ（500ms後）
+  const doFetch = async () => {
+    return await fetch(API+path,{...fetchOpts,headers:{...headers,...(fetchOpts.headers||{})}});
+  };
   try{
-    const res=await fetch(API+path,{...fetchOpts,headers:{...headers,...(fetchOpts.headers||{})}});
-    const data=await res.json();
+    let res;
+    try{
+      res = await doFetch();
+    }catch(netErr){
+      // ERR_CONNECTION_CLOSED 等の場合、1回だけリトライ
+      console.warn('api network error, retrying once:',path,netErr);
+      await new Promise(r=>setTimeout(r,500));
+      try{
+        res = await doFetch();
+      }catch(retryErr){
+        console.error('api retry failed:',path,retryErr);
+        return null;
+      }
+    }
+    const data=await res.json().catch(()=>({}));
     if(!res.ok){
       if(res.status===401){stopNotifPolling();S.token=null;S.user=null;S.moduleAccess=null;S.unreadCount=0;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}S.scr='login';rr();return null;}
       // 404 は silent404 オプション時はサイレントに（「Not found」バッジ問題対策）
@@ -443,7 +460,15 @@ function compactSection(opts){
   w.appendChild(list);
   return w;
 }
-function toast(m){S.toast=m;if(S.tt)clearTimeout(S.tt);S.tt=setTimeout(()=>{S.toast=null;rr()},1200);rr()}
+function toast(m){
+  // v4.19: 同じメッセージが3秒以内に再度出るのを抑制（連続エラー時のループ防止）
+  if(S._lastToast && S._lastToast.msg === m && (Date.now() - S._lastToast.at < 3000)) return;
+  S._lastToast = {msg:m, at:Date.now()};
+  S.toast=m;
+  if(S.tt)clearTimeout(S.tt);
+  S.tt=setTimeout(()=>{S.toast=null;rr()},1800);
+  rr();
+}
 // 患者データのオーナーEmail（スタッフは法人adminのemail、管理者は自分のemail）
 function getOwnerEmail(){return S.user?.owner_email||S.user?.email||'';}
 
@@ -2863,6 +2888,14 @@ function consentNewPage(){
     submitBtn.disabled=true;
     submitBtn.textContent='発行中...';
     try{
+      // v4.19: /consent/create 前に必ず /sync で患者を D1 にアップサート（404「患者が見つかりません」防止）
+      try{
+        await fetch(API+'/sync',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},
+          body:JSON.stringify(D)
+        });
+      }catch(e){console.warn('sync before consent/create failed:',e);}
       const res=await api('/consent/create',{method:'POST',body:JSON.stringify(body)});
       if(!res?.ok){toast(res?.error||'発行に失敗しました');submitBtn.disabled=false;submitBtn.textContent='発行する（医師署名へ進む）';return;}
       const cfId=res.consent_form_id;
@@ -3926,7 +3959,8 @@ function sharedChartPage(){
   if(n.has_pdf){
     // PDF.jsで独自レンダリング（ダウンロードボタンなし・完全制御）
     let pdfZoom=1.4;
-    const pdfSection=h('div',{style:{marginBottom:'16px',width:'100%'}});
+    const pdfSectionId = 'pdf-section-'+n.id;
+    const pdfSection=h('div',{id:pdfSectionId,style:{marginBottom:'16px',width:'100%'}});
     pdfSection.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'8px'}},'介護・看護サマリー（PDF）'));
     const pdfLoading=h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-l)',background:'#fafafa',borderRadius:'8px',border:'1px solid var(--border)'}},'PDFを読み込み中...');
     pdfSection.appendChild(pdfLoading);
@@ -3983,12 +4017,14 @@ function sharedChartPage(){
         return wrap;
       };
       const pdfContainer=await reRender();
-      // 既存コンテンツを置換
-      while(pdfSection.children.length>1)pdfSection.removeChild(pdfSection.lastChild);
-      pdfSection.appendChild(ctrl);
-      pdfSection.appendChild(pdfContainer);
+      // v4.19: DOM 再検索で安全化（rr() で pdfSection が DOM から外れている場合は無視）
+      const liveSection = document.getElementById(pdfSectionId) || pdfSection;
+      if(!liveSection.isConnected) return;  // 既に DOM から外れていたら描画スキップ
+      while(liveSection.children.length>1) liveSection.removeChild(liveSection.lastChild);
+      liveSection.appendChild(ctrl);
+      liveSection.appendChild(pdfContainer);
       if(stage<4){
-        pdfSection.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'4px',textAlign:'center'}},'閲覧専用です。受入確定後にダウンロードが可能になります。'));
+        liveSection.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-l)',marginTop:'4px',textAlign:'center'}},'閲覧専用です。受入確定後にダウンロードが可能になります。'));
       }
     };
 
