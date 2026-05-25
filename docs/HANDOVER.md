@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-25（v4.23 / HERO タイトル1行化＋サブタイトル赤色＋モバイル写真切れ解消）
+**最終更新**: 2026-05-26（v4.24 / モバイルHERO写真を「全員見える」アスペクト比固定表示に切替）
 
 **現状 HEAD**:
-- medadapt: `6d693e8`（v4.23 / HERO最終調整）
+- medadapt: v4.24（モバイルHERO写真切れ完全解消）
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -95,6 +95,55 @@ grep -nE "4つの中核|6職種|6 つの強み" 対象ファイル
 | 「算定要件にも完全準拠」 | 「算定要件に沿って運用できます」 | v4.21 |
 
 ---
+
+### v4.24 セッションでの完了事項（2026-05-26 / モバイルHERO写真切れの根本解消）
+
+大下指示「アプリ設計㉜ 再開するよ。モバイルにすると、画像が切れちゃう。」を受けて、v4.23 までの `background-size: cover` + `background-position` 調整方式の限界を解消:
+
+**v4.23 までの問題**: モバイル（Pixel 7 412px幅等）で `background-size: cover` のため、横長16:9写真の左右が大幅に切り取られ、中央2人と建物の「Y HOSPITAL」文字しか見えない状態だった。`background-position` の縦位置調整では横方向のクリップは回避不能。
+
+**v4.24 修正方針**: モバイル時のみ写真を「アスペクト比固定表示」に切替。`background-size: 100% auto` + `background-position: top center` + `background-repeat: no-repeat` で写真を画面幅いっぱいに横並べ。高さは `56.25vw`（= 100/1.778）で自動決定。これで11人全員＋背景の建物まで完全表示される。
+
+**実装詳細** (`medadapt/index.html` L203-237):
+
+```css
+@media (max-width:980px) {
+  .hero { min-height: 0; }
+  .hero::before {
+    background-size: 100% auto;
+    background-position: top center;
+    background-repeat: no-repeat;
+    background-color: #f8fafc;
+  }
+  .hero::after {
+    /* 写真領域(56.25vw)の下端から白くフェードしてテキスト可読性確保 */
+    background:
+      linear-gradient(180deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0) calc(56.25vw - 60px),
+        rgba(248,250,252,.85) calc(56.25vw - 10px),
+        rgba(248,250,252,1) calc(56.25vw + 20px),
+        rgba(248,250,252,1) 100%
+      );
+  }
+  .hero-text-block { margin-top: calc(56.25vw - 30px); ... }
+}
+@media (max-width:600px) {
+  .hero-text-block { margin-top: calc(56.25vw - 24px); ... }
+}
+@media (max-width:400px) {
+  .hero-text-block { margin-top: calc(56.25vw - 20px); }
+}
+```
+
+**検証済みビューポート**（Playwright スクショ取得）:
+- Pixel 7 (412×915): 11人全員＋EMERGENCY HOSPITAL の建物が完全表示 ✅
+- iPhone SE (375×667): 同上 ✅
+- 600px幅: 同上 ✅
+- タブレット (768×1024): 同上 ✅
+- デスクトップ (1366×900): v4.23 のレイアウト維持 ✅
+
+**デスクトップに影響なし**: 981px以上は従来通り `background-size: cover` + `background-position: center 18%` で全面表示＋テキストカードオーバーレイ。
 
 ### v4.23 セッションでの完了事項（2026-05-25 同日連続・HERO最終調整）
 
