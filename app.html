@@ -2706,14 +2706,10 @@ function consentPage(){
     return w;
   }
   const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
-  // v4.16: 患者ID→患者名のキャッシュ
+  // v4.17: ローカル D.patients から患者ID→名前マップを構築（Worker /patient/list 未実装のため）
   if(!S._patientNameMap){
     S._patientNameMap={};
-    api('/patient/list',{silent404:true}).then(res=>{
-      const items=res?.items||res?.patients||[];
-      items.forEach(p=>{const n=p.data?(safeParse(p.data).name||p.id):(p.name||p.id);S._patientNameMap[p.id]=n;});
-      rr();
-    }).catch(()=>{});
+    (D.patients||[]).forEach(p=>{S._patientNameMap[p.id]=p.name||p.id;});
   }
   S.consentList.forEach(item=>{
     const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
@@ -2759,25 +2755,25 @@ function consentNewPage(){
   ptSelect.appendChild(h('option',{value:''},'患者を選択'));
   ptWrap.appendChild(ptSelect);
   form.appendChild(ptWrap);
-  // 患者リストを取得（preselectPatientId があれば自動選択）
-  api('/patient/list').then(res=>{
-    const items=res?.items||res?.patients||[];
-    items.forEach(p=>{
-      const name=p.data?(safeParse(p.data).name||p.id):(p.name||p.id);
-      ptSelect.appendChild(h('option',{value:p.id},name+' ('+p.id+')'));
-    });
-    // v4.16: 患者ハブから来た場合は自動選択
-    if(ptId){
-      ptSelect.value=ptId;
-      // 「現在: ◯◯さん」バナーを患者選択フィールドの下に表示
-      const selectedPt=items.find(p=>p.id===ptId);
-      if(selectedPt){
-        const ptName=selectedPt.data?(safeParse(selectedPt.data).name||selectedPt.id):(selectedPt.name||selectedPt.id);
-        const hint=h('div',{style:{marginTop:'6px',padding:'6px 12px',background:'#ecfeff',border:'1px solid rgba(8,145,178,.25)',borderRadius:'6px',fontSize:'11px',color:'#0e7490'}},'✓ 患者ハブから来ました: '+ptName+' を自動選択しました');
-        ptWrap.appendChild(hint);
-      }
+  // v4.17: Worker未実装の /patient/list は呼ばず、ローカル D.patients を使用
+  // 既存の患者データは localStorage で同期されているため、API は不要
+  const localPatients = (D.patients||[]).map(p=>({
+    id: p.id,
+    name: p.name || p.id,
+    data: null
+  }));
+  localPatients.forEach(p=>{
+    ptSelect.appendChild(h('option',{value:p.id},p.name+' ('+p.id+')'));
+  });
+  // 患者ハブから来た場合は自動選択
+  if(ptId){
+    ptSelect.value=ptId;
+    const selectedPt=localPatients.find(p=>p.id===ptId);
+    if(selectedPt){
+      const hint=h('div',{style:{marginTop:'6px',padding:'6px 12px',background:'#ecfeff',border:'1px solid rgba(8,145,178,.25)',borderRadius:'6px',fontSize:'11px',color:'#0e7490'}},'✓ 患者ハブから来ました: '+selectedPt.name+' を自動選択しました');
+      ptWrap.appendChild(hint);
     }
-  }).catch(()=>{});
+  }
 
   // 施術種別
   const typeWrap=h('div');
@@ -3126,13 +3122,10 @@ function acuMassagePage(){
   // v4.16: 患者ハブから来た場合のバナー
   const fromHubPtId=S.preselectPatientId;
   if(fromHubPtId){
-    if(!S._patientNameMap)S._patientNameMap={};
-    if(!S._patientNameMap[fromHubPtId]){
-      api('/patient/list',{silent404:true}).then(res=>{
-        const items=res?.items||res?.patients||[];
-        items.forEach(p=>{const n=p.data?(safeParse(p.data).name||p.id):(p.name||p.id);S._patientNameMap[p.id]=n;});
-        rr();
-      }).catch(()=>{});
+    // v4.17: ローカル D.patients から名前を引く（Worker /patient/list 未実装のため）
+    if(!S._patientNameMap){
+      S._patientNameMap={};
+      (D.patients||[]).forEach(p=>{S._patientNameMap[p.id]=p.name||p.id;});
     }
     const ptName=S._patientNameMap?.[fromHubPtId]||fromHubPtId;
     const banner=h('div',{style:{padding:'10px 14px',background:'#ecfeff',border:'1px solid rgba(8,145,178,.25)',borderRadius:'8px',marginBottom:'14px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',flexWrap:'wrap'}},
@@ -3247,14 +3240,10 @@ function claimsPage(){
   // 算定対象一覧
   w.appendChild(h('div',{style:{fontWeight:'700',marginBottom:'8px',fontSize:'14px'}},'算定対象の文書'));
   const eligibleList=S.claimSummary.list.filter(x=>x.insurance_claim_kind);
-  // v4.16: 患者名キャッシュをロード
+  // v4.17: ローカル D.patients から患者ID→名前マップ（Worker /patient/list 未実装のため）
   if(!S._patientNameMap){
     S._patientNameMap={};
-    api('/patient/list',{silent404:true}).then(res=>{
-      const items=res?.items||res?.patients||[];
-      items.forEach(p=>{const n=p.data?(safeParse(p.data).name||p.id):(p.name||p.id);S._patientNameMap[p.id]=n;});
-      rr();
-    }).catch(()=>{});
+    (D.patients||[]).forEach(p=>{S._patientNameMap[p.id]=p.name||p.id;});
   }
   if(eligibleList.length===0){
     w.appendChild(h('div',{style:{padding:'20px',textAlign:'center',color:'#94a3b8',fontSize:'13px',background:'#f9fafb',borderRadius:'6px'}},'算定対象の文書はありません'));
