@@ -156,33 +156,32 @@ body {
   margin-top: 420px;
   margin-bottom: 70px;
 }
-.hero-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: var(--blue-l);
-  border: 1px solid rgba(8,145,178,.25);
-  color: var(--blue-d);
-  padding: 7px 18px; border-radius: var(--r-pill);
-  font-size: .72rem; font-weight: 700; margin-bottom: 18px;
-  text-shadow: none;
-}
-.hero-badge-dot { width: 7px; height: 7px; background: var(--blue); border-radius: 50%; animation: bounce 2s infinite; }
 .hero-title {
-  font-size: clamp(1.6rem, 3.6vw, 2.4rem);
-  font-weight: 900; line-height: 1.3;
-  color: var(--ink); margin-bottom: 14px;
+  font-size: clamp(2.6rem, 6.4vw, 4.8rem);
+  font-weight: 900; line-height: 1.05;
+  color: var(--ink); margin-bottom: 12px;
   text-shadow: none;
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
 }
 .hero-title .highlight {
   color: var(--blue);
   text-shadow: none;
   background: none; -webkit-background-clip: initial; -webkit-text-fill-color: initial; background-clip: initial;
 }
-.hero-desc {
-  font-size: .92rem; line-height: 1.85;
-  color: var(--ink-l);
-  margin-bottom: 22px;
+.hero-subtitle {
+  font-size: clamp(.85rem, 1.3vw, 1rem);
+  font-weight: 700;
+  color: var(--blue-d);
+  letter-spacing: .12em;
+  margin-bottom: 24px;
   text-shadow: none;
+}
+.hero-desc {
+  font-size: .82rem; line-height: 1.95;
+  color: var(--ink-l);
+  margin-bottom: 26px;
+  text-shadow: none;
+  word-break: keep-all;
 }
 .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
 .hero-actions .btn-primary {
@@ -201,15 +200,16 @@ body {
   .hero { min-height: 640px; }
   .hero::before { background-position: center 18%; }
   .hero-text-block { max-width: 100%; margin-top: 340px; margin-bottom: 56px; padding: 26px 24px 30px; }
-  .hero-title { font-size: 1.5rem; line-height: 1.4; }
+  .hero-title { font-size: clamp(2.2rem, 8vw, 3.6rem); line-height: 1.1; }
+  .hero-subtitle { font-size: .78rem; margin-bottom: 20px; }
 }
 @media (max-width:600px) {
   .hero { min-height: 580px; }
   .hero::before { background-position: center 22%; }
   .hero-text-block { margin-top: 280px; margin-bottom: 48px; padding: 22px 20px 26px; border-radius: 16px; }
-  .hero-title { font-size: 1.35rem; line-height: 1.4; }
-  .hero-desc { font-size: .85rem; line-height: 1.85; margin-bottom: 20px; }
-  .hero-badge { font-size: .68rem; padding: 6px 14px; margin-bottom: 14px; }
+  .hero-title { font-size: 2.1rem; line-height: 1.1; }
+  .hero-subtitle { font-size: .72rem; margin-bottom: 16px; letter-spacing: .1em; }
+  .hero-desc { font-size: .76rem; line-height: 1.9; margin-bottom: 20px; }
   .hero-actions .btn-primary { padding: 13px 24px; font-size: .88rem; }
 }
 
@@ -558,15 +558,12 @@ body {
   <div class="container">
     <div class="hero-inner">
       <div class="hero-text-block">
-        <div class="hero-badge anim-up">
-          <span class="hero-badge-dot"></span>
-          ｍやるゼ！/ 医療介護連携OS
-        </div>
-        <h1 class="hero-title anim-up anim-up-d1">
-          退院調整・会議・書類、<br><span class="highlight">ぜんぶｍやるゼ！</span>
+        <h1 class="hero-title anim-up">
+          <span class="highlight">ぜんぶ<br>ｍやるゼ！</span>
         </h1>
+        <p class="hero-subtitle anim-up anim-up-d1">医療介護連携OS</p>
         <p class="hero-desc anim-up anim-up-d2">
-          日程調整、アセスメント、サービス担当者会議、<br>NDA・同意書、モニタリング、退院通知、<br>記録生成支援まで。<br>病院と施設のやりとり、もう疲れない。
+          ＃日程調整　＃アセスメント　＃サービス担当者会議　＃退院時共同指導　＃居宅療養管理指導　＃NDA　＃同意書　＃モニタリング　＃退院通知　＃訪問マッサージ（鍼灸含む）連携　＃多職種カンファレンス　＃電子署名＋タイムスタンプ　＃ハッシュチェーン　＃療養費同意書交付料(B013)　＃退院時共同指導加算(B004)　＃記録生成支援
         </p>
         <div class="hero-actions anim-up anim-up-d3">
           <a href="app.html#signup" class="btn-primary">会員登録して始める →</a>
