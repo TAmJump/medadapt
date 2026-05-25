@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>同意書（はり及びきゅう療養費用）</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Serif JP', serif;
+    font-size: 11pt;
+    line-height: 1.75;
+    color: #000;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 15mm;
+    margin: 0 auto;
+    background: #fff;
+    position: relative;
+  }
+  .form-no {
+    font-size: 9pt;
+    text-align: right;
+    margin-bottom: 4mm;
+    color: #555;
+  }
+  .title {
+    text-align: center;
+    font-size: 18pt;
+    font-weight: bold;
+    margin-bottom: 8mm;
+    letter-spacing: 8pt;
+  }
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1.5px solid #000;
+    margin-bottom: 6mm;
+  }
+  .table th, .table td {
+    border: 1px solid #000;
+    padding: 3mm 4mm;
+    vertical-align: middle;
+    font-size: 10.5pt;
+    text-align: left;
+    line-height: 1.7;
+  }
+  .table th {
+    background: #f5f5f5;
+    font-weight: bold;
+    width: 28mm;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .table th.row-th-narrow {
+    width: 22mm;
+  }
+  .row-patient th {
+    border-bottom: 1px dashed #000;
+  }
+  .row-patient th.last {
+    border-bottom: 1px solid #000;
+  }
+  .row-patient td {
+    border-bottom: 1px dashed #000;
+  }
+  .row-patient td.last {
+    border-bottom: 1px solid #000;
+  }
+
+  /* 病名リスト */
+  .disease-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1mm 8mm;
+  }
+  .disease-list li {
+    font-size: 10.5pt;
+    display: flex;
+    align-items: baseline;
+  }
+  .disease-no {
+    display: inline-block;
+    width: 8mm;
+    font-weight: bold;
+  }
+  .disease-name {
+    display: inline-block;
+  }
+  .disease-mark {
+    display: inline-block;
+    width: 5mm;
+    height: 5mm;
+    border: 1.5px solid transparent;
+    margin-right: 2mm;
+    text-align: center;
+    line-height: 5mm;
+    font-weight: bold;
+    color: #c00;
+    flex-shrink: 0;
+  }
+  .disease-mark.circled {
+    border-radius: 50%;
+    border-color: #c00;
+  }
+  .disease-other-text {
+    margin-left: 1mm;
+    border-bottom: 1px solid #000;
+    padding: 0 2mm;
+    min-width: 60mm;
+    display: inline-block;
+  }
+
+  /* 同意区分 */
+  .consent-type span {
+    display: inline-block;
+    padding: 0 3mm;
+    margin: 0 1mm;
+  }
+  .consent-type .marked {
+    border: 1.5px solid #c00;
+    border-radius: 50%;
+    color: #c00;
+    font-weight: bold;
+  }
+
+  /* 日付欄 */
+  .date-cell {
+    font-size: 10.5pt;
+  }
+  .date-cell .era {
+    display: inline-block;
+    padding: 0 2mm;
+  }
+  .date-cell .era.selected {
+    border: 1.5px solid #c00;
+    border-radius: 50%;
+    color: #c00;
+    font-weight: bold;
+  }
+  .date-cell .num {
+    display: inline-block;
+    min-width: 8mm;
+    border-bottom: 1px solid #000;
+    text-align: center;
+    margin: 0 1mm;
+    padding: 0 1mm;
+  }
+
+  /* フリーテキスト欄 */
+  .free-text {
+    min-height: 12mm;
+    font-size: 10.5pt;
+    line-height: 1.85;
+    white-space: pre-wrap;
+  }
+
+  /* 同意文 */
+  .consent-statement {
+    margin: 8mm 0 6mm;
+    font-size: 11.5pt;
+    line-height: 2;
+    text-align: center;
+  }
+
+  /* 保険医欄 */
+  .clinic-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1.5px solid #000;
+    margin-top: 4mm;
+  }
+  .clinic-table th, .clinic-table td {
+    border: 1px solid #000;
+    padding: 3mm 4mm;
+    font-size: 10.5pt;
+    vertical-align: middle;
+    line-height: 1.7;
+  }
+  .clinic-table th {
+    background: #f5f5f5;
+    font-weight: bold;
+    width: 32mm;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .seal-area {
+    display: inline-block;
+    width: 14mm;
+    height: 14mm;
+    border: 1.5px solid #c00;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 14mm;
+    color: #c00;
+    font-size: 9pt;
+    margin-left: 3mm;
+    vertical-align: middle;
+  }
+  .seal-area.empty { border-color: #ccc; color: #ccc; }
+
+  /* 注釈 */
+  .footnote {
+    font-size: 8.5pt;
+    color: #444;
+    line-height: 1.7;
+    margin-top: 4mm;
+    border-top: 1px solid #aaa;
+    padding-top: 3mm;
+  }
+  .footnote ul {
+    margin: 1mm 0 0;
+    padding-left: 5mm;
+  }
+
+  /* フッタ QR */
+  .footer-qr {
+    margin: 4mm 0 2mm auto;
+    width: max-content;
+    text-align: center;
+    font-size: 8pt;
+    color: #555;
+  }
+  .footer-qr img {
+    width: 18mm;
+    height: 18mm;
+    display: block;
+    margin: 0 auto 1mm;
+  }
+
+  /* フッタ ハッシュ */
+  .footer-hash {
+    margin: 0 0 2mm 0;
+    font-family: 'Courier New', monospace;
+    font-size: 7.5pt;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  /* 医監修クレジット */
+  .supervisor-credit {
+    position: absolute;
+    bottom: 5mm;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7pt;
+    color: #555;
+    white-space: nowrap;
+  }
+
+  /* 有効期限バナー */
+  .validity-banner {
+    background: #fffbe6;
+    border: 1.5px solid #d4a017;
+    border-radius: 3mm;
+    padding: 3mm 5mm;
+    margin: 6mm 0 4mm;
+    font-size: 10.5pt;
+    color: #7a5500;
+    text-align: center;
+  }
+  .validity-banner strong { color: #b08300; }
+</style>
+</head>
+<body>
+<div class="page" id="consent-page">
+
+  <div class="form-no">別添１（別紙１）</div>
+
+  <div class="title">同意書</div>
+  <div style="text-align:center; font-size:12pt; margin-top:-6mm; margin-bottom:6mm;">（はり及びきゅう療養費用）</div>
+
+  <!-- 患者情報 -->
+  <table class="table">
+    <tbody>
+      <tr class="row-patient">
+        <th rowspan="3">患　者</th>
+        <th class="row-th-narrow">住　所</th>
+        <td><span id="patient-address"></span></td>
+      </tr>
+      <tr class="row-patient">
+        <th class="row-th-narrow">氏　名</th>
+        <td><span id="patient-name"></span></td>
+      </tr>
+      <tr class="row-patient">
+        <th class="row-th-narrow last">生年月日</th>
+        <td class="last">
+          <span class="date-cell">
+            <span class="era" id="birth-era-m">明</span>・<span class="era" id="birth-era-t">大</span>・<span class="era" id="birth-era-s">昭</span>・<span class="era" id="birth-era-h">平</span>
+            <span class="num" id="birth-year"></span> 年
+            <span class="num" id="birth-month"></span> 月
+            <span class="num" id="birth-day"></span> 日
+          </span>
+        </td>
+      </tr>
+
+      <!-- 病名 -->
+      <tr>
+        <th colspan="2">病　名</th>
+        <td>
+          <ul class="disease-list" id="disease-list">
+            <!-- JS で動的生成 -->
+          </ul>
+          <div style="font-size:8pt; color:#555; margin-top:2mm; line-height:1.5;">
+            ※ １〜６は、当てはまるものに○をつけて下さい。<br>
+            ７は、慢性的な疼痛を主訴とする疾病で鍼灸の施術に同意する病名を記載下さい。
+          </div>
+        </td>
+      </tr>
+
+      <!-- 発病年月日 -->
+      <tr>
+        <th colspan="2">発病年月日</th>
+        <td>
+          <span class="date-cell">
+            <span class="era" id="onset-era-s">昭</span>・<span class="era" id="onset-era-h">平</span>・<span class="era" id="onset-era-r">令</span>
+            <span class="num" id="onset-year"></span> 年
+            <span class="num" id="onset-month"></span> 月
+            <span class="num" id="onset-day"></span> 日
+          </span>
+        </td>
+      </tr>
+
+      <!-- 同意区分 -->
+      <tr>
+        <th colspan="2">同意区分</th>
+        <td>
+          <span class="consent-type">
+            <span id="consent-type-new">初回の同意</span>　・　<span id="consent-type-renew">再　同　意</span>
+          </span>
+          <span style="font-size:9pt; color:#555; margin-left:4mm;">（○をつけて下さい）</span>
+        </td>
+      </tr>
+
+      <!-- 診察日 -->
+      <tr>
+        <th colspan="2">診察日</th>
+        <td>
+          <span class="date-cell">
+            令和
+            <span class="num" id="exam-year"></span> 年
+            <span class="num" id="exam-month"></span> 月
+            <span class="num" id="exam-day"></span> 日
+          </span>
+        </td>
+      </tr>
+
+      <!-- 注意事項等 -->
+      <tr>
+        <th colspan="2">注意事項等</th>
+        <td>
+          <div class="free-text" id="notes"></div>
+          <div style="font-size:8pt; color:#555; margin-top:1mm;">
+            ※ 施術に当たって注意すべき事項等があれば記載して下さい（任意）
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 同意文 -->
+  <div class="consent-statement">
+    上記の者については、頭書の疾病により鍼灸の施術に同意する。
+  </div>
+
+  <!-- 同意年月日 -->
+  <div style="text-align:center; font-size:11pt; margin-bottom:6mm;">
+    <span class="date-cell">
+      令和
+      <span class="num" id="consent-year"></span> 年
+      <span class="num" id="consent-month"></span> 月
+      <span class="num" id="consent-day"></span> 日
+    </span>
+  </div>
+
+  <!-- 保険医療機関 -->
+  <table class="clinic-table">
+    <tbody>
+      <tr>
+        <th>保険医療機関名</th>
+        <td><span id="clinic-name"></span></td>
+      </tr>
+      <tr>
+        <th>所在地</th>
+        <td><span id="clinic-address"></span></td>
+      </tr>
+      <tr>
+        <th>保険医氏名</th>
+        <td>
+          <span id="doctor-name"></span>
+          <span class="seal-area" id="seal-area">印</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 有効期限バナー -->
+  <div class="validity-banner">
+    <strong>有効期間：6か月</strong>（はり・きゅう）<br>
+    <span id="valid-until-line" style="font-size:10pt;"></span>
+  </div>
+
+  <!-- 注釈 -->
+  <div class="footnote">
+    ※ 保険医が、当該疾病について診察の上で同意する必要があります。<br>
+    保険医氏名は、診察した医師の氏名を記載して下さい。<br>
+    ※ この同意書は、「はり師、きゅう師及びあん摩・マッサージ・指圧師の施術に係る療養費の支給の留意事項等について」（平成16年10月1日付保医発第1001002号）に基づくものです。
+  </div>
+
+  <!-- フッタ QR -->
+  <div class="footer-qr" id="footer-qr" style="display:none;">
+    <img id="qr-image" src="" alt="検証QR">
+    <div>QRで真正性検証</div>
+  </div>
+
+  <!-- フッタ ハッシュ -->
+  <div class="footer-hash" id="footer-hash" style="display:none;">
+    <div>ID: <span id="sd-id">SD-XXXXXXXX</span></div>
+    <div>HASH: <span id="content-hash-short">XXXXXXXX...XXXXXXXX</span></div>
+    <div>CHAIN: #<span id="chain-index">XXXX</span></div>
+    <div id="tsa-line" style="display:none">TSA: <span id="tsa-authority"></span> <span id="tsa-acquired"></span></div>
+  </div>
+
+  <!-- 医監修クレジット -->
+  <div class="supervisor-credit">
+    本書式は ｍやるゼ！プラットフォーム（医監修：後藤基温医師）にて電子発行されました
+  </div>
+
+</div>
+
+<script>
+/**
+ * 同意書（はり及びきゅう療養費用）レンダラー
+ * 厚労省様式（別添1別紙1）準拠
+ *
+ * window.consentAcupunctureTemplateRender(data) を呼び出すと、
+ * サーバから受け取った signed_documents + consent_forms（acupuncture）の
+ * スナップショットをこのテンプレートに差し込む。
+ *
+ * data = {
+ *   sd_id, content_hash, chain_index, qr_image_base64,
+ *   patient: { address, name, birth: { era: 'M'|'T'|'S'|'H', year, month, day } },
+ *   diseases: {
+ *     '神経痛': true,
+ *     'リウマチ': false,
+ *     '頸腕症候群': true,
+ *     '五十肩': false,
+ *     '腰痛症': true,
+ *     '頸椎捻挫後遺症': false,
+ *     'その他': { checked: true, text: '線維筋痛症' } | { checked: false }
+ *   },
+ *   onset: { era: 'S'|'H'|'R', year, month, day },
+ *   consent_type: 'new' | 'renew',
+ *   exam_date: { year, month, day },                  // 令和
+ *   notes: '',
+ *   consent_date: { year, month, day },               // 令和
+ *   clinic: { name, address },
+ *   doctor: { name, has_seal: true },
+ *   tsa: { authority: 'mhlw'|'shacho'|null, acquired_at: 'YYYY-MM-DDTHH:mm:ssZ' } | null
+ * }
+ */
+window.consentAcupunctureTemplateRender = function(data) {
+  // 再描画対応: 全 .selected / .marked / .circled クラスを一旦解除
+  document.querySelectorAll('#consent-page .selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('#consent-page .marked').forEach(el => el.classList.remove('marked'));
+  document.querySelectorAll('#consent-page .circled').forEach(el => el.classList.remove('circled'));
+
+  // 患者
+  document.getElementById('patient-address').textContent = data.patient?.address || '';
+  document.getElementById('patient-name').textContent = data.patient?.name || '';
+  if (data.patient?.birth) {
+    const e = data.patient.birth.era;
+    if (e === 'M') document.getElementById('birth-era-m').classList.add('selected');
+    if (e === 'T') document.getElementById('birth-era-t').classList.add('selected');
+    if (e === 'S') document.getElementById('birth-era-s').classList.add('selected');
+    if (e === 'H') document.getElementById('birth-era-h').classList.add('selected');
+    document.getElementById('birth-year').textContent = data.patient.birth.year ?? '';
+    document.getElementById('birth-month').textContent = data.patient.birth.month ?? '';
+    document.getElementById('birth-day').textContent = data.patient.birth.day ?? '';
+  }
+
+  // 病名
+  renderDiseases(data.diseases || {});
+
+  // 発病年月日
+  if (data.onset) {
+    if (data.onset.era === 'S') document.getElementById('onset-era-s').classList.add('selected');
+    if (data.onset.era === 'H') document.getElementById('onset-era-h').classList.add('selected');
+    if (data.onset.era === 'R') document.getElementById('onset-era-r').classList.add('selected');
+    document.getElementById('onset-year').textContent = data.onset.year ?? '';
+    document.getElementById('onset-month').textContent = data.onset.month ?? '';
+    document.getElementById('onset-day').textContent = data.onset.day ?? '';
+  }
+
+  // 同意区分
+  if (data.consent_type === 'new') {
+    document.getElementById('consent-type-new').classList.add('marked');
+  } else if (data.consent_type === 'renew') {
+    document.getElementById('consent-type-renew').classList.add('marked');
+  }
+
+  // 診察日
+  if (data.exam_date) {
+    document.getElementById('exam-year').textContent = data.exam_date.year ?? '';
+    document.getElementById('exam-month').textContent = data.exam_date.month ?? '';
+    document.getElementById('exam-day').textContent = data.exam_date.day ?? '';
+  }
+
+  // 注意事項
+  document.getElementById('notes').textContent = data.notes || '';
+
+  // 同意年月日
+  if (data.consent_date) {
+    document.getElementById('consent-year').textContent = data.consent_date.year ?? '';
+    document.getElementById('consent-month').textContent = data.consent_date.month ?? '';
+    document.getElementById('consent-day').textContent = data.consent_date.day ?? '';
+    // 有効期限（同意年月日から6か月）
+    renderValidUntil(data.consent_date, 6);
+  }
+
+  // 保険医
+  document.getElementById('clinic-name').textContent = data.clinic?.name || '';
+  document.getElementById('clinic-address').textContent = data.clinic?.address || '';
+  document.getElementById('doctor-name').textContent = data.doctor?.name || '';
+  const seal = document.getElementById('seal-area');
+  if (data.doctor && data.doctor.has_seal) {
+    seal.classList.remove('empty');
+  } else {
+    seal.classList.add('empty');
+  }
+
+  // フッタ（改ざん検証）
+  if (data.sd_id) {
+    document.getElementById('footer-hash').style.display = '';
+    document.getElementById('sd-id').textContent = data.sd_id;
+    if (data.content_hash) {
+      const h = data.content_hash;
+      document.getElementById('content-hash-short').textContent = h.slice(0, 8) + '...' + h.slice(-8);
+    }
+    if (data.chain_index != null) {
+      document.getElementById('chain-index').textContent = data.chain_index;
+    }
+    if (data.tsa && data.tsa.authority) {
+      document.getElementById('tsa-line').style.display = '';
+      document.getElementById('tsa-authority').textContent = data.tsa.authority.toUpperCase();
+      if (data.tsa.acquired_at) {
+        document.getElementById('tsa-acquired').textContent = '@' + data.tsa.acquired_at.slice(0, 10);
+      }
+    }
+  }
+  if (data.qr_image_base64) {
+    document.getElementById('footer-qr').style.display = '';
+    document.getElementById('qr-image').src = 'data:image/png;base64,' + data.qr_image_base64;
+  }
+};
+
+function renderDiseases(d) {
+  const list = document.getElementById('disease-list');
+  list.innerHTML = '';
+
+  const FIXED = [
+    { no: '１．', key: '神経痛' },
+    { no: '２．', key: 'リウマチ' },
+    { no: '３．', key: '頸腕症候群' },
+    { no: '４．', key: '五十肩' },
+    { no: '５．', key: '腰痛症' },
+    { no: '６．', key: '頸椎捻挫後遺症' },
+  ];
+  FIXED.forEach(item => {
+    const li = document.createElement('li');
+    const mark = document.createElement('span');
+    mark.className = 'disease-mark' + (d[item.key] ? ' circled' : '');
+    mark.textContent = d[item.key] ? '○' : '';
+    li.appendChild(mark);
+    const no = document.createElement('span');
+    no.className = 'disease-no';
+    no.textContent = item.no;
+    li.appendChild(no);
+    const name = document.createElement('span');
+    name.className = 'disease-name';
+    name.textContent = item.key;
+    li.appendChild(name);
+    list.appendChild(li);
+  });
+
+  // ７．その他
+  const other = d['その他'] || { checked: false };
+  const li = document.createElement('li');
+  li.style.gridColumn = '1 / -1';
+  const mark = document.createElement('span');
+  mark.className = 'disease-mark' + (other.checked ? ' circled' : '');
+  mark.textContent = other.checked ? '○' : '';
+  li.appendChild(mark);
+  const no = document.createElement('span');
+  no.className = 'disease-no';
+  no.textContent = '７．';
+  li.appendChild(no);
+  const name = document.createElement('span');
+  name.className = 'disease-name';
+  name.textContent = 'その他（';
+  li.appendChild(name);
+  const txt = document.createElement('span');
+  txt.className = 'disease-other-text';
+  txt.textContent = other.text || '';
+  li.appendChild(txt);
+  const close = document.createElement('span');
+  close.textContent = '）';
+  li.appendChild(close);
+  list.appendChild(li);
+}
+
+function renderValidUntil(cd, months) {
+  if (!cd || cd.year == null || cd.month == null || cd.day == null) return;
+  // 令和n年 m月 d日 + months か月 = 令和n年 (m+months)月 d日
+  let y = cd.year, m = cd.month + months, d = cd.day;
+  while (m > 12) { y += 1; m -= 12; }
+  document.getElementById('valid-until-line').textContent =
+    `同意年月日（令和${cd.year}年${cd.month}月${cd.day}日）から6か月後 ＝ 令和${y}年${m}月${d}日まで有効`;
+}
+
+// 単独デモ
+if (window.location.search.includes('demo=1')) {
+  window.consentAcupunctureTemplateRender({
+    sd_id: 'SD-DEMO-AC01',
+    content_hash: 'a3b8e7d2f1c5b4a9e8d7c6b5a4938271a3b8e7d2f1c5b4a9e8d7c6b5a4938271',
+    chain_index: 1,
+    patient: {
+      address: '埼玉県さいたま市大宮区桜木町4-1-1',
+      name: '田中 タムジ',
+      birth: { era: 'S', year: 14, month: 8, day: 15 }
+    },
+    diseases: {
+      '神経痛': true,
+      'リウマチ': false,
+      '頸腕症候群': false,
+      '五十肩': false,
+      '腰痛症': true,
+      '頸椎捻挫後遺症': false,
+      'その他': { checked: false, text: '' }
+    },
+    onset: { era: 'R', year: 5, month: 3, day: 10 },
+    consent_type: 'new',
+    exam_date: { year: 8, month: 5, day: 24 },
+    notes: '高齢のため、訪問にて施術いただきたい。',
+    consent_date: { year: 8, month: 5, day: 24 },
+    clinic: {
+      name: '医療法人社団コンパス　コンパス内科歯科クリニック大宮',
+      address: '〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室'
+    },
+    doctor: { name: '後藤 基温', has_seal: true },
+    tsa: { authority: 'mhlw', acquired_at: '2026-05-24T10:00:00Z' }
+  });
+}
+</script>
+</body>
+</html>
