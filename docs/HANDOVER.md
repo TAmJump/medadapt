@@ -2,7 +2,12 @@
 
 **最終更新**: 2026-05-25（v4.16 / 患者と全機能の双方向リンク完成）
 
-**現状 HEAD**: medadapt `fd9ee87`（v4.16 / 患者と全機能の双方向リンク完成）
+**現状 HEAD**:
+- medadapt: `41fa00c`（v4.16 / discharge_new に preselectPatientId 対応 + favicon追加）
+- adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
+- one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
+
+v4.16 では患者ハブ概要タブに「医師交付同意書を発行」「マッサージ・鍼灸ハブ」「退院通知作成」「加算管理」の actionBar を新設、ハブから各機能ページへ患者ID自動引き継ぎ + 戻るリンクで双方向リンク完成。
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
