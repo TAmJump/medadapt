@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>ｍやるゼ！</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -3562,16 +3564,24 @@ function dischargePage(){
 // ═══════════════════════════════════════════
 function dischargeNewPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'680px'}});
-  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}},
-    h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:'13px',padding:'0'},onClick:()=>{S.page='discharge';rr()}},'← 戻る'),
+  // v4.16: 患者ハブから来た場合の戻り導線
+  const fromHubPtId = S.preselectPatientId;
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}},
+    fromHubPtId
+      ? h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.preselectPatientId=null;S.page='hub';S.ptId=fromHubPtId;S.hubTab='overview';rr()}},'← 患者ハブに戻る')
+      : h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:'13px',padding:'0'},onClick:()=>{S.page='discharge';rr()}},'← 戻る'),
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'退院通知を発行する')
   ));
 
-  // 患者選択
+  // 患者選択（preselectPatientId があればその患者で初期化）
   const patients=D.patients||[];
   const pt_opts=[h('option',{value:''},'-- 患者を選択 --'),...patients.map(p=>h('option',{value:p.id},p.name+'（'+p.cl+'・'+(p.status==='pre_admission'?'入居前':'利用中')+'）'))];
   const ptSel=h('select',{id:'dn_patient',style:{width:'100%',padding:'8px 10px',border:'1px solid var(--border)',borderRadius:'8px',fontSize:'13px'}});
   pt_opts.forEach(o=>ptSel.appendChild(o));
+  if(fromHubPtId){
+    // 初期選択を patient ハブから来た患者に
+    setTimeout(()=>{const el=document.getElementById('dn_patient');if(el)el.value=fromHubPtId;},0);
+  }
   w.appendChild(h('div',{className:'field'},h('label',null,'対象患者'),ptSel));
 
   // タイトル（受信側に表示。患者名は入れない）
