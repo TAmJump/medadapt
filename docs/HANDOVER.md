@@ -2,7 +2,7 @@
 
 **最終更新**: 2026-05-25（v4.16 / 患者と全機能の双方向リンク完成）
 
-**現状 HEAD**: v4.16 commit（後述）
+**現状 HEAD**: medadapt `fd9ee87`（v4.16 / 患者と全機能の双方向リンク完成）
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
