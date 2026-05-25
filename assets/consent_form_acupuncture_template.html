@@ -206,6 +206,81 @@
     vertical-align: middle;
   }
   .seal-area.empty { border-color: #ccc; color: #ccc; }
+  /* 電子署名・タイムスタンプ認証バナー */
+  .e-cert-banner {
+    margin: 5mm 0 3mm;
+    border: 2px solid #0891b2;
+    border-radius: 3mm;
+    background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 100%);
+    padding: 4mm 5mm;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4mm;
+    align-items: center;
+    page-break-inside: avoid;
+  }
+  .e-cert-icon {
+    width: 14mm; height: 14mm;
+    border-radius: 50%;
+    background: #0891b2;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18pt; font-weight: bold;
+    flex-shrink: 0;
+  }
+  .e-cert-body {
+    font-size: 9.5pt;
+    line-height: 1.7;
+    color: #0c4a6e;
+  }
+  .e-cert-title {
+    font-weight: bold;
+    font-size: 10.5pt;
+    color: #0891b2;
+    margin-bottom: 1mm;
+  }
+  .e-cert-row {
+    display: flex;
+    gap: 4mm;
+    flex-wrap: wrap;
+    font-size: 8.5pt;
+    margin-top: 1mm;
+  }
+  .e-cert-row > span {
+    color: #555;
+  }
+  .e-cert-row > span > strong {
+    color: #0c4a6e;
+    font-family: 'Courier New', monospace;
+    font-weight: normal;
+  }
+  /* 「印」欄を「電子署名済」表示に */
+  .seal-area.signed {
+    width: auto;
+    height: auto;
+    border-radius: 3mm;
+    border: 2px solid #0891b2;
+    background: #ecfeff;
+    color: #0891b2;
+    padding: 1.5mm 4mm;
+    line-height: 1.3;
+    font-size: 8.5pt;
+    font-weight: bold;
+    text-align: center;
+    margin-left: 4mm;
+  }
+  .seal-area.signed::before {
+    content: '✓ 電子署名済';
+    display: block;
+  }
+  .seal-area.signed .signed-time {
+    display: block;
+    font-size: 7pt;
+    color: #555;
+    font-weight: normal;
+    margin-top: 0.5mm;
+  }
+
 
   /* 注釈 */
   .footnote {
@@ -408,6 +483,20 @@
     <span id="valid-until-line" style="font-size:10pt;"></span>
   </div>
 
+  <!-- 電子署名・タイムスタンプ認証バナー -->
+  <div class="e-cert-banner" id="e-cert-banner">
+    <div class="e-cert-icon">✓</div>
+    <div class="e-cert-body">
+      <div class="e-cert-title">電子署名＋タイムスタンプ済</div>
+      <div>本書面は <strong>e-文書法・電子署名法</strong> に準拠した電子署名と、第三者機関のタイムスタンプを付与した上で、<strong>SHA-256 ハッシュチェーン</strong> に登録された原本性保証付き文書です。</div>
+      <div class="e-cert-row">
+        <span>署名者: <strong id="cert-signer">—</strong></span>
+        <span>タイムスタンプ: <strong id="cert-timestamp">—</strong></span>
+        <span>認証局: <strong id="cert-tsa-authority">—</strong></span>
+      </div>
+    </div>
+  </div>
+
   <!-- 注釈 -->
   <div class="footnote">
     ※ 保険医が、当該疾病について診察の上で同意する必要があります。<br>
@@ -531,10 +620,33 @@ window.consentAcupunctureTemplateRender = function(data) {
   document.getElementById('clinic-address').textContent = data.clinic?.address || '';
   document.getElementById('doctor-name').textContent = data.doctor?.name || '';
   const seal = document.getElementById('seal-area');
-  if (data.doctor && data.doctor.has_seal) {
+  // 電子署名済の場合は seal を「電子署名済」表示に変更
+  if (data.doctor && data.doctor.has_seal && data.signature && data.signature.signed_at) {
+    seal.className = 'seal-area signed';
+    seal.textContent = '';
+    const t = document.createElement('span');
+    t.className = 'signed-time';
+    t.textContent = formatSignedTime(data.signature.signed_at);
+    seal.appendChild(t);
+  } else if (data.doctor && data.doctor.has_seal) {
     seal.classList.remove('empty');
   } else {
     seal.classList.add('empty');
+  }
+
+  // 電子署名＋タイムスタンプ認証バナーへの値差し込み
+  const certBanner = document.getElementById('e-cert-banner');
+  if (data.signature && data.signature.signed_at) {
+    certBanner.style.display = '';
+    document.getElementById('cert-signer').textContent =
+      (data.doctor?.name ? data.doctor.name + ' 医師' : '保険医') +
+      (data.clinic?.name ? '（' + data.clinic.name + '）' : '');
+    document.getElementById('cert-timestamp').textContent = formatSignedTime(data.signature.signed_at);
+    document.getElementById('cert-tsa-authority').textContent =
+      data.tsa?.authority ? data.tsa.authority.toUpperCase() : 'mYaruze TSA';
+  } else {
+    // 未署名の場合はバナーを薄く表示（または非表示）
+    certBanner.style.display = 'none';
   }
 
   // フッタ（改ざん検証）
@@ -561,6 +673,21 @@ window.consentAcupunctureTemplateRender = function(data) {
     document.getElementById('qr-image').src = 'data:image/png;base64,' + data.qr_image_base64;
   }
 };
+
+function formatSignedTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}`;
+  } catch(e) {
+    return iso.slice(0, 16).replace('T', ' ');
+  }
+}
 
 function renderDiseases(d) {
   const list = document.getElementById('disease-list');
@@ -656,6 +783,7 @@ if (window.location.search.includes('demo=1')) {
       address: '〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室'
     },
     doctor: { name: '後藤 基温', has_seal: true },
+    signature: { signed_at: '2026-05-24T10:00:00+09:00' },
     tsa: { authority: 'mhlw', acquired_at: '2026-05-24T10:00:00Z' }
   });
 }

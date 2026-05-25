@@ -105,105 +105,110 @@ body {
 /* ─── Hero (v4.9 写真背景型) ─── */
 .hero {
   position: relative; overflow: hidden;
-  min-height: 720px; height: 92vh; max-height: 880px;
+  min-height: 880px;
+  height: auto;
   padding: 64px 0 0;
-  display: flex; align-items: stretch;
+  display: block;
   background: #fff;
 }
 .hero::before {
-  content: ''; position: absolute; inset: 0;
+  content: ''; position: absolute;
+  top: 64px; left: 0; right: 0;
+  /* 上が画像、下にテキスト帯 */
+  height: 540px;
   background-image: url('assets/img/generated/v2/team_yaruze.jpg');
-  background-size: cover; background-position: center 35%;
+  background-size: cover;
+  background-position: center 30%;
   z-index: 0;
 }
-/* 文字可読性のためのグラデーション・オーバーレイ */
+/* 画像の下端をフェードアウト */
 .hero::after {
-  content: ''; position: absolute; inset: 0; z-index: 1;
-  background:
-    linear-gradient(100deg,
-      rgba(15,23,42,.88) 0%,
-      rgba(15,23,42,.78) 28%,
-      rgba(15,23,42,.55) 48%,
-      rgba(15,23,42,.20) 68%,
-      rgba(15,23,42,.05) 100%
-    ),
-    linear-gradient(180deg,
-      rgba(15,23,42,.15) 0%,
-      transparent 30%,
-      transparent 70%,
-      rgba(15,23,42,.50) 100%
-    );
+  content: ''; position: absolute;
+  top: 64px; left: 0; right: 0;
+  height: 540px;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(15,23,42,.00) 0%,
+    rgba(15,23,42,.00) 62%,
+    rgba(15,23,42,.30) 78%,
+    rgba(15,23,42,.70) 92%,
+    rgba(248,250,252,1.0) 100%
+  );
 }
+/* テキストは画像の下、白背景に独立配置 */
 .hero-inner {
-  display: block;
-  position: relative; z-index: 2;
-  width: 100%;
-  padding: 80px 0 64px;
+  position: relative;
+  z-index: 2;
+  padding: 540px 0 0;
 }
 .hero-text-block {
-  max-width: 640px;
-  color: #fff;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 56px 28px 80px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  color: var(--ink);
+  text-align: left;
 }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,.18);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,.28);
-  color: #fff;
+  background: var(--blue-l);
+  border: 1px solid rgba(8,145,178,.25);
+  color: var(--blue-d);
   padding: 7px 18px; border-radius: var(--r-pill);
-  font-size: .72rem; font-weight: 700; margin-bottom: 28px;
-  text-shadow: 0 1px 3px rgba(0,0,0,.25);
+  font-size: .72rem; font-weight: 700; margin-bottom: 22px;
+  text-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-.hero-badge-dot { width: 7px; height: 7px; background: #06b6d4; border-radius: 50%; animation: bounce 2s infinite; box-shadow: 0 0 8px #06b6d4; }
+.hero-badge-dot { width: 7px; height: 7px; background: var(--blue); border-radius: 50%; animation: bounce 2s infinite; }
 .hero-title {
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  font-weight: 900; line-height: 1.3;
-  color: #fff; margin-bottom: 24px;
-  text-shadow: 0 2px 18px rgba(0,0,0,.45), 0 1px 4px rgba(0,0,0,.6);
+  font-size: clamp(1.8rem, 4.2vw, 3rem);
+  font-weight: 900; line-height: 1.32;
+  color: var(--ink); margin-bottom: 18px;
+  text-shadow: none;
   letter-spacing: -.01em;
 }
 .hero-title .highlight {
-  color: #67e8f9;
-  text-shadow: 0 2px 14px rgba(6,182,212,.55), 0 1px 4px rgba(0,0,0,.6);
+  color: var(--blue);
+  text-shadow: none;
+  background: none; -webkit-background-clip: initial; -webkit-text-fill-color: initial; background-clip: initial;
 }
 .hero-desc {
-  font-size: 1rem; line-height: 2;
-  color: rgba(255,255,255,.95);
-  margin-bottom: 36px; max-width: 560px;
-  text-shadow: 0 1px 6px rgba(0,0,0,.4);
+  font-size: .95rem; line-height: 1.95;
+  color: var(--ink-l);
+  margin-bottom: 28px; max-width: 640px;
+  text-shadow: none;
 }
 .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
 .hero-actions .btn-primary {
-  background: #fff;
-  color: var(--blue-d) !important;
-  -webkit-text-fill-color: var(--blue-d) !important;
-  box-shadow: 0 10px 28px rgba(0,0,0,.25);
+  background: var(--grad);
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: 0 8px 24px rgba(8,145,178,.30);
   font-weight: 800;
 }
 .hero-actions .btn-primary:hover {
-  background: #f0fdfa; transform: translateY(-2px);
-  box-shadow: 0 14px 36px rgba(0,0,0,.30);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(8,145,178,.40);
 }
 
 @media (max-width:980px) {
-  .hero { min-height: 640px; height: auto; }
-  .hero::before { background-position: center 25%; }
-  .hero::after {
-    background:
-      linear-gradient(180deg,
-        rgba(15,23,42,.40) 0%,
-        rgba(15,23,42,.75) 100%
-      );
-  }
-  .hero-inner { padding: 80px 0 64px; }
-  .hero-text-block { max-width: 100%; }
+  .hero { min-height: 720px; }
+  .hero::before { height: 380px; background-position: center 20%; }
+  .hero::after { height: 380px; }
+  .hero-inner { padding: 380px 0 0; }
+  .hero-text-block { max-width: 100%; padding: 40px 24px 56px; }
 }
 @media (max-width:600px) {
-  .hero { min-height: 560px; padding-top: 80px; }
-  .hero-title { font-size: 1.85rem; line-height: 1.35; }
-  .hero-desc { font-size: .9rem; line-height: 1.9; margin-bottom: 28px; }
-  .hero-badge { font-size: .68rem; padding: 6px 14px; margin-bottom: 20px; }
-  .hero-actions .btn-primary { padding: 14px 26px; font-size: .9rem; }
+  .hero { min-height: 600px; padding-top: 80px; }
+  .hero::before { top: 80px; height: 280px; background-position: center 15%; }
+  .hero::after { top: 80px; height: 280px; }
+  .hero-inner { padding: 280px 0 0; }
+  .hero-text-block { padding: 32px 20px 48px; }
+  .hero-title { font-size: 1.55rem; line-height: 1.4; }
+  .hero-desc { font-size: .88rem; line-height: 1.85; margin-bottom: 22px; }
+  .hero-badge { font-size: .68rem; padding: 6px 14px; margin-bottom: 16px; }
+  .hero-actions .btn-primary { padding: 13px 24px; font-size: .88rem; }
 }
 
 .btn-primary {
