@@ -192,10 +192,19 @@ async function api(path,opts={}){
       if(res.status===401){stopNotifPolling();S.token=null;S.user=null;S.moduleAccess=null;S.unreadCount=0;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');localStorage.removeItem('medadapt-last-email');try{sessionStorage.removeItem('medadapt-invite-token');}catch(e){}S.scr='login';rr();return null;}
       // 404 は silent404 オプション時はサイレントに（「Not found」バッジ問題対策）
       if(res.status===404 && silent404){return null;}
-      // エラーメッセージのユーザーフレンドリー化
-      const errMsg = (data.error==='Not found' || data.error==='not_found')
-        ? '対象が見つかりません'
-        : (data.error||'エラーが発生しました');
+      // エラーメッセージのユーザーフレンドリー化（v5.0.5: バリエーション網羅）
+      const rawErr = String(data.error||'').trim();
+      const lowerErr = rawErr.toLowerCase();
+      let errMsg;
+      if(lowerErr==='not found' || lowerErr==='not_found' || lowerErr==='notfound' || res.status===404){
+        errMsg = '対象が見つかりません';
+      } else if(res.status===403){
+        errMsg = rawErr || 'アクセス権限がありません';
+      } else if(res.status>=500){
+        errMsg = '一時的なエラーが発生しました。しばらくしてからお試しください';
+      } else {
+        errMsg = rawErr || 'エラーが発生しました';
+      }
       toast(errMsg);return null;
     }
     return data;
@@ -395,10 +404,12 @@ async function loadPatients(){
   const d=await api('/patients'+(S.ptFilter&&S.ptFilter!=='all'?'?status='+S.ptFilter:''));
   if(d)D.patients=d.patients||[];
 }
-async function loadCases(pid){const d=await api('/patients/'+pid+'/cases');if(d)D.cases=(D.cases||[]).filter(c=>c.patient_id!==pid).concat(d.cases||[]);}
-async function loadConfs(pid){const d=await api('/patients/'+pid+'/conferences');if(d)D.conferences=(D.conferences||[]).filter(c=>c.patient_id!==pid).concat(d.conferences||[]);}
-async function loadMons(pid){const d=await api('/patients/'+pid+'/monitors');if(d)D.monitors=(D.monitors||[]).filter(c=>c.patient_id!==pid).concat(d.monitors||[]);}
-async function loadAssess(pid){const d=await api('/patients/'+pid+'/assessments');if(d)D.assessments=(D.assessments||[]).filter(a=>a.patient_id!==pid).concat(d.assessments||[]);}
+// v5.0.5: silent404 を付与して「Not found」トースト/バッジを抑止
+// （新規患者やデータ未保存の患者で 404 が返るのは正常な状態のため）
+async function loadCases(pid){const d=await api('/patients/'+pid+'/cases',{silent404:true});if(d)D.cases=(D.cases||[]).filter(c=>c.patient_id!==pid).concat(d.cases||[]);}
+async function loadConfs(pid){const d=await api('/patients/'+pid+'/conferences',{silent404:true});if(d)D.conferences=(D.conferences||[]).filter(c=>c.patient_id!==pid).concat(d.conferences||[]);}
+async function loadMons(pid){const d=await api('/patients/'+pid+'/monitors',{silent404:true});if(d)D.monitors=(D.monitors||[]).filter(c=>c.patient_id!==pid).concat(d.monitors||[]);}
+async function loadAssess(pid){const d=await api('/patients/'+pid+'/assessments',{silent404:true});if(d)D.assessments=(D.assessments||[]).filter(a=>a.patient_id!==pid).concat(d.assessments||[]);}
 async function loadPendingShares(){const d=await api('/shares/pending',{silent404:true});if(d)S.pendingShares=d.shares||[];}
 
 function h(t,a,...ch){const e=document.createElement(t);if(a)Object.entries(a).forEach(([k,v])=>{if(v==null)return;if(k==='style'&&typeof v==='object')Object.assign(e.style,v);else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2).toLowerCase(),v);else if(k.startsWith('on'))e.setAttribute(k.toLowerCase(),v);else if(k==='className')e.className=v;else if(k==='innerHTML')e.innerHTML=v;else e.setAttribute(k,v)});ch.flat(9).forEach(c=>{if(c==null||c===false)return;e.appendChild(typeof c==='string'||typeof c==='number'?document.createTextNode(String(c)):c)});return e}
@@ -4110,7 +4121,7 @@ function showDentalModal(ex,docKind){
     m.appendChild(fld('指示内容（歯科衛生士向け）','dn_in',r.instructions,v=>{r.instructions=v},{ta:true,rows:'3',req:true,ph:'例: 月2回の口腔ケア、歯肉マッサージ、入れ歯洗浄指導'}));
   }
   // フッタ
-  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px',flexWrap:'wrap'}},
     btn(isE?'保存':'作成','btn-pri',()=>{
       if(!r.patient_id){toast('患者必須');return}
       if(!r.chief_complaint){toast('主訴必須');return}
@@ -4126,6 +4137,7 @@ function showDentalModal(ex,docKind){
       }
       sv();S.modal=null;toast(isE?'保存':'作成');rr();
     }),
+    isE?btn('PDF出力','btn-out',()=>{genDentalPDF(r);}):null,
     isE?btn('非表示','btn-out',()=>{
       if(!confirm('この記録を非表示にしますか？'))return;
       D.dentalRecords=D.dentalRecords.map(x=>x.id===r.id?{...x,archived:true}:x);
@@ -4230,7 +4242,7 @@ function showReferralModal(ex){
       }):null
     ));
   }
-  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px',flexWrap:'wrap'}},
     btn(isE?'保存':'発行','btn-pri',()=>{
       if(!r.patient_id){toast('患者必須');return}
       if(!r.to_org_name){toast('宛先機関必須');return}
@@ -4246,6 +4258,7 @@ function showReferralModal(ex){
       }
       sv();S.modal=null;toast(isE?'保存':'発行完了');rr();
     }),
+    isE?btn('PDF出力','btn-out',()=>{genReferralPDF(r);}):null,
     isE?btn('非表示','btn-out',()=>{
       if(!confirm('この提供書を非表示にしますか？'))return;
       D.medicalReferrals=D.medicalReferrals.map(x=>x.id===r.id?{...x,archived:true}:x);
@@ -5945,12 +5958,7 @@ function genKyotakuPDF(r){
   addR2('ケアマネ事業所',r.cm_org);
   addR2('CM共有',r.cm_shared?'共有済（'+(r.cm_shared_at||'').slice(0,10)+'）':'未共有');
   d.appendChild(t2);
-  // フッタ（電子署名＋タイムスタンプ）
-  d.appendChild(h('div',{style:{marginTop:'14px',padding:'8px 10px',background:'#ecfeff',border:'1px solid #0891b2',borderRadius:'6px',fontSize:'10px',color:'#0e7490'}},
-    '✓ 電子署名＋タイムスタンプ済（e-文書法・電子署名法・SHA-256 ハッシュチェーン）　',
-    '署名者: '+(S.user&&S.user.name||'')+'　',
-    'タイムスタンプ: '+new Date().toISOString().slice(0,19).replace('T',' ')
-  ));
+  // フッタ（電子署名＋タイムスタンプ）v5.0.5: 共通ヘルパーに統一
   d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));
   cn.appendChild(d);
   // 帳票保存
@@ -5959,11 +5967,152 @@ function genKyotakuPDF(r){
   }
   addAudit(r.audit,'居宅療養管理指導 PDF出力','');
   sv();
-  if(typeof genPdf==='function')genPdf(cn,'居宅療養管理指導_'+(pt.name||'')+'_'+r.visit_date+'.pdf');
+  // v5.0.5: 共通の電子署名+TSA ブロックを末尾に追加（buildECertHtml + buildTimestampCertHtml）
+  (async()=>{
+    const sd = await fetchSignedDocInfo('kyotaku_ryoyo_record', r.id);
+    if(sd){
+      const wrap = document.createElement('div');
+      wrap.innerHTML = buildECertHtml(sd, S.user?.name||'担当者') + buildTimestampCertHtml(sd);
+      d.appendChild(wrap);
+    }
+    if(typeof genPdf==='function')genPdf(cn,'居宅療養管理指導_'+(pt.name||'')+'_'+r.visit_date+'.pdf');
+  })();
   toast('PDF生成しました');
 }
 
-function genAssessPDF(a,pt){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'アセスメント'));d.appendChild(h('div',{style:{margin:'12px 0'}},'患者：'+(pt?pt.name:'')+'　種別：'+({pre_admission:'入居前',periodic:'定期',adhoc:'臨時',post_incident:'事故後'}[a.type]||'')+'　日付：'+a.date+'　担当：'+a.author));const items=[];if(a.adl){const i=Object.entries(a.adl).filter(([,v])=>v);if(i.length)items.push('ADL: '+i.map(([k,v])=>k+'='+v).join(', '))}if(a.medical){const i=Object.entries(a.medical).filter(([,v])=>v);if(i.length)items.push('医療処置: '+i.map(([k])=>k).join(', '))}if(a.risk){const i=Object.entries(a.risk).filter(([,v])=>v);if(i.length)items.push('リスク: '+i.map(([k])=>k).join(', '))}if(a.medication)items.push('服薬: '+a.medication);if(a.family)items.push('家族意向: '+a.family);if(a.conditions)items.push('受入条件: '+a.conditions);if(a.notes)items.push('備考: '+a.notes);d.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'12px',fontFamily:'serif'}},items.join('\n\n')));d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);genPdf(cn,'アセスメント_'+(pt?pt.name:'')+'.pdf')}
+// v5.0.5: 診療情報提供書（医科）PDF 出力
+function genReferralPDF(r){
+  const pt=(D.patients||[]).find(p=>p.id===r.patient_id)||{};
+  const cn=document.getElementById('pdf-render');
+  cn.style.display='block';cn.innerHTML='';
+  const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.8',color:'#000',background:'#fff'}});
+  d.appendChild(h('div',{style:{textAlign:'center',fontSize:'17px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'診療情報提供書'));
+  d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginTop:'8px'}},'発行日：'+(r.issued_date||'')));
+  // 宛先・発行元
+  const top=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',margin:'10px 0'}});
+  top.appendChild(h('div',null,
+    h('div',{style:{fontSize:'10px',color:'#666'}},'宛先'),
+    h('div',{style:{fontWeight:'700'}},(r.to_org_name||'')+' 御中'),
+    r.to_doctor?h('div',null,(r.to_doctor||'')+' 先生'):null
+  ));
+  top.appendChild(h('div',{style:{textAlign:'right'}},
+    h('div',{style:{fontSize:'10px',color:'#666'}},'発行元'),
+    h('div',null,r.from_clinic||''),
+    h('div',{style:{fontWeight:'700'}},(r.from_doctor||'')+' 医師')
+  ));
+  d.appendChild(top);
+  // 内容
+  const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'10px'},border:'1'});
+  const addR=(l,v)=>{tbl.appendChild(h('tr',null,
+    h('td',{style:{padding:'6px',fontWeight:'700',width:'140px',background:'#f9f9f9'}},l),
+    h('td',{style:{padding:'6px',whiteSpace:'pre-wrap'}},v||'—')
+  ))};
+  addR('患者氏名',(pt.name||'')+' 様');
+  addR('生年月日・年齢',(pt.age?pt.age+'歳':'')+(pt.sex?'　'+(pt.sex==='female'?'女性':'男性'):''));
+  addR('紹介目的',r.purpose);
+  addR('現在の傷病名・診断',r.diagnosis);
+  addR('既往歴・治療経過',r.treatment_history);
+  addR('現在の処方',r.current_medication);
+  addR('アレルギー・禁忌',r.allergies);
+  addR('検査結果（要点）',r.examination_results);
+  addR('紹介理由・依頼内容',r.request_content);
+  d.appendChild(tbl);
+  d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));
+  cn.appendChild(d);
+  if(typeof saveDocument==='function'){
+    saveDocument('medical_referral','診療情報提供書　'+(pt.name||'')+'　'+(r.issued_date||''),r.patient_id||'',r.id,r);
+  }
+  addAudit(r.audit,'診療情報提供書 PDF出力','');
+  sv();
+  (async()=>{
+    const sd = await fetchSignedDocInfo('medical_referral', r.id);
+    if(sd){
+      const wrap = document.createElement('div');
+      wrap.innerHTML = buildECertHtml(sd, r.from_doctor||S.user?.name||'担当医') + buildTimestampCertHtml(sd);
+      d.appendChild(wrap);
+    }
+    genPdf(cn,'診療情報提供書_'+(pt.name||'')+'.pdf');
+  })();
+  toast('PDF生成しました');
+}
+
+// v5.0.5: 歯科診療情報提供書 / 歯科訪問診療指示書 PDF 出力
+function genDentalPDF(r){
+  const pt=(D.patients||[]).find(p=>p.id===r.patient_id)||{};
+  const isReferral = r.doc_kind==='dental_referral';
+  const title = isReferral?'歯科診療情報提供書':'歯科訪問診療指示書';
+  const cn=document.getElementById('pdf-render');
+  cn.style.display='block';cn.innerHTML='';
+  const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.8',color:'#000',background:'#fff'}});
+  d.appendChild(h('div',{style:{textAlign:'center',fontSize:'17px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},title));
+  d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginTop:'8px'}},'発行日：'+(r.issued_date||'')));
+  const top=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',margin:'10px 0'}});
+  if(isReferral){
+    top.appendChild(h('div',null,
+      h('div',{style:{fontSize:'10px',color:'#666'}},'宛先'),
+      h('div',{style:{fontWeight:'700'}},(r.to_org_name||'')+' 御中'),
+      r.to_dentist?h('div',null,(r.to_dentist||'')+' 先生'):null
+    ));
+  }else{
+    top.appendChild(h('div',null,
+      h('div',{style:{fontSize:'10px',color:'#666'}},'指示対象'),
+      h('div',{style:{fontWeight:'700'}},r.target_for_hygienist||'歯科衛生士')
+    ));
+  }
+  top.appendChild(h('div',{style:{textAlign:'right'}},
+    h('div',{style:{fontSize:'10px',color:'#666'}},'発行元'),
+    h('div',null,r.from_clinic||''),
+    h('div',{style:{fontWeight:'700'}},(r.from_dentist||'')+' 歯科医師')
+  ));
+  d.appendChild(top);
+  const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'10px'},border:'1'});
+  const addR=(l,v)=>{tbl.appendChild(h('tr',null,
+    h('td',{style:{padding:'6px',fontWeight:'700',width:'140px',background:'#f9f9f9'}},l),
+    h('td',{style:{padding:'6px',whiteSpace:'pre-wrap'}},v||'—')
+  ))};
+  addR('患者氏名',(pt.name||'')+' 様');
+  addR('生年月日・年齢',(pt.age?pt.age+'歳':'')+(pt.sex?'　'+(pt.sex==='female'?'女性':'男性'):''));
+  addR('主訴',r.chief_complaint);
+  addR('既往歴・現病歴',r.medical_history);
+  addR('口腔内所見',r.oral_findings);
+  addR('補綴物状態',r.prosthesis_status);
+  addR('歯周ポケット深度',r.periodontal_pocket);
+  addR('X線所見',r.xray_findings);
+  if(isReferral){addR('紹介目的',r.purpose);}
+  else{addR('指示内容',r.instructions);}
+  d.appendChild(tbl);
+  d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));
+  cn.appendChild(d);
+  if(typeof saveDocument==='function'){
+    saveDocument(r.doc_kind||'dental_referral',title+'　'+(pt.name||'')+'　'+(r.issued_date||''),r.patient_id||'',r.id,r);
+  }
+  addAudit(r.audit,title+' PDF出力','');
+  sv();
+  (async()=>{
+    const sd = await fetchSignedDocInfo(r.doc_kind||'dental_referral', r.id);
+    if(sd){
+      const wrap = document.createElement('div');
+      wrap.innerHTML = buildECertHtml(sd, r.from_dentist||S.user?.name||'担当歯科医') + buildTimestampCertHtml(sd);
+      d.appendChild(wrap);
+    }
+    genPdf(cn,title+'_'+(pt.name||'')+'.pdf');
+  })();
+  toast('PDF生成しました');
+}
+
+function genAssessPDF(a,pt){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'アセスメント'));d.appendChild(h('div',{style:{margin:'12px 0'}},'患者：'+(pt?pt.name:'')+'　種別：'+({pre_admission:'入居前',periodic:'定期',adhoc:'臨時',post_incident:'事故後'}[a.type]||'')+'　日付：'+a.date+'　担当：'+a.author));const items=[];if(a.adl){const i=Object.entries(a.adl).filter(([,v])=>v);if(i.length)items.push('ADL: '+i.map(([k,v])=>k+'='+v).join(', '))}if(a.medical){const i=Object.entries(a.medical).filter(([,v])=>v);if(i.length)items.push('医療処置: '+i.map(([k])=>k).join(', '))}if(a.risk){const i=Object.entries(a.risk).filter(([,v])=>v);if(i.length)items.push('リスク: '+i.map(([k])=>k).join(', '))}if(a.medication)items.push('服薬: '+a.medication);if(a.family)items.push('家族意向: '+a.family);if(a.conditions)items.push('受入条件: '+a.conditions);if(a.notes)items.push('備考: '+a.notes);d.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'12px',fontFamily:'serif'}},items.join('\n\n')));d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);
+// v5.0.5: アセスPDFにも電子署名+TSA ブロックを追加 + saveDocument 連動
+if(typeof saveDocument==='function'){saveDocument('assessment','アセスメント　'+(pt?pt.name:'')+'　'+(a.date||''),a.patient_id||a.patientId||(pt?pt.id:''),a.id,a);}
+(async()=>{
+  const sd = await fetchSignedDocInfo('assessment', a.id);
+  if(sd){
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildECertHtml(sd, a.author||'担当者') + buildTimestampCertHtml(sd);
+    d.appendChild(wrap);
+  }
+  genPdf(cn,'アセスメント_'+(pt?pt.name:'')+'.pdf');
+})();
+}
 function showRecordPreview(c){
 const g=c.record?.guidance||{};
 const pt=D.patients.find(p=>p.id===c.patientId)||{};
