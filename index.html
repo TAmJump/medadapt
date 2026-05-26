@@ -112,17 +112,20 @@ body {
   isolation: isolate;
   min-height: 720px;
 }
-/* チーム写真背景（全面・トリミングなし）v5.0.6: 彩度を落として透け感を出す */
+/* チーム写真背景（全面・トリミングなし）v5.0.6: 画像比率16:9を維持して両端切れ防止 */
 .hero::before {
   content: ''; position: absolute;
-  inset: 0;
+  top: 0; left: 0; right: 0;
+  /* 画像比率(1600×900=16:9)を保持。画面幅100%で表示し、高さは自動算出 */
+  aspect-ratio: 16 / 9;
   background-image: url('assets/img/generated/v2/team_yaruze_hero.jpg');
-  background-size: cover;
-  background-position: center 18%;
+  background-size: 100% 100%;
+  background-position: center top;
+  background-repeat: no-repeat;
   filter: saturate(0.75) brightness(1.05);
   z-index: -2;
 }
-/* 全面薄白オーバーレイ（写真透けOK・下半分はテキストの可読性のため濃く） v5.0.6: 上部やや濃くして淡い印象に */
+/* 全面薄白オーバーレイ（写真透けOK・下半分はテキストの可読性のため濃く） v5.0.6 */
 .hero::after {
   content: ''; position: absolute;
   inset: 0;
@@ -154,13 +157,14 @@ body {
   box-shadow: 0 16px 48px rgba(15,23,42,.18), 0 4px 12px rgba(15,23,42,.08);
   color: var(--ink);
   text-align: left;
-  /* v5.0.6: 画面幅追随で大画面でも人物に被らないよう margin-top を可変に */
-  margin-top: clamp(420px, 38vw, 640px);
+  /* v5.0.6: 画像高さ(画面幅×9/16=56.25vw)の約70%地点(=脚部分)からテキスト開始 */
+  /* 大画面では絶対値の上限で抑える(超大画面でも下がりすぎない) */
+  margin-top: min(calc(56.25vw * 0.72), 720px);
   margin-bottom: 70px;
 }
-/* v5.0.6: 大画面では .hero 自体の高さも追随させて、写真領域を確保 */
+/* v5.0.6: 大画面では .hero 自体の高さも画像高さに追随させる */
 @media (min-width: 981px) {
-  .hero { min-height: max(720px, 50vw); }
+  .hero { min-height: calc(56.25vw + 100px); }
 }
 .hero-title {
   font-size: clamp(2.6rem, 6.4vw, 4.8rem);
