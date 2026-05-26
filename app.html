@@ -786,10 +786,12 @@ function fmtSignedTimeJST(iso){
 
 // 共通の電子署名認証バナー（シアン枠）
 function buildECertHtml(sd, signerName){
-  if(!sd || !sd.signed_at) return '';
+  // v5.0.5: signed_documents には signed_at 列がないため finalized_at / created_at をフォールバックに
+  const signedAt = sd && (sd.signed_at || sd.finalized_at || sd.created_at);
+  if(!sd || !signedAt) return '';
   const signer = signerName || sd.signer_name || '—';
   const tsa = (sd.tsa_authority||'').toUpperCase() || 'SEIKO';
-  const ts = fmtSignedTimeJST(sd.tsa_acquired_at || sd.signed_at);
+  const ts = fmtSignedTimeJST(sd.tsa_acquired_at || signedAt);
   return `
   <div style="background:linear-gradient(135deg,#ecfeff 0%,#f0fdfa 100%);border:2px solid #0891b2;border-radius:12px;padding:12px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start;font-family:'Hiragino Sans','Yu Gothic','Meiryo',sans-serif;">
     <div style="width:36px;height:36px;border-radius:50%;background:#0891b2;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0;">✓</div>
@@ -831,9 +833,16 @@ function buildTimestampCertHtml(sd){
 }
 
 // signed_documents から該当帳票のメタデータを取得
+// v5.0.5: Worker レスポンスは {ok:true, signed_document:{...}} ラッパ形式のため、
+// signed_document 部分のみアンラップして返す。Worker 側の enrichTsaFields により
+// tsa_authority_name / tsa_cert_no / tsa_serial / hash_algorithm / document_hash
+// が補完済みの構造化メタデータが含まれる。
 async function fetchSignedDocInfo(docKind, docId){
   if(!docKind || !docId) return null;
-  return await api(`/signed-docs/by-doc/${docKind}/${docId}`, {silent404: true});
+  const res = await api(`/signed-docs/by-doc/${docKind}/${docId}`, {silent404: true});
+  if(!res) return null;
+  // 後方互換: signed_document でラップされている場合はアンラップ、そうでない場合はそのまま
+  return res.signed_document || res;
 }
 
 // HTML escape helper（ヘルパー関数群で使用）

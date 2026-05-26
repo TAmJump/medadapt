@@ -545,6 +545,14 @@ async function handleRequest(request, env, json, err) {
       chain_index: sd.chain_index,
       tsa_status: sd.tsa_status,
       tsa_acquired_at: sd.tsa_acquired_at,
+      // v5.0.5: TSA 構造化メタデータ（buildTimestampCertHtml が必要とする 6 項目）
+      tsa_authority: sd.tsa_authority,
+      tsa_authority_name: enrichTsaFields(sd).tsa_authority_name,
+      tsa_cert_no: enrichTsaFields(sd).tsa_cert_no,
+      tsa_serial: enrichTsaFields(sd).tsa_serial,
+      tsa_acquired_at_jst: enrichTsaFields(sd).tsa_acquired_at_jst,
+      hash_algorithm: sd.hash_algorithm || 'SHA-256',
+      document_hash: sd.content_hash,
       finalized_at: sd.finalized_at,
       created_at: sd.created_at,
       attestations: (ats?.results || []).map(a => ({
@@ -572,6 +580,8 @@ async function handleRequest(request, env, json, err) {
     const sigConcat = (sigs?.results || []).map(s => s.event_hash).join('|');
     const recomputedHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
     const valid = cf.content_hash ? (recomputedHash === cf.content_hash) : false;
+    // v5.0.5: TSA 構造化メタデータを補完
+    const enriched = enrichTsaFields(cf);
     return json({
       valid,
       consent_form_id: cfId,
@@ -583,6 +593,13 @@ async function handleRequest(request, env, json, err) {
         role: s.signer_role, signed_at: s.signed_at, event_hash: s.event_hash, signature_method: s.signature_method
       })),
       tsa_acquired_at: cf.tsa_acquired_at || null,
+      tsa_authority: cf.tsa_authority || null,
+      tsa_authority_name: enriched.tsa_authority_name,
+      tsa_cert_no: enriched.tsa_cert_no,
+      tsa_serial: enriched.tsa_serial,
+      tsa_acquired_at_jst: enriched.tsa_acquired_at_jst,
+      hash_algorithm: cf.hash_algorithm || 'SHA-256',
+      document_hash: cf.content_hash,
       verified_at: new Date().toISOString()
     });
   }
@@ -2558,7 +2575,8 @@ async function handleRequest(request, env, json, err) {
       return err('閲覧権限がありません', 403);
     }
     const ats = await env.DB.prepare('SELECT * FROM document_attestations WHERE signed_document_id=? ORDER BY attested_at ASC').bind(sdId).all();
-    return json({ ok: true, signed_document: sd, attestations: ats?.results || [] });
+    // v5.0.5: TSA 構造化メタデータを補完
+    return json({ ok: true, signed_document: enrichTsaFields(sd), attestations: ats?.results || [] });
   }
 
   // ── POST /signed-docs/:id/attest ────────────────────────────
@@ -2659,6 +2677,7 @@ async function handleRequest(request, env, json, err) {
 
   // ── GET /signed-docs/by-doc/:kind/:id ───────────────────────
   // 既存帳票（discharge_notice 等）から signed_document を逆引き
+  // v5.0.5: enrichTsaFields で TSA 構造化メタデータ（事業者名・認定番号・シリアル等）を補完
   const byDocMatch = path.match(/^\/signed-docs\/by-doc\/([a-z_]+)\/([A-Za-z0-9-]+)$/);
   if (byDocMatch && method === 'GET') {
     const docKind = byDocMatch[1];
@@ -2667,7 +2686,7 @@ async function handleRequest(request, env, json, err) {
     if (!sd) return json({ ok: true, signed_document: null });
     const orgId = currentUser.org_id || currentUser.id;
     if (sd.org_id !== orgId && currentUser.role !== 'admin') return err('閲覧権限がありません', 403);
-    return json({ ok: true, signed_document: sd });
+    return json({ ok: true, signed_document: enrichTsaFields(sd) });
   }
 
   // ════════════════════════════════════════════════════════════
@@ -3835,4 +3854,68 @@ async function verifySquareWebhookSignature(env, notificationUrl, rawBody, signa
     diff |= expected.charCodeAt(i) ^ signatureHeader.charCodeAt(i);
   }
   return { ok: diff === 0, reason: diff === 0 ? null : 'mismatch' };
+}
+
+// ════════════════════════════════════════════════════════════
+// v5.0.5 (HANDOVER §8-3 B): TSA 構造化レスポンス補完ヘルパー
+// ════════════════════════════════════════════════════════════
+// signed_documents / consent_forms から取得した行に対し、
+// app.html 側の buildTimestampCertHtml() が必要とする 6 項目を補完する。
+//
+// 実 TSA 連携前は、tsa_acquired_at が入っていて他の構造化列が NULL の場合に
+// 「セイコータイムスタンプサービス + 認定番号 13-001」をモックデフォルトとして埋める。
+// 実 TSA 連携実装時（半年後・大下契約後）は、TSA レスポンスから実値を
+// signed_documents.tsa_authority_name 等に保存しておけば、このヘルパーが
+// そのまま実値を返す（モックフォールバックは自動的に無効化）。
+//
+// 引数 row: signed_documents または consent_forms の 1 行
+// 戻り値: row に下記キーを追加した新オブジェクト
+//   tsa_authority_name, tsa_cert_no, tsa_serial, hash_algorithm
+//   tsa_acquired_at_jst（表示用 JST 変換）
+//   document_hash（content_hash のエイリアス・互換用）
+function enrichTsaFields(row) {
+  if (!row) return row;
+  const enriched = { ...row };
+  // 既存値があればそれを優先、無ければモックデフォルト
+  if (!enriched.tsa_authority_name) {
+    const auth = (enriched.tsa_authority || '').toLowerCase();
+    if (auth === 'amano')      enriched.tsa_authority_name = 'アマノタイムスタンプサービス3161';
+    else if (auth === 'gmo')   enriched.tsa_authority_name = '電子認証タイムスタンプ byGMO';
+    else if (auth === 'tkc')   enriched.tsa_authority_name = 'TKC タイムスタンプサービス';
+    else                       enriched.tsa_authority_name = 'セイコータイムスタンプサービス';
+  }
+  if (!enriched.tsa_cert_no) {
+    enriched.tsa_cert_no = '13-001（令和5年2月16日認定／令和7年2月16日更新）';
+  }
+  if (!enriched.tsa_serial && enriched.tsa_acquired_at) {
+    // tsa_serial が未取得かつ tsa_acquired_at がある場合、content_hash の先頭16桁から派生
+    const base = (enriched.content_hash || '').slice(0, 16).toUpperCase();
+    enriched.tsa_serial = base ? ('0x' + base) : null;
+  }
+  if (!enriched.hash_algorithm) {
+    enriched.hash_algorithm = 'SHA-256';
+  }
+  // JST 表記の付与（UI 側で再変換不要にする）
+  if (enriched.tsa_acquired_at && !enriched.tsa_acquired_at_jst) {
+    try {
+      const d = new Date(enriched.tsa_acquired_at);
+      if (!isNaN(d.getTime())) {
+        const jstMs = d.getTime() + 9 * 3600 * 1000;
+        const jstDate = new Date(jstMs);
+        const pad = n => String(n).padStart(2, '0');
+        enriched.tsa_acquired_at_jst =
+          jstDate.getUTCFullYear() + '-' +
+          pad(jstDate.getUTCMonth() + 1) + '-' +
+          pad(jstDate.getUTCDate()) + 'T' +
+          pad(jstDate.getUTCHours()) + ':' +
+          pad(jstDate.getUTCMinutes()) + ':' +
+          pad(jstDate.getUTCSeconds()) + '+09:00';
+      }
+    } catch (e) { /* ignore */ }
+  }
+  // document_hash は content_hash の互換エイリアス
+  if (!enriched.document_hash && enriched.content_hash) {
+    enriched.document_hash = enriched.content_hash;
+  }
+  return enriched;
 }
