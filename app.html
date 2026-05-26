@@ -3399,7 +3399,8 @@ function consentNewPage(){
   const typeWrap=h('div');
   typeWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'施術種別 *'));
   const typeSel=h('select',{id:'cf-type',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
-  ['acupuncture:はり・きゅう','massage:あマ指（あん摩・マッサージ・指圧）','both:はり・きゅう＋あマ指'].forEach(o=>{
+  // v5.0.5: HANDOVER §8-3 F: request_form（訪問診療同意書/依頼書）を選択肢に追加
+  ['acupuncture:はり・きゅう','massage:あマ指（あん摩・マッサージ・指圧）','both:はり・きゅう＋あマ指','request_form:訪問診療同意書（依頼書）'].forEach(o=>{
     const [v,l]=o.split(':');
     typeSel.appendChild(h('option',{value:v},l));
   });
@@ -3504,18 +3505,20 @@ function consentNewPage(){
   const submitBtn=btn('発行する（医師署名へ進む）','btn-pri',async ()=>{
     const pt=document.getElementById('cf-patient').value;
     if(!pt){toast('患者を選択してください');return;}
+    const ctype=document.getElementById('cf-type').value;
     const dRaw=document.getElementById('cf-diseases').value.trim();
-    if(!dRaw){toast('傷病名を1つ以上入力してください');return;}
-    const diseases=dRaw.split('\n').filter(l=>l.trim()).map(l=>{
+    // v5.0.5: request_form（訪問診療同意書/依頼書）の場合は傷病名を任意に
+    if(ctype!=='request_form' && !dRaw){toast('傷病名を1つ以上入力してください');return;}
+    const diseases= dRaw ? dRaw.split('\n').filter(l=>l.trim()).map(l=>{
       const m=l.split(':');
       return {name:(m[0]||'').trim(),onset_date:(m[1]||'').trim()||null};
-    });
+    }) : [];
     const reasonChecks=document.querySelectorAll('.cf-reason:checked');
     const drJson={};
     reasonChecks.forEach(cb=>{drJson[cb.value]=true});
     const body={
       patient_id:pt,
-      consent_type:document.getElementById('cf-type').value,
+      consent_type:ctype,
       disease_names:diseases,
       consent_date:document.getElementById('cf-date').value,
       validity_months:(function(){

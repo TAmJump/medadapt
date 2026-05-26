@@ -2039,11 +2039,16 @@ async function handleRequest(request, env, json, err) {
       patient_name, patient_address, patient_birth,
       form_payload
     } = body;
-    if (!patient_id || !consent_type || !disease_names || !consent_date) {
-      return err('必須項目が不足しています（patient_id / consent_type / disease_names / consent_date）');
+    // v5.0.5: request_form（訪問診療同意書/依頼書）の場合は disease_names を不要に
+    // （依頼書テンプレートでは疾患名は必須項目ではないため）
+    if (!patient_id || !consent_type || !consent_date) {
+      return err('必須項目が不足しています（patient_id / consent_type / consent_date）');
     }
-    if (!['acupuncture', 'massage', 'both'].includes(consent_type)) {
-      return err('consent_type は acupuncture / massage / both のいずれか');
+    if (consent_type !== 'request_form' && !disease_names) {
+      return err('disease_names が必要です（はり・きゅう／あマ指の場合）');
+    }
+    if (!['acupuncture', 'massage', 'both', 'request_form'].includes(consent_type)) {
+      return err('consent_type は acupuncture / massage / both / request_form のいずれか');
     }
     // 患者の存在 + 同医療機関配下確認
     const orgId = currentUser.org_id || currentUser.id;
@@ -2058,7 +2063,10 @@ async function handleRequest(request, env, json, err) {
     const cfId = 'CF-' + genUuid();
     const tpId = 'TP-' + genUuid();
     const now = new Date().toISOString();
-    const diseaseJson = typeof disease_names === 'string' ? disease_names : JSON.stringify(disease_names);
+    // v5.0.5: request_form 時は空配列で代替
+    const diseaseJson = disease_names
+      ? (typeof disease_names === 'string' ? disease_names : JSON.stringify(disease_names))
+      : '[]';
     const difficultyJson = difficulty_reasons ? (typeof difficulty_reasons === 'string' ? difficulty_reasons : JSON.stringify(difficulty_reasons)) : '';
     const formPayloadJson = form_payload ? (typeof form_payload === 'string' ? form_payload : JSON.stringify(form_payload)) : '{}';
     // doctor_user_id：med_clinic 本人 or org_staff から作成する場合は同 org 内の med_clinic を採用
