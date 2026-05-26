@@ -494,6 +494,31 @@ body {
 .footer-links a { color:rgba(255,255,255,.4); text-decoration:none; font-size:.72rem; transition:color .2s; }
 .footer-links a:hover { color:#fff; }
 
+/* ─── Footer easter egg ─── */
+/* 「ｍやるゼ！」の「ｍ」が何を意味するか、こっそり */
+.footer-easter-egg { position:relative; display:inline-flex; align-items:center; }
+.footer-easter-egg-trigger {
+  font-size:.7rem; color:rgba(255,255,255,.3); margin-left:8px;
+  cursor:help; transition:color .25s, transform .25s;
+  user-select:none;
+}
+.footer-easter-egg-trigger:hover { color:rgba(255,255,255,.7); transform:scale(1.15); }
+.footer-easter-egg-text {
+  position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%) translateX(-4px);
+  background:rgba(8,145,178,.95); color:#fff; padding:8px 14px; border-radius:8px;
+  font-size:.72rem; white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .25s, transform .25s; box-shadow:0 6px 18px rgba(0,0,0,.25);
+  z-index:10;
+}
+.footer-easter-egg-text em { font-style:normal; color:#fef08a; font-weight:700; }
+.footer-easter-egg:hover .footer-easter-egg-text {
+  opacity:1; transform:translateY(-50%) translateX(0);
+}
+@media (max-width:600px) {
+  .footer-easter-egg-text { left:auto; right:0; top:calc(100% + 6px); transform:translateY(-4px); white-space:normal; max-width:240px; }
+  .footer-easter-egg:hover .footer-easter-egg-text { transform:translateY(0); }
+}
+
 /* ─── Responsive ─── */
 @media (max-width:900px) {
   .hero-inner { grid-template-columns:1fr; text-align:center; }
@@ -1684,6 +1709,67 @@ body {
   </div>
 </section>
 
+<!-- ─── AD PLANS (v5.0 新設・広告まわりの料金プラン案内) ─── -->
+<section class="sec" id="ad-plans" style="background:linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);">
+  <div class="container">
+    <span class="sec-label-c">Ad Plans</span>
+    <h2 class="sec-title-c">広告との付き合い方を、選べます。</h2>
+    <p class="sec-sub-c">ご利用者・連携機関の体験を最優先に。広告は地域別で出し分けし、無関係な情報を表示しません。<br>※ 広告システムは段階的に提供開始予定です（時期はお知らせで案内）。</p>
+
+    <div style="max-width:1080px;margin:32px auto 0;display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:24px;">
+
+      <!-- プラン1: 広告無し（利用者向け有料オプション） -->
+      <div style="background:#fff;border-radius:16px;border:2px solid var(--blue-l);padding:28px 24px;box-shadow:0 4px 18px rgba(15,23,42,.06);position:relative;">
+        <div style="position:absolute;top:14px;right:14px;background:var(--blue-l);color:var(--blue-d);font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.08em;">利用者向け</div>
+        <div style="font-size:.72rem;font-weight:700;color:var(--blue);letter-spacing:.12em;margin-bottom:8px;">PLAN 01</div>
+        <h3 style="font-size:1.2rem;font-weight:800;margin:0 0 6px;color:var(--ink);">広告非表示プラン</h3>
+        <p style="font-size:.78rem;color:var(--ink-l);line-height:1.7;margin:0 0 16px;">アプリ内・通話画面・通知に広告を一切表示しない有料オプション。集中して業務に取り組みたい方向け。</p>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--ink);">¥<span style="font-size:2.4rem;">未定</span><span style="font-size:.78rem;font-weight:500;color:var(--ink-l);"> /月</span></div>
+        <div style="font-size:.7rem;color:var(--ink-l);margin-top:4px;">料金は提供開始時に確定します</div>
+        <ul style="font-size:.78rem;color:var(--ink-m);line-height:1.95;margin:14px 0 0;padding-left:18px;">
+          <li>アプリ内・通話中の広告を非表示</li>
+          <li>通知メールからもバナー除外</li>
+          <li>機能制限なし</li>
+        </ul>
+      </div>
+
+      <!-- プラン2: 広告掲載（広告主向け） -->
+      <div style="background:#fff;border-radius:16px;border:2px solid #fbbf24;padding:28px 24px;box-shadow:0 4px 18px rgba(15,23,42,.06);position:relative;">
+        <div style="position:absolute;top:14px;right:14px;background:#fef3c7;color:#92400e;font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.08em;">広告主向け</div>
+        <div style="font-size:.72rem;font-weight:700;color:#d97706;letter-spacing:.12em;margin-bottom:8px;">PLAN 02</div>
+        <h3 style="font-size:1.2rem;font-weight:800;margin:0 0 6px;color:var(--ink);">広告掲載プラン</h3>
+        <p style="font-size:.78rem;color:var(--ink-l);line-height:1.7;margin:0 0 16px;">医療・介護関連サービス、地域の事業所・薬局・福祉用具などの掲載枠。出稿審査あり。</p>
+        <div style="font-size:1.8rem;font-weight:900;color:var(--ink);">¥<span style="font-size:2.4rem;">未定</span><span style="font-size:.78rem;font-weight:500;color:var(--ink-l);"> /月</span></div>
+        <div style="font-size:.7rem;color:var(--ink-l);margin-top:4px;">料金は提供開始時に確定します</div>
+        <ul style="font-size:.78rem;color:var(--ink-m);line-height:1.95;margin:14px 0 0;padding-left:18px;">
+          <li>業種・地域でターゲティング</li>
+          <li>クリック・表示数レポート</li>
+          <li>医療・介護関連業種限定</li>
+        </ul>
+      </div>
+
+      <!-- プラン3: 地域別表示 -->
+      <div style="background:#fff;border-radius:16px;border:2px solid #d8b4fe;padding:28px 24px;box-shadow:0 4px 18px rgba(15,23,42,.06);position:relative;">
+        <div style="position:absolute;top:14px;right:14px;background:#f3e8ff;color:#6b21a8;font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.08em;">地域連携</div>
+        <div style="font-size:.72rem;font-weight:700;color:#9333ea;letter-spacing:.12em;margin-bottom:8px;">FEATURE</div>
+        <h3 style="font-size:1.2rem;font-weight:800;margin:0 0 6px;color:var(--ink);">地域別ターゲティング</h3>
+        <p style="font-size:.78rem;color:var(--ink-l);line-height:1.7;margin:0 0 16px;">大阪の事業所が東京の利用者に表示されても意味がない。利用者の所属エリアに基づいて、地域に合った情報だけを届けます。</p>
+        <ul style="font-size:.78rem;color:var(--ink-m);line-height:1.95;margin:14px 0 0;padding-left:18px;">
+          <li>都道府県・市区町村単位の出し分け</li>
+          <li>連携機関の検索結果と連動</li>
+          <li>無関係な広告を排除</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <p style="text-align:center;font-size:.72rem;color:var(--ink-l);margin-top:24px;line-height:1.8;max-width:680px;margin-left:auto;margin-right:auto;">
+      ※ 広告は会員数が一定規模に達した段階で段階的に提供開始予定です。料金・掲載基準は提供時に正式発表します。<br>
+      医療広告ガイドラインに準拠し、誇大広告・効果保証等は掲載審査で排除します。
+    </p>
+  </div>
+</section>
+
 <!-- ─── SCREENSHOTS ─── -->
 <section id="screens" style="background:#f0f4f8;padding:80px 0;">
   <div class="container">
@@ -1721,7 +1807,8 @@ body {
     <div>
       <div style="font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--blue);text-transform:uppercase;margin-bottom:12px;">03 — ビデオ通話</div>
       <h3 style="font-size:1.6rem;font-weight:800;line-height:1.4;margin-bottom:16px;">オンライン共同指導を<br>アプリ内で完結。</h3>
-      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">URL発行からビデオ通話・参加記録まで一体化。通話内容は補助的に自動文字起こしされますが、誤字や認識誤差はあり得るため、テンプレに沿って内容を確認・修正の上、議事録 PDF を出力します。</p>
+      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">URL発行からビデオ通話・参加記録まで一体化。通話内容は補助的に自動文字起こしされますが、誤字や認識誤差はあり得るため、テンプレに沿って内容を確認・修正の上、議事録 PDF を出力します。録音・録画データは関係者がダウンロード・保存でき、申し送り資料としてもそのまま活用できます。</p>
+      <p style="font-size:.82rem;color:var(--ink-l);line-height:1.85;margin-top:12px;padding:12px 14px;background:var(--blue-l);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;">僻地医療や在宅看取りの現場では、ご家族や主治医がその場に集まれない場面でも、オンラインで最期のお時間にそっと立ち会うことができます。声と表情の温度感を、距離を越えて届けます。</p>
     </div>
     <div style="border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15);max-width:340px;width:100%;margin:0 auto;">
       <img src="images/screen4.jpg" style="width:100%;display:block;" alt="オンライン通話">
@@ -1934,6 +2021,10 @@ body {
       <div class="footer-logo">
         
         <span class="footer-logo-text">ｍやるゼ！</span>
+        <div class="footer-easter-egg">
+          <span class="footer-easter-egg-trigger" title="ヒント：ホバーしてみてください">ⓘ</span>
+          <span class="footer-easter-egg-text">「ｍ」は <em>m</em>tg の ｍ ─ 多職種の <em>m</em>eeting を支えます。</span>
+        </div>
       </div>
       <div class="footer-links">
         <a href="#problems">課題</a>

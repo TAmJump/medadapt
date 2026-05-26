@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>やるゼ！プラットフォーム 統合設計書 v5.0 / 2026-05-26</title>
+<style>
+  body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f9f9f9; max-width: 1180px; margin: 20px auto; padding: 20px; line-height: 1.7; color: #222; }
+  h1 { background: linear-gradient(90deg, #0891b2, #0e7490); color: white; padding: 20px 26px; border-radius: 8px; margin: 0 0 24px; }
+  h2 { background: #0891b2; color: white; padding: 12px 18px; border-radius: 6px; margin-top: 36px; }
+  h3 { color: #0891b2; border-bottom: 2px solid #0891b2; padding-bottom: 4px; margin-top: 24px; }
+  h4 { color: #444; margin-top: 16px; background: #fef3c7; padding: 8px 14px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; background: white; }
+  th, td { border: 1px solid #ddd; padding: 8px 12px; font-size: 0.88em; vertical-align: top; }
+  th { background: #fef3c7; }
+  td.label { background: #f9fafb; font-weight: bold; width: 24%; }
+  .urgent { background: #fef2f2; border-left: 4px solid #dc2626; padding: 14px 18px; margin: 12px 0; border-radius: 4px; }
+  .urgent strong { color: #dc2626; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; margin: 12px 0; border-radius: 4px; }
+  .pitfall { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 14px 18px; margin: 12px 0; border-radius: 4px; }
+  .pitfall strong { color: #b45309; }
+  .ok { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px 18px; margin: 12px 0; border-radius: 4px; }
+  .ok strong { color: #16a34a; }
+  .v5-new { background: #fef9c3; border: 2px solid #f59e0b; padding: 14px 18px; margin: 12px 0; border-radius: 4px; }
+  .v5-new strong { color: #b45309; }
+  code { background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.85em; }
+  pre { background: #1e293b; color: #f1f5f9; padding: 14px 18px; border-radius: 6px; overflow-x: auto; font-size: 0.78em; line-height: 1.55; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  .toc { background: white; padding: 16px 24px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 32px; }
+  .toc a { color: #0891b2; text-decoration: none; font-weight: 600; }
+  .toc ol { padding-left: 24px; }
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 2px solid #0891b2; color: #666; font-size: 0.85em; text-align: center; }
+  .badge-done { background: #16a34a; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; }
+  .badge-todo { background: #dc2626; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; }
+  .badge-progress { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; }
+  .phase-table { width: 100%; }
+  .phase-table th { background: #0891b2; color: white; }
+  .phase-1 { background: #ecfeff; }
+  .phase-2 { background: #fef9c3; }
+  .phase-3 { background: #fce7f3; }
+  .phase-4 { background: #ede9fe; }
+</style>
+</head>
+<body>
+
+<h1>やるゼ！プラットフォーム 統合設計書 v5.0<br>2026-05-26 / 医療文書共有・外部連携BOX・医師本人確認 大幅機能追加</h1>
+
+<p>本書は v4.21 を基盤に、2026-05-26 大下指示「医師本人確認・医療文書共有・タイムスタンプ機能 追加指示書」+ 10件の追加要件への対応設計を集約する v5.0 設計書。<strong>5/28 デプロイ目標</strong>で、Phase 1〜4 の段階実装を以下で規定する。</p>
+
+<div class="urgent">
+<strong>⚠️ 実装上の絶対ルール（v5.0）</strong>:
+<ol>
+<li>既存の <code>signed_documents</code> / <code>document_attestations</code> / <code>hash_chain</code> を壊さない</li>
+<li>既存テーブルの不用意な ALTER は禁止。新規追加は別テーブル</li>
+<li>医療文書は <code>doc_kind</code> 追加で対応</li>
+<li>確定済み文書は上書き禁止 → 修正は新版発行のみ</li>
+<li>医師未確認ユーザーは医師文書を確定できない</li>
+<li>文書確定時は再認証必須</li>
+<li>HPKI あり / なしを必ず表示</li>
+<li>紙スキャンと電子原本を明確に分ける</li>
+<li>共有先ごとに閲覧権限を分ける</li>
+<li>閲覧 / DL / 受領確認 / 差戻しを全てログ化</li>
+<li>verify URL で改ざん検証可能な状態を維持</li>
+<li>保存期限前の削除禁止（論理削除のみ）</li>
+<li>ZIP 一括タイムスタンプ禁止 → 文書単位でハッシュ・署名・タイムスタンプを持つ</li>
+</ol>
+</div>
+
+<div class="toc">
+<h3 style="margin-top:0;border:none;">目次</h3>
+<ol>
+<li><a href="#scope">§1 v5.0 のスコープと優先順位</a></li>
+<li><a href="#confirmed">§2 確認済み事項（現状調査結果）</a></li>
+<li><a href="#phase1">§3 Phase 1: 外部連携BOX（doc_kind追加・アップロード・一覧・verify）</a></li>
+<li><a href="#phase2">§4 Phase 2: 外部機関共有・閲覧ログ・受領確認</a></li>
+<li><a href="#phase3">§5 Phase 3: 医師本人確認・HPKI・署名レベル</a></li>
+<li><a href="#phase4">§6 Phase 4: 保存期限・新版発行・監査ログ</a></li>
+<li><a href="#dental">§7 歯科対応</a></li>
+<li><a href="#kyotaku">§8 居宅療養管理指導（介護保険）対応</a></li>
+<li><a href="#discharge">§9 退院時共同指導 統一フォーマット</a></li>
+<li><a href="#massage-period">§10 訪問マッサージ（鍼灸含む）指示書の期間自由入力</a></li>
+<li><a href="#consent-flow">§11 同意書取扱フロー（参考資料・別途検討）</a></li>
+<li><a href="#recording">§12 録音・録画ダウンロード</a></li>
+<li><a href="#ad">§13 広告システム（段階提供）</a></li>
+<li><a href="#mtg">§14 「ｍやるゼ！」の「ｍ」イースターエッグ</a></li>
+<li><a href="#mitori">§15 オンライン通話・看取り対応の表現</a></li>
+<li><a href="#assessment-prev">§16 アセス・指示書の過去引継ぎ</a></li>
+<li><a href="#future">§17 1年以内タスク（半年後着手）</a></li>
+<li><a href="#schedule">§18 5/28までのスケジュール</a></li>
+</ol>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="scope">§1 v5.0 のスコープと優先順位</h2>
+
+<p>2026-05-26 大下指示は大別して以下に分類できる:</p>
+
+<table class="phase-table">
+<tr><th>カテゴリ</th><th>項目</th><th>v5.0 でやる</th><th>セッション</th></tr>
+<tr class="phase-1"><td rowspan="6">Phase 1<br>外部連携BOX基盤</td><td>doc_kind 14種類追加</td><td><span class="badge-todo">TODO</span></td><td>5/27</td></tr>
+<tr class="phase-1"><td>medical_document_shares テーブル追加</td><td><span class="badge-todo">TODO</span></td><td>5/27</td></tr>
+<tr class="phase-1"><td>medical_document_access_logs テーブル追加</td><td><span class="badge-todo">TODO</span></td><td>5/27</td></tr>
+<tr class="phase-1"><td>medical_document_versions テーブル追加</td><td><span class="badge-todo">TODO</span></td><td>5/27</td></tr>
+<tr class="phase-1"><td>患者詳細「外部連携BOX」タブ追加</td><td><span class="badge-todo">TODO</span></td><td>5/27</td></tr>
+<tr class="phase-1"><td>14 API 追加（upload/list/share/ack/reject/revoke/new-version/access-logs 等）</td><td><span class="badge-todo">TODO</span></td><td>5/27-28</td></tr>
+<tr class="phase-2"><td rowspan="3">Phase 2<br>共有・受領</td><td>外部機関共有 UI</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-2"><td>受領確認・差戻し・共有停止</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-2"><td>閲覧ログ表示画面</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-3"><td rowspan="3">Phase 3<br>医師認証</td><td>doctor_profiles テーブル追加</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-3"><td>署名レベル表示（none/system/license/hpki）</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-3"><td>HPKI フィールド（実連携は未対応・データ構造のみ）</td><td><span class="badge-progress">構造のみ</span></td><td>5/28</td></tr>
+<tr class="phase-4"><td rowspan="3">Phase 4<br>保管・監査</td><td>保存期限フィールド追加</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-4"><td>新版発行ワークフロー</td><td><span class="badge-todo">TODO</span></td><td>5/28</td></tr>
+<tr class="phase-4"><td>監査ログ出力（CSV）</td><td><span class="badge-progress">既存活用</span></td><td>5/28</td></tr>
+<tr><td rowspan="5">LP / UI 軽微修正</td><td>マッサージ指示書 期間自由入力</td><td><span class="badge-done">5/26 完了</span></td><td>5/26</td></tr>
+<tr><td>退院時共同指導 機関プルダウン</td><td><span class="badge-done">5/26 完了</span></td><td>5/26</td></tr>
+<tr><td>広告プラン LP セクション</td><td><span class="badge-done">5/26 完了</span></td><td>5/26</td></tr>
+<tr><td>看取り表現追加・録画DL予告</td><td><span class="badge-done">5/26 完了</span></td><td>5/26</td></tr>
+<tr><td>「ｍ=mtg」のｍ イースターエッグ</td><td><span class="badge-done">5/26 完了</span></td><td>5/26</td></tr>
+<tr><td rowspan="2">追加要件</td><td>歯科対応（医科同等の発行・カンファ参加）</td><td><span class="badge-progress">設計のみ</span></td><td>5/27-28</td></tr>
+<tr><td>居宅療養管理指導（介護保険）対応</td><td><span class="badge-progress">設計のみ</span></td><td>5/27-28</td></tr>
+<tr><td>1年以内タスク</td><td>サービスキャンセル / 広告本格運用 / 電子カルテ連携</td><td>× 半年後</td><td>2026/12-</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="confirmed">§2 確認済み事項（現状調査結果）</h2>
+
+<h3>2-1. 各事業所から医師指示書への直接アクセス</h3>
+
+<div class="ok">
+<strong>結論: アクセス制御は実装済み（ただし共有モデルは v5.0 で拡張）</strong>
+<ul>
+<li>既存 <code>consent_forms</code> は <code>shared_to_user_id</code> による明示共有のみ。Worker (L2364) で <code>cf.shared_to_user_id !== currentUser.id</code> なら拒否</li>
+<li>退院通知は <code>notice_recipients</code> で受信者を明示管理</li>
+<li>第三者が URL を推測しても、本人 / 所属組織 / 共有先以外はアクセス不可</li>
+<li><strong>ただし</strong> 「複数事業所への 1:N 共有」「役割ベースの閲覧制限」は未実装 → Phase 2 で <code>medical_document_shares</code> として整備</li>
+</ul>
+</div>
+
+<h3>2-2. アセス・指示書等の過去引継ぎ</h3>
+
+<div class="pitfall">
+<strong>結論: 現状未実装、v5.0 で追加が必要</strong>
+<ul>
+<li><code>D.assessments.push(...)</code> はあるが、過去レコードから値をコピーする UI / API は未実装</li>
+<li>記録系（退院時共同指導・サービス担当者会議・モニタリング）も同様</li>
+<li><strong>追加方針</strong>: 各記録フォームの上部に「前回値を引き継ぐ」ボタンを追加。同一患者の最新レコードから ADL / 服薬 / 家族構成 / 病名等の汎用フィールドを初期値として埋める（§16 参照）</li>
+</ul>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="phase1">§3 Phase 1: 外部連携BOX（doc_kind追加・アップロード・一覧・verify）</h2>
+
+<h3>3-1. doc_kind 拡張</h3>
+
+<p>Worker <code>assets/worker_v7_complete.js</code> L2449 の <code>allowedKinds</code> を以下に拡張:</p>
+
+<pre>const allowedKinds = [
+  // 既存 6種
+  'consent_form',
+  'discharge_notice',
+  'org_nda',
+  'treatment_plan',
+  'acupuncture_report',
+  'joint_guidance_record',
+
+  // v5.0 新規 14種
+  'medical_referral',           // 診療情報提供書
+  'discharge_summary',          // 退院サマリ
+  'nursing_summary',            // 看護サマリ
+  'visit_nurse_instruction',    // 訪問看護指示書
+  'special_visit_instruction',  // 特別訪問看護指示書
+  'rehab_instruction',          // リハビリ指示書
+  'pharmacy_info',              // 薬剤情報提供書
+  'care_plan',                  // ケアプラン
+  'service_meeting_record',     // サービス担当者会議記録
+  'monitoring_record',          // モニタリング記録
+  'patient_consent',            // 患者同意書
+  'family_consent',             // 家族同意書
+  'home_medical_instruction',   // 在宅医療指示書
+  'massage_acupuncture_consent',// マッサージ・鍼灸同意書
+
+  // v5.0 追加（歯科・介護保険）
+  'dental_referral',            // 歯科診療情報提供書
+  'dental_instruction',         // 歯科指示書
+  'kyotaku_ryoyo_record'        // 居宅療養管理指導記録
+];</pre>
+
+<h3>3-2. 新規テーブル（D1 migration v15）</h3>
+
+<pre>-- 医療文書共有
+CREATE TABLE IF NOT EXISTS medical_document_shares (
+  id TEXT PRIMARY KEY,
+  signed_document_id TEXT NOT NULL,
+  patient_id TEXT,
+  from_org_id TEXT NOT NULL,
+  from_user_id TEXT NOT NULL,
+  to_org_id TEXT,
+  to_user_id TEXT,
+  to_role TEXT,
+  permission TEXT DEFAULT 'view',  -- view / download / acknowledge
+  share_status TEXT DEFAULT 'active',
+  shared_at TEXT NOT NULL,
+  expires_at TEXT,
+  revoked_at TEXT,
+  revoked_by TEXT,
+  message TEXT DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mds_document ON medical_document_shares(signed_document_id);
+CREATE INDEX IF NOT EXISTS idx_mds_patient ON medical_document_shares(patient_id);
+CREATE INDEX IF NOT EXISTS idx_mds_to_org ON medical_document_shares(to_org_id);
+CREATE INDEX IF NOT EXISTS idx_mds_to_user ON medical_document_shares(to_user_id);
+
+-- 閲覧・受領確認ログ
+CREATE TABLE IF NOT EXISTS medical_document_access_logs (
+  id TEXT PRIMARY KEY,
+  signed_document_id TEXT NOT NULL,
+  share_id TEXT,
+  patient_id TEXT,
+  user_id TEXT,
+  org_id TEXT,
+  role TEXT,
+  action TEXT NOT NULL,         -- view/download/print/acknowledge/reject/comment/revoke/verify
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mdal_document ON medical_document_access_logs(signed_document_id);
+CREATE INDEX IF NOT EXISTS idx_mdal_share ON medical_document_access_logs(share_id);
+CREATE INDEX IF NOT EXISTS idx_mdal_user ON medical_document_access_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_mdal_action ON medical_document_access_logs(action);
+
+-- 新版管理
+CREATE TABLE IF NOT EXISTS medical_document_versions (
+  id TEXT PRIMARY KEY,
+  parent_signed_document_id TEXT NOT NULL,
+  new_signed_document_id TEXT NOT NULL,
+  version_no INTEGER NOT NULL,
+  reason TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mdv_parent ON medical_document_versions(parent_signed_document_id);
+CREATE INDEX IF NOT EXISTS idx_mdv_new ON medical_document_versions(new_signed_document_id);</pre>
+
+<h3>3-3. 患者詳細に「外部連携BOX」タブ追加</h3>
+
+<p>v4.16 で患者ハブは「概要 / 受入れ・移行 / サービス担当者会議 / モニタリング / 記録・監査 / 同意書・帳票」の 6 タブ構成。これに新タブを 1 つ追加:</p>
+
+<pre>① 概要
+② 受入れ・移行
+③ サービス担当者会議
+④ モニタリング
+⑤ 記録・監査
+⑥ 同意書・帳票
+⑦ 外部連携BOX  ← v5.0 新規</pre>
+
+<h3>3-4. API（Phase 1 範囲）</h3>
+
+<table>
+<tr><th>API</th><th>メソッド</th><th>用途</th></tr>
+<tr><td>/medical-docs/upload</td><td>POST</td><td>医療文書アップロード（PDF / 構造化データ）</td></tr>
+<tr><td>/medical-docs/patient/:patient_id</td><td>GET</td><td>患者別文書一覧</td></tr>
+<tr><td>/verify/document/:signed_document_id</td><td>GET</td><td>既存検証URL流用</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="phase2">§4 Phase 2: 外部機関共有・閲覧ログ・受領確認</h2>
+
+<h3>4-1. 共有先ロール</h3>
+
+<table>
+<tr><th>ロール</th><th>閲覧可能文書</th></tr>
+<tr><td>hospital（病院）</td><td>全種類</td></tr>
+<tr><td>clinic_med（医科診療所・訪問診療）</td><td>全種類</td></tr>
+<tr><td>clinic_dent（歯科）</td><td>歯科系全種類 + 患者基本情報 + 薬剤情報</td></tr>
+<tr><td>visiting_nurse（訪問看護）</td><td>訪問看護指示書・特別訪問看護指示書・退院サマリ・診療情報提供書・看護サマリ</td></tr>
+<tr><td>pharmacy（薬局）</td><td>薬剤情報・診療情報提供書（薬剤関連部分）・服薬指導関連</td></tr>
+<tr><td>care_manager（居宅ケアマネ）</td><td>ケアプラン・退院サマリ・サービス担当者会議記録</td></tr>
+<tr><td>care_facility（介護施設）</td><td>退院サマリ・看護サマリ・診療情報提供書・同意書</td></tr>
+<tr><td>rehab_provider（リハビリ事業所）</td><td>リハビリ指示書・退院サマリ</td></tr>
+<tr><td>massage_acupuncture_provider</td><td>マッサージ・鍼灸同意書・訪問マッサージ指示書</td></tr>
+<tr><td>patient / family</td><td>同意書・共有許可された説明文書</td></tr>
+</table>
+
+<h3>4-2. API（Phase 2 範囲）</h3>
+
+<table>
+<tr><th>API</th><th>メソッド</th><th>用途</th></tr>
+<tr><td>/medical-docs/:id/share</td><td>POST</td><td>外部機関へ共有</td></tr>
+<tr><td>/medical-docs/shared-with-me</td><td>GET</td><td>自分／自組織に共有された文書一覧</td></tr>
+<tr><td>/medical-docs/:id/acknowledge</td><td>POST</td><td>受領確認</td></tr>
+<tr><td>/medical-docs/:id/reject</td><td>POST</td><td>差戻し</td></tr>
+<tr><td>/medical-docs/:id/revoke</td><td>POST</td><td>共有停止</td></tr>
+<tr><td>/medical-docs/:id/access-logs</td><td>GET</td><td>閲覧・受領ログ確認</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="phase3">§5 Phase 3: 医師本人確認・HPKI・署名レベル</h2>
+
+<h3>5-1. doctor_profiles テーブル</h3>
+
+<pre>CREATE TABLE IF NOT EXISTS doctor_profiles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  doctor_name TEXT NOT NULL,
+  medical_license_number TEXT,
+  license_image_url TEXT,
+  license_verified_status TEXT DEFAULT 'pending',
+  license_verified_at TEXT,
+  license_verified_by TEXT,
+  organization_id TEXT,
+  organization_name TEXT,
+  organization_verified_status TEXT DEFAULT 'pending',
+  organization_verified_at TEXT,
+  organization_verified_by TEXT,
+  hpki_enabled INTEGER DEFAULT 0,
+  hpki_cert_subject TEXT,
+  hpki_cert_serial TEXT,
+  hpki_cert_issuer TEXT,
+  hpki_verified_at TEXT,
+  signing_authority_status TEXT DEFAULT 'disabled',
+  mfa_enabled INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);</pre>
+
+<h3>5-2. 署名レベル（signature_level）</h3>
+
+<table>
+<tr><th>レベル</th><th>説明</th><th>表示例</th></tr>
+<tr><td>none</td><td>署名なし</td><td>署名未取得</td></tr>
+<tr><td>system_verified</td><td>システム内本人確認済み</td><td>システム内電子署名（HPKI未使用）</td></tr>
+<tr><td>doctor_license_verified</td><td>医師資格確認済み</td><td>医師資格確認済み署名</td></tr>
+<tr><td>hpki_signed</td><td>HPKI電子署名</td><td>HPKI電子署名（医師資格に基づく）</td></tr>
+<tr><td>external_signed_pdf</td><td>外部電子署名済みPDF</td><td>外部電子署名済み</td></tr>
+<tr><td>paper_scan</td><td>紙原本スキャン</td><td>紙原本スキャン（電子原本ではありません）</td></tr>
+</table>
+
+<div class="info">
+<strong>HPKI 実連携は v5.0 では未対応</strong>: フィールドとUI表示のみ実装。実 HPKI カード読み取り / 外部CA連携は別途検討（半年後タスク）。
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="phase4">§6 Phase 4: 保存期限・新版発行・監査ログ</h2>
+
+<h3>6-1. signed_documents への保存期限フィールド追加（ALTER）</h3>
+
+<div class="pitfall">
+<strong>例外的に ALTER 実施</strong>: 既存 signed_documents への ALTER は禁止だが、保存期限は文書単位で必須のため例外的に追加。後方互換のため全てデフォルト値あり:
+</div>
+
+<pre>ALTER TABLE signed_documents ADD COLUMN retention_required INTEGER DEFAULT 0;
+ALTER TABLE signed_documents ADD COLUMN retention_years INTEGER DEFAULT 5;
+ALTER TABLE signed_documents ADD COLUMN retention_until TEXT;
+ALTER TABLE signed_documents ADD COLUMN legal_basis TEXT;
+ALTER TABLE signed_documents ADD COLUMN delete_policy TEXT DEFAULT 'logical';
+ALTER TABLE signed_documents ADD COLUMN signature_level TEXT DEFAULT 'none';</pre>
+
+<h3>6-2. 文書ステータス</h3>
+
+<p>signed_documents の <code>status</code> 列に以下を許容:</p>
+
+<pre>draft / waiting_signature / waiting_timestamp / finalized
+shared / acknowledged / rejected / revoked
+expired / superseded / archived</pre>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="dental">§7 歯科対応</h2>
+
+<h3>7-1. 課題</h3>
+<p>大下指示: 「歯科も診療情報の発行やカンファレンス参加など、医科のように作業、操作できるようにして。記録関係はプルダウンで選べるようにしたらいいのかな？そもそもフォーマットの内容が違うのかな？」</p>
+
+<h3>7-2. 結論: フォーマットは似ているが項目が異なる</h3>
+
+<table>
+<tr><th>項目</th><th>医科</th><th>歯科</th></tr>
+<tr><td>診療情報提供書様式</td><td>厚労省様式（一般的）</td><td>歯科診療情報提供書様式（医療法施行規則・歯科特有）</td></tr>
+<tr><td>必須項目</td><td>主訴・既往歴・現病歴・現在の治療・処方等</td><td>主訴・口腔内所見・補綴物状態・歯周ポケット・X線所見等</td></tr>
+<tr><td>カンファレンス</td><td>退院時共同指導・サービス担当者会議</td><td>同左（歯科医師の参加機関種別が必要）→ §9 で対応済み（プルダウン「歯科診療所」追加）</td></tr>
+<tr><td>指示書</td><td>訪問看護指示書等</td><td>歯科訪問診療指示書（歯科衛生士向け）</td></tr>
+</table>
+
+<h3>7-3. 実装方針</h3>
+
+<ul>
+<li>doc_kind に <code>dental_referral</code>, <code>dental_instruction</code> を追加（既に §3-1 反映）</li>
+<li>診療情報提供書フォーム作成時、「医科 / 歯科」をユーザー選択し、項目フィールドを切り替え（テンプレで対応・別 doc_kind）</li>
+<li>退院時共同指導の機関プルダウンに「歯科診療所（訪問歯科含む）」を追加（5/26 完了）</li>
+<li>歯科診療所 (clinic_dent) ロールで院内アカウント発行可能に</li>
+</ul>
+
+<h3>7-4. 記録フォームのプルダウン</h3>
+
+<p>「記録関係はプルダウンで選べるようにしたら？」への回答: <strong>診療科プルダウンで初期値を切り替える方式</strong>を採用。フォーム自体は別 doc_kind だが、UI 上はプルダウン操作で適切なテンプレが開く。</p>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="kyotaku">§8 居宅療養管理指導（介護保険）対応</h2>
+
+<h3>8-1. 制度概要</h3>
+
+<table>
+<tr><td class="label">対象</td><td>介護保険被保険者（要支援・要介護認定者）</td></tr>
+<tr><td class="label">提供者</td><td>医師・歯科医師・薬剤師・管理栄養士・歯科衛生士</td></tr>
+<tr><td class="label">単位数</td><td>医師: 1回 515単位（月2回まで） / 歯科医師: 同左 / 薬剤師: 1回 565単位 等</td></tr>
+<tr><td class="label">頻度</td><td>原則月2回まで（月1回計画的訪問が基本）</td></tr>
+<tr><td class="label">記録要件</td><td>訪問日時・指導内容・利用者状況・ケアマネへの情報提供記録</td></tr>
+</table>
+
+<h3>8-2. 実装方針</h3>
+
+<ul>
+<li>doc_kind 追加: <code>kyotaku_ryoyo_record</code></li>
+<li>新規メニュー: 「居宅療養管理指導」（既存「同意書」「マッサージ・鍼灸」と並列）</li>
+<li>記録項目:
+  <ul>
+    <li>訪問日・時刻</li>
+    <li>提供職種（医師/歯科医師/薬剤師/管理栄養士/歯科衛生士）</li>
+    <li>利用者状況（バイタル・ADL・服薬・栄養）</li>
+    <li>指導内容</li>
+    <li>ケアマネへの情報提供（送付済み / 未送付）</li>
+    <li>次回訪問予定日</li>
+  </ul>
+</li>
+<li>オンライン実施対応: ビデオ通話セクション（既存）から URL 発行可能</li>
+<li>PDF 出力 + signed_documents 自動登録</li>
+<li>ケアマネへの自動共有: §4「医療文書共有」基盤を流用</li>
+</ul>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="discharge">§9 退院時共同指導 統一フォーマット</h2>
+
+<h3>9-1. 完了内容（5/26）</h3>
+
+<div class="ok">
+<strong>5/26 セッションで完了</strong>: <code>app.html</code> の退院時共同指導記録に、参加機関を選択するプルダウン UI を追加。以下16種類の機関種別から複数選択可能。
+</div>
+
+<ul>
+<li>病院</li>
+<li>医科診療所（訪問診療含む）</li>
+<li>歯科診療所（訪問歯科含む） ← §7 対応</li>
+<li>訪問看護事業所</li>
+<li>薬局（在宅対応含む）</li>
+<li>居宅介護支援事業所（ケアマネ）</li>
+<li>介護施設</li>
+<li>訪問介護事業所（ヘルパー）</li>
+<li>リハビリ事業所（PT/OT/ST）</li>
+<li>訪問マッサージ（鍼灸含む）</li>
+<li>福祉用具事業所</li>
+<li>デイサービス</li>
+<li>訪問入浴</li>
+<li>地域包括支援センター</li>
+<li>その他</li>
+</ul>
+
+<h3>9-2. 既存帳票への適用範囲</h3>
+
+<p>サービス担当者会議記録・モニタリング記録にも同じプルダウンを展開予定（5/27-28）。</p>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="massage-period">§10 訪問マッサージ（鍼灸含む）指示書の期間自由入力</h2>
+
+<h3>10-1. 完了内容（5/26）</h3>
+
+<div class="ok">
+<strong>5/26 完了</strong>: <code>app.html</code> L2867 のマッサージ同意書の期間UIを改修:
+<ul>
+<li>プリセット選択肢: 「6か月（通常）」「1か月（変形徒手矯正術）」</li>
+<li><strong>新規追加</strong>: 「カスタム期間を入力」を選択すると、開始日・終了日のカレンダー入力欄が出現</li>
+<li>送信時、カスタム期間の場合は開始/終了日の差から月数を算出して既存 <code>validity_months</code> フィールドに整数化して送付（Worker 側は無改修で互換維持）</li>
+<li>同時に <code>valid_from</code>, <code>valid_until</code> フィールドも送付（将来の Worker 側拡張で活用可能）</li>
+</ul>
+</div>
+
+<h3>10-2. 厚労省様式との整合性</h3>
+
+<p>厚労省「保医発第1001002号」では同意書の「加療期間」欄に具体的な日付範囲を記載することが認められている。プリセットの「6か月/1か月」は便宜的な選択肢で、本来は日付指定が正規ルート。</p>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="consent-flow">§11 同意書取扱フロー（参考資料・別途検討）</h2>
+
+<div class="info">
+大下指示: 「診療情報提供書の取り扱いについて→作成や提出をアプリ内で完結させたい。（※取り扱い方法は別途添付する。あくまでも参考までにだから、そのまま設計しないように。）」
+</div>
+
+<h3>11-1. 受領待ちの大下提供資料</h3>
+
+<p>診療情報提供書の取扱方法資料は<strong>別途添付予定</strong>。受領後、以下を決定する:</p>
+
+<ol>
+<li>記載必須項目（基本様式 vs 大下提案フォーマットの差分）</li>
+<li>署名フローの厳密さ（システム内署名で十分 / HPKI 必須 等）</li>
+<li>受領機関への自動共有ルール</li>
+<li>診療情報提供料（B009: 250点等）の算定根拠化</li>
+</ol>
+
+<p>5/28 までに資料が間に合えば実装、間に合わなければ 6 月以降に持ち越し。</p>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="recording">§12 録音・録画ダウンロード</h2>
+
+<h3>12-1. 大下指示</h3>
+<blockquote>録音、録画もされるんだっけ？ダウンロードもしくは保存できるようにして。（このデータをそのまま送った方が効率がいいし、言葉の温度感も分かる）</blockquote>
+
+<h3>12-2. 現状</h3>
+
+<p>ビデオ通話は Whereby を埋め込んで運用。Whereby 側で録画機能あり（プラン依存）。録画データは Whereby のクラウドに保存されるか、ローカル保存される。</p>
+
+<h3>12-3. 実装方針</h3>
+
+<ul>
+<li>LP 側: 録音・録画データのダウンロード可能を訴求（5/26 完了）</li>
+<li>app.html 側: 通話終了後の画面に「録画 / 録音ダウンロード」ボタンを追加（Whereby API で取得 or ファイルアップロード）</li>
+<li>ダウンロードしたデータを <code>signed_documents</code> に「録画ファイル」として登録（doc_kind 追加: <code>call_recording</code>）</li>
+<li>関係者への共有は §4 共有基盤を流用</li>
+</ul>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="ad">§13 広告システム（段階提供）</h2>
+
+<h3>13-1. 完了内容（5/26）</h3>
+
+<div class="ok">
+<strong>5/26 完了</strong>: LP（index.html）の料金セクション直後に「広告との付き合い方を、選べます。」セクション追加。3 プラン:
+<ol>
+<li>PLAN 01 広告非表示プラン（利用者向け有料オプション・料金未定）</li>
+<li>PLAN 02 広告掲載プラン（広告主向け・料金未定）</li>
+<li>FEATURE 地域別ターゲティング</li>
+</ol>
+</div>
+
+<h3>13-2. 料金未定の理由</h3>
+
+<p>大下指示「広告無し（月額いくら？）。広告掲載料（月額いくら？）」に対し、相場調査が必要。参考:</p>
+
+<table>
+<tr><th>サービス</th><th>広告非表示プラン</th><th>広告掲載料</th></tr>
+<tr><td>YouTube Premium</td><td>¥1,280/月</td><td>CPM ¥300-1000</td></tr>
+<tr><td>Spotify Premium</td><td>¥980/月</td><td>CPC ¥30-100</td></tr>
+<tr><td>類似BtoBアプリ</td><td>¥500-2000/月</td><td>¥30,000-100,000/月</td></tr>
+</table>
+
+<div class="pitfall">
+<strong>医療広告ガイドラインの制約</strong>: 医療機関に対する広告は厚労省「医療広告ガイドライン」に基づく審査が必要。誇大広告・効果保証・体験談等は禁止。広告審査機能の実装が必要（半年後タスク）。
+</div>
+
+<h3>13-3. 地域別ターゲティング</h3>
+
+<p>登録時に取得した「所属事業所所在地」を元に、都道府県・市区町村単位で出し分け。大阪の事業所が東京の利用者に表示されないよう、絶対的にフィルタ。</p>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="mtg">§14 「ｍやるゼ！」の「ｍ」イースターエッグ</h2>
+
+<h3>14-1. 完了内容（5/26）</h3>
+
+<div class="ok">
+<strong>5/26 完了</strong>: フッターのロゴ「ｍやるゼ！」の横に「ⓘ」アイコンを追加。ホバーで「『ｍ』は <strong>m</strong>tg の ｍ ─ 多職種の <strong>m</strong>eeting を支えます。」とツールチップ表示。
+</div>
+
+<h3>14-2. デザイン意図</h3>
+
+<ul>
+<li>「こっそり教えたい」意図に合わせ、初見では「ⓘ」だけが薄く表示</li>
+<li>ホバー時に半透明シアン背景でツールチップ展開</li>
+<li>モバイルでも動作（タップで表示）</li>
+</ul>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="mitori">§15 オンライン通話・看取り対応の表現</h2>
+
+<h3>15-1. 完了内容（5/26）</h3>
+
+<div class="ok">
+<strong>5/26 完了</strong>: <code>index.html</code> L1747 のビデオ通話セクションに、シアン枠のサブ説明を追加:
+<blockquote>僻地医療や在宅看取りの現場では、ご家族や主治医がその場に集まれない場面でも、オンラインで最期のお時間にそっと立ち会うことができます。声と表情の温度感を、距離を越えて届けます。</blockquote>
+</div>
+
+<h3>15-2. 表現の配慮</h3>
+
+<ul>
+<li>「死亡宣告」「臨終」など直接的な表現は避け、「最期のお時間にそっと立ち会う」と柔らかく</li>
+<li>「僻地医療」を明示し、対応事例があることを暗示</li>
+<li>「声と表情の温度感」で人間味を強調</li>
+</ul>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="assessment-prev">§16 アセス・指示書の過去引継ぎ</h2>
+
+<h3>16-1. 大下指示</h3>
+<blockquote>アセスや指示書等の記録計は、過去の内容を引き継げるようになっているか？</blockquote>
+
+<h3>16-2. 現状調査結果</h3>
+
+<div class="pitfall">
+<strong>未実装</strong>。現状は新規作成時に空フォームが開く。
+</div>
+
+<h3>16-3. 実装方針（5/27-28）</h3>
+
+<ul>
+<li>各記録フォーム（アセスメント・退院時共同指導・サービス担当者会議・モニタリング・指示書）の上部に「前回値を引き継ぐ」ボタンを追加</li>
+<li>クリック時、同一患者の同種類最新レコードを取得し、以下のフィールドを初期値として埋める:
+  <ul>
+    <li>ADL（食事・排泄・入浴・移動・認知）</li>
+    <li>服薬リスト</li>
+    <li>家族構成・主介護者</li>
+    <li>病名・既往歴</li>
+    <li>医療処置（経管栄養・カテーテル等）</li>
+  </ul>
+</li>
+<li>引き継いだ項目は薄黄色背景で「前回値」マークを表示、編集すると通常背景へ</li>
+<li>引き継ぎ元レコードのIDを <code>copied_from_record_id</code> に保存（監査ログ化）</li>
+</ul>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="future">§17 1年以内タスク（半年後着手）</h2>
+
+<table>
+<tr><th>タスク</th><th>概要</th><th>着手予定</th></tr>
+<tr><td>当日サービスキャンセル報告</td><td>訪問入浴・デイサービス等が、利用者の血圧・体調により当日キャンセル時、関係機関にアプリ内通知</td><td>2026/12</td></tr>
+<tr><td>広告本格運用</td><td>会員ある程度集まったら、アプリ内・通話中・通知で広告表示。地域別出し分け、有料非表示オプション</td><td>2026/12</td></tr>
+<tr><td>電子カルテ・介護記録系連携</td><td>外部の電子カルテ・介護記録システムと API 連携。基本情報・服薬情報等の双方向同期</td><td>2027/03</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════ -->
+<h2 id="schedule">§18 5/28までのスケジュール</h2>
+
+<table>
+<tr><th>日付</th><th>セッション</th><th>作業</th></tr>
+<tr><td>5/26（今日）</td><td>v5.0 設計＋LP・UI 軽微修正</td><td>
+  <ul>
+    <li>マッサージ指示書 期間自由入力 <span class="badge-done">完了</span></li>
+    <li>退院時共同指導 機関プルダウン <span class="badge-done">完了</span></li>
+    <li>広告プラン LP セクション <span class="badge-done">完了</span></li>
+    <li>看取り表現・録画DL予告 <span class="badge-done">完了</span></li>
+    <li>「ｍ=mtg」イースターエッグ <span class="badge-done">完了</span></li>
+    <li>v5.0 設計書作成 <span class="badge-done">完了</span></li>
+  </ul>
+</td></tr>
+<tr><td>5/27</td><td>Phase 1 + Phase 2 前半</td><td>
+  <ul>
+    <li>D1 migration v15（4 テーブル + ALTER）</li>
+    <li>doc_kind 14種類追加（Worker 側）</li>
+    <li>患者ハブに「外部連携BOX」タブ追加</li>
+    <li>医療文書アップロード UI/API</li>
+    <li>患者単位の文書一覧画面</li>
+    <li>過去引継ぎボタン（アセス・指示書等）</li>
+  </ul>
+</td></tr>
+<tr><td>5/28</td><td>Phase 2 後半 + Phase 3 + Phase 4 + QA</td><td>
+  <ul>
+    <li>外部機関共有 UI</li>
+    <li>共有先権限ロール対応</li>
+    <li>受領確認・差戻し・共有停止</li>
+    <li>閲覧ログ表示</li>
+    <li>doctor_profiles テーブル + 医師確認UI</li>
+    <li>署名レベル表示</li>
+    <li>保存期限フィールド</li>
+    <li>新版発行ワークフロー</li>
+    <li>歯科 / 居宅療養管理指導 doc_kind 追加</li>
+    <li>QA + 本番デプロイ</li>
+  </ul>
+</td></tr>
+</table>
+
+<div class="urgent">
+<strong>5/28 デプロイ判定基準</strong>: 以下が完了したら本番リリース。
+<ul>
+<li>Phase 1 = 外部連携BOX タブ表示 + 患者単位文書一覧 + 既存 verify URL 動作</li>
+<li>Phase 2 = 1機関への共有 + 受領確認 + 閲覧ログ記録</li>
+<li>Phase 3 = 医師資格確認ステータス表示（管理者が手動で「確認済み」マーク可能）</li>
+<li>Phase 4 = 保存期限フィールド表示 + 新版発行ボタン（実機能は半完成でも UI 出ていれば可）</li>
+</ul>
+<p>これに満たない場合はリリースを 6/1 まで遅延。</p>
+</div>
+
+<div class="footer">
+<p>やるゼ！プラットフォーム 統合設計書 v5.0 / 2026-05-26 作成<br>Owner: TAmJ.Corp 代表 / 大下さん</p>
+</div>
+
+</body>
+</html>
