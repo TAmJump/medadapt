@@ -158,13 +158,16 @@ let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',sign
 
 // ── API Helper ──
 async function api(path,opts={}){
-  const headers={'Content-Type':'application/json'};
+  const headers={};
+  // v5.0.4: FormData の場合は Content-Type を設定しない（multipart boundary をブラウザが自動付与）
+  if(!opts.isFormData)headers['Content-Type']='application/json';
   if(S.token)headers['Authorization']='Bearer '+S.token;
   // silent404: 404 をエラー扱いせず null を返す（「該当なし」を期待する API 用）
   const silent404 = opts.silent404 === true;
   // sanitize opts before fetch
   const fetchOpts = {...opts};
   delete fetchOpts.silent404;
+  delete fetchOpts.isFormData;
   // v4.19: ネットワーク失敗時に1回だけ自動リトライ（500ms後）
   const doFetch = async () => {
     return await fetch(API+path,{...fetchOpts,headers:{...headers,...(fetchOpts.headers||{})}});
@@ -5572,6 +5575,36 @@ async function loadNotifList(){
   }catch(e){}
 }
 
+// v5.0.4: 免許証画像アップロード（R2経由）
+function uploadLicenseImage(u,dp){
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='image/jpeg,image/png,image/webp,application/pdf';
+  inp.onchange=async(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    if(!file)return;
+    if(file.size>10*1024*1024){toast('ファイルサイズは10MB以内にしてください');return}
+    toast('アップロード中...');
+    try{
+      const fd=new FormData();
+      fd.append('file',file);
+      fd.append('purpose','license');
+      const res=await api('/files/upload',{method:'POST',body:fd,isFormData:true,silent404:true});
+      if(res&&res.file_url){
+        dp.license_image_url=res.file_url;
+        saveUser(u);
+        toast('免許証画像をアップロードしました。管理者の確認をお待ちください');
+        rr();
+      }else{
+        toast('アップロードに失敗しました（D1未適用の可能性）');
+      }
+    }catch(err){
+      toast('通信エラー: '+(err.message||err));
+    }
+  };
+  inp.click();
+}
+
 function settingsPage(){const w=h('div');const u=S.user;
 // 初回表示時：契約情報未取得なら取得して再描画
 if(!SQ.infoLoaded){SQ.infoLoaded=true;refreshBillingInfo().then(()=>rr());}
@@ -5625,7 +5658,7 @@ doc.appendChild(h('div',{style:{display:'flex',gap:'10px',marginTop:'12px',flexW
 // 操作ボタン
 doc.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'14px',flexWrap:'wrap'}},
   btn('プロフィール保存','btn-out',()=>{dp.doctor_name=document.getElementById('dr_n')?.value||dp.doctor_name;dp.medical_license_number=document.getElementById('dr_lic')?.value||'';dp.organization_name=document.getElementById('dr_org')?.value||'';saveUser(u);toast('保存しました')}),
-  btn('免許証画像アップロード','btn-out',()=>{toast('近日対応：免許証画像アップロード')}),
+  btn('免許証画像アップロード','btn-out',()=>uploadLicenseImage(u,dp)),
   btn(dp.mfa_enabled?'多要素認証 解除':'多要素認証 設定','btn-out',()=>{dp.mfa_enabled=!dp.mfa_enabled;saveUser(u);toast(dp.mfa_enabled?'多要素認証 ON':'多要素認証 OFF')}),
   u.role==='admin'?btn(dp.license_verified_status==='verified'?'資格確認 取消':'資格確認済みにする','btn-out',()=>{
     if(dp.license_verified_status==='verified'){dp.license_verified_status='pending';dp.license_verified_at=''}

@@ -1,6 +1,6 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-26（v5.0.4 / Phase 1-4 全実装完了 / Worker API 10本 / 医師認証フォーム / 保存期限通知 / 居宅療養PDF）
+**最終更新**: 2026-05-26（v5.0.4 / Phase 1-4 全実装＋R2 ファイルアップロード＋デプロイ自動化）
 
 **現状 HEAD**:
 - medadapt: v5.0.4
@@ -8,12 +8,18 @@
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
 **📌 v5.0 設計書**: `docs/DESIGN_yaruze_v5_0_2026-05-26.html`
+**📌 デプロイ手順書**: `docs/DEPLOY_v5_0_4_production.md` ★必読
 **📌 大下指示書**: 「医師本人確認・医療文書共有・タイムスタンプ機能 追加指示書」+ 10件の追加要件 + 1年以内タスク3件
 
-**📅 5/28 までのロードマップ**:
-- **5/26（今日）**: LP軽微修正5件＋アプリ修正2件＋v5.0設計書＋過去引継ぎ＋外部連携BOX UI＋大下指示書全項目（v5.0.3）＋Worker API 10本＋医師認証＋保存期限通知＋居宅療養PDF（v5.0.4）✅ 完了
-- **5/27**: D1 v16 適用（wrangler）+ Worker デプロイ + 本番動作確認
-- **5/28**: QA + LP/アプリ最終調整 + 本番リリース判定
+**📅 進行状況**:
+- **5/26（今日）**: 大下指示書 全項目実装完了（v5.0.1〜v5.0.4）✅ + Worker API 13本（うち R2 3本）+ wrangler.toml + GitHub Actions ワークフロー + デプロイ手順書 ✅
+- **次回再開時の必要作業**（Cloudflare 側操作・大下さんの手元 or GitHub Actions 経由）:
+  0. `docs/deploy_templates/worker.yml` を `.github/workflows/worker.yml` にコピーして commit & push（Claude PAT に workflow スコープがないため大下さんの手元で1回だけ）
+  1. Cloudflare API Token + Account ID + D1 Database ID 取得 → GitHub Secrets 登録
+  2. `wrangler.toml` の `REPLACE_WITH_ACTUAL_D1_ID` を実IDに差し替え（または同様の手動編集）
+  3. R2 バケット `medadapt-files` 作成
+  4. GitHub Actions「Deploy Cloudflare Worker」を `apply_migration=true` で実行（初回のみ）
+  5. デプロイ手順書 §E2E チェックリスト 8項目を実行
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
@@ -216,15 +222,64 @@ extDocs.forEach(d=>{
 - ✅ 居宅療養新規モーダル + 患者選択正常動作
 - ✅ JSエラー: ローカル特有のCORS以外 0件
 
-#### G. 残タスク（5/27-28 持ち越し）
+#### G. R2 ファイルアップロード機能（免許証画像・PDF添付対応）
 
-| 項目 | 日付 | 規模 |
+**Worker `worker_v7_complete.js` に 3 エンドポイント追加（計 13 本）**:
+
+| エンドポイント | メソッド | 用途 |
 |---|---|---|
-| D1 v16 マイグレーション本番適用 | 5/27 | 小（`wrangler d1 execute` 1発） |
-| Worker `worker_v7_complete.js` 本番デプロイ | 5/27 | 小（既存のCFパイプライン） |
-| 本番でのE2E動作確認（実D1で文書登録→共有→受領） | 5/27 | 中 |
-| 免許証画像アップロード機能（R2 + 署名URL） | 5/28 or 後日 | 中 |
-| HPKI実連携（外部CA） | 半年後 | 大 |
+| `/files/upload` | POST | multipart/form-data 受信→R2 保存→URL返却（10MB上限・jpeg/png/webp/pdfのみ） |
+| `/files/get/:key` | GET | R2 ファイル取得（権限チェック付き・閲覧ログ自動記録） |
+| `/files/:key` | DELETE | ファイル削除（アップロード者 or admin のみ） |
+
+**`purpose='license'` で `/files/upload` を呼ぶと、`doctor_profiles.license_image_url` を自動更新**（INSERT or UPDATE）。
+
+**アプリ側**:
+- `api()` ヘルパーに `isFormData: true` オプション追加（Content-Type を自動で外す）
+- `uploadLicenseImage(u, dp)` 関数新規追加 ─ ファイル選択ダイアログ→multipart 送信→トーストで状態表示
+- 設定画面「免許証画像アップロード」ボタンが動作するように
+
+#### H. デプロイ自動化基盤
+
+**新規ファイル**:
+
+1. **`wrangler.toml`** ─ Worker / D1 / R2 / 環境変数の binding 定義
+   - `database_id` は本番デプロイ前に要差し替え（`REPLACE_WITH_ACTUAL_D1_ID`）
+   - R2 binding `MEDADAPT_FILES` → バケット `medadapt-files`
+
+2. **`.github/workflows/worker.yml`** ─ Worker デプロイ用 GitHub Actions
+   - push 時は worker.js / wrangler.toml / migration.sql 変更時のみトリガー
+   - workflow_dispatch でマイグレーション適用フラグを選択可能
+   - 必要な GitHub Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+
+3. **`docs/DEPLOY_v5_0_4_production.md`** ─ デプロイ手順書（必読）
+   - 方法A: GitHub Actions 経由（推奨）
+   - 方法B: ローカル wrangler 直接実行
+   - E2E チェックリスト 8 項目
+   - 障害時ロールバック手順
+   - トラブルシューティング Q&A
+
+#### I. Playwright 動作検証（v5.0.4 最終確認）
+
+- ✅ 設定画面の「免許証画像アップロード」ボタン存在確認
+- ✅ 「多要素認証 設定」ボタン存在確認
+- ✅ 居宅療養管理指導 編集モード「PDF出力」ボタン存在確認
+- ✅ Worker API `/medical-docs/patient/:id` / `/shared-with-me` 呼び出し確認
+- ✅ JSエラー: ローカル特有のCORS以外 0件
+
+#### J. 残タスク（次セッション・Cloudflare 操作のみ）
+
+| タスク | 規模 | 必要なもの |
+|---|---|---|
+| Cloudflare API Token 取得 | 小 | Cloudflare アカウント |
+| Account ID + D1 Database ID 確認 | 小 | Cloudflare Dashboard |
+| GitHub Secrets 登録 | 小 | GitHub リポジトリ Settings |
+| wrangler.toml の database_id 差し替え | 小 | テキストエディタ |
+| R2 バケット `medadapt-files` 作成 | 小 | wrangler または Dashboard |
+| GitHub Actions「Deploy Cloudflare Worker」実行 | 小 | apply_migration=true 初回 |
+| E2E 動作確認 8 項目 | 中 | アプリ実機 |
+| 実 HPKI 連携（外部CA契約） | 大 | 半年後タスク |
+| 実 TSA 連携（セイコー/アマノ/GMO 月額） | 大 | 半年後タスク |
 
 ---
 

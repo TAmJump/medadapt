@@ -1,0 +1,75 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/worker_v7_complete.js'
+      - 'wrangler.toml'
+      - 'assets/v*_d1_*.sql'
+      - '.github/workflows/worker.yml'
+  workflow_dispatch:
+    inputs:
+      apply_migration:
+        description: 'D1 マイグレーション (v16) を適用するか'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        run: npm install -g wrangler
+
+      - name: Verify wrangler.toml
+        run: |
+          if grep -q "REPLACE_WITH_ACTUAL_D1_ID" wrangler.toml; then
+            echo "::warning::wrangler.toml の database_id がプレースホルダのままです。Cloudflare Dashboard から取得して差し替えてください"
+            echo "現状の wrangler.toml:"
+            cat wrangler.toml
+          fi
+
+      - name: Apply D1 migration (v16)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.apply_migration == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "→ v16 マイグレーション適用中..."
+          wrangler d1 execute medadapt-prod --remote --file=assets/v16_d1_migration.sql
+          echo "→ マイグレーション完了"
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler deploy
+
+      - name: Smoke test (HTTPS endpoint)
+        run: |
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://medadapt-api-v2.animalb001.workers.dev/health || echo "000")
+          echo "Health check: HTTP $STATUS"
+          # /health は無いかもしれないので 404 でも OK（Worker が反応していれば成功）
+          if [ "$STATUS" = "000" ]; then
+            echo "::error::Worker が応答していません"
+            exit 1
+          fi
+          echo "✓ Worker is alive"

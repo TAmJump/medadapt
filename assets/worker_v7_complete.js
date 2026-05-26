@@ -3102,6 +3102,119 @@ async function handleRequest(request, env, json, err) {
     }
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v5.0.4: R2 ファイルアップロード（免許証画像・PDF添付）
+  // ════════════════════════════════════════════════════════════
+  // ── POST /files/upload ──────────────────────────────────────
+  // multipart/form-data でファイル受け取り → R2 保存 → URL 返却
+  if (path === '/files/upload' && method === 'POST') {
+    if (!env.MEDADAPT_FILES) {
+      return err('R2 バケットが設定されていません（wrangler.toml の MEDADAPT_FILES binding を確認）', 503);
+    }
+    try {
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const purpose = formData.get('purpose') || 'general';  // license / medical_doc / general
+      if (!file || typeof file === 'string') return err('file が必要です');
+      // ファイルサイズ制限 10MB
+      if (file.size > 10 * 1024 * 1024) return err('ファイルサイズは 10MB 以内にしてください', 413);
+      // 許可される MIME タイプ
+      const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+      if (!allowedMime.includes(file.type)) return err('jpeg / png / webp / pdf のいずれかをアップロードしてください', 415);
+      const orgId = currentUser.org_id || currentUser.id;
+      const ext = file.type === 'application/pdf' ? 'pdf' : (file.type.split('/')[1] || 'bin');
+      const key = `${purpose}/${orgId}/${currentUser.id}/${Date.now()}-${genUuid()}.${ext}`;
+      await env.MEDADAPT_FILES.put(key, file.stream(), {
+        httpMetadata: { contentType: file.type },
+        customMetadata: {
+          uploaded_by: currentUser.id,
+          uploaded_by_name: currentUser.name || '',
+          org_id: orgId,
+          org_name: currentUser.org || '',
+          purpose,
+          original_filename: file.name || ''
+        }
+      });
+      // 署名 URL 生成（Worker 経由でアクセスさせる方式）
+      const fileUrl = `${url.origin}/files/get/${encodeURIComponent(key)}`;
+      // 免許証アップロード時は doctor_profiles を自動更新
+      if (purpose === 'license') {
+        const profileExists = await env.DB.prepare('SELECT id FROM doctor_profiles WHERE user_id=?').bind(currentUser.id).first().catch(() => null);
+        const nowIso = new Date().toISOString();
+        if (profileExists) {
+          await env.DB.prepare(`UPDATE doctor_profiles SET license_image_url=?, updated_at=? WHERE user_id=?`)
+            .bind(fileUrl, nowIso, currentUser.id).run().catch(e => console.error('dp update error:', e.message));
+        } else {
+          await env.DB.prepare(`
+            INSERT INTO doctor_profiles (id, user_id, doctor_name, license_image_url, license_verified_status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+          `).bind('dp_' + genUuid(), currentUser.id, currentUser.name || '', fileUrl, nowIso, nowIso).run().catch(e => console.error('dp insert error:', e.message));
+        }
+      }
+      return json({ ok: true, file_url: fileUrl, key, size: file.size, content_type: file.type });
+    } catch (e) {
+      console.error('files/upload error:', e.message);
+      return err('アップロードに失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── GET /files/get/:key ─────────────────────────────────────
+  // R2 ファイル取得（認証付き・組織または管理者のみ）
+  const filesGetMatch = path.match(/^\/files\/get\/(.+)$/);
+  if (filesGetMatch && method === 'GET') {
+    if (!env.MEDADAPT_FILES) return err('R2 バケットが設定されていません', 503);
+    const key = decodeURIComponent(filesGetMatch[1]);
+    try {
+      const obj = await env.MEDADAPT_FILES.get(key);
+      if (!obj) return err('ファイルが見つかりません', 404);
+      // 権限チェック: アップロード者の組織 / admin のみ
+      const metaOrgId = obj.customMetadata?.org_id;
+      const orgId = currentUser.org_id || currentUser.id;
+      if (currentUser.role !== 'admin' && metaOrgId !== orgId) {
+        return err('このファイルへのアクセス権限がありません', 403);
+      }
+      // 閲覧ログ記録（best effort）
+      try {
+        await env.DB.prepare(`
+          INSERT INTO medical_document_access_logs (id, signed_document_id, user_id, user_name, org_id, org_name, role, action, detail, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          'log_' + genUuid(), null, currentUser.id, currentUser.name || '',
+          orgId, currentUser.org || '', currentUser.role || '', 'file_view', key, new Date().toISOString()
+        ).run();
+      } catch (e) {}
+      const headers = {
+        'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+        'Cache-Control': 'private, max-age=300',
+        ...cors
+      };
+      return new Response(obj.body, { headers });
+    } catch (e) {
+      console.error('files/get error:', e.message);
+      return err('ファイル取得に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── DELETE /files/:key ──────────────────────────────────────
+  // ファイル削除（アップロード者または admin）
+  const filesDelMatch = path.match(/^\/files\/(.+)$/);
+  if (filesDelMatch && method === 'DELETE') {
+    if (!env.MEDADAPT_FILES) return err('R2 バケットが設定されていません', 503);
+    const key = decodeURIComponent(filesDelMatch[1]);
+    try {
+      const head = await env.MEDADAPT_FILES.head(key);
+      if (!head) return err('ファイルが見つかりません', 404);
+      const orgId = currentUser.org_id || currentUser.id;
+      if (currentUser.role !== 'admin' && head.customMetadata?.org_id !== orgId) {
+        return err('削除権限がありません', 403);
+      }
+      await env.MEDADAPT_FILES.delete(key);
+      return json({ ok: true });
+    } catch (e) {
+      return err('削除に失敗しました: ' + e.message, 500);
+    }
+  }
+
   return err('Not found', 404);
 }
 

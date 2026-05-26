@@ -1,0 +1,44 @@
+# Cloudflare Worker 設定 (v5.0.4 / 2026-05-26)
+# 既存 Worker: medadapt-api-v2.animalb001.workers.dev
+# 設計書: DESIGN_yaruze_v5_0_2026-05-26.html
+
+name = "medadapt-api-v2"
+main = "assets/worker_v7_complete.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ───────────────────────────────────────────
+# D1 データベース binding
+# ───────────────────────────────────────────
+# 注意: database_id は実際のCloudflare Dashboardで確認したIDに置き換える必要あり。
+# 取得コマンド: wrangler d1 list
+# 大下さんが Cloudflare Dashboard から取得して埋めるか、wrangler d1 list で確認。
+[[d1_databases]]
+binding = "DB"
+database_name = "medadapt-prod"
+database_id = "REPLACE_WITH_ACTUAL_D1_ID"   # ← 本番デプロイ前に要差し替え
+
+# ───────────────────────────────────────────
+# R2 バケット binding（v5.0.4 で追加・免許証画像アップロード用）
+# ───────────────────────────────────────────
+[[r2_buckets]]
+binding = "MEDADAPT_FILES"
+bucket_name = "medadapt-files"
+# 用途:
+#   - doctor_profiles の license_image_url（医師免許証画像）
+#   - 外部連携BOXの実ファイル添付（PDF原本）
+# preview_bucket_name は開発時のみ使用
+
+# ───────────────────────────────────────────
+# 環境変数（公開可・Secrets は wrangler secret put で別途設定）
+# ───────────────────────────────────────────
+[vars]
+ENV = "production"
+APP_URL = "https://myaruze.tamjump.com"
+
+# 以下は wrangler secret put で個別に設定（GitHub にコミットしない）:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put SMTP_USER
+#   wrangler secret put SMTP_PASS
+#   wrangler secret put SQUARE_ACCESS_TOKEN
+#   wrangler secret put TSA_API_KEY        # 認定タイムスタンプ事業者用（半年後対応）
