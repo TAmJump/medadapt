@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>buntyan 様事案 引継書 v2 / 2026-05-26</title>
+<style>
+  body { font-family: 'Hiragino Sans','Yu Gothic',sans-serif; max-width:1000px; margin:40px auto; padding:20px; color:#1f2937; line-height:1.7; }
+  h1 { color:#0369a1; border-bottom:3px solid #0369a1; padding-bottom:10px; }
+  h2 { color:#0369a1; margin-top:36px; padding:8px 12px; background:#f0f9ff; border-left:6px solid #0369a1; }
+  h3 { color:#0c4a6e; margin-top:24px; }
+  h4 { color:#1e40af; margin-top:18px; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:14px; }
+  th, td { border:1px solid #cbd5e1; padding:8px 12px; vertical-align:top; }
+  th { background:#e0f2fe; }
+  .urgent { background:#fee2e2; border-left:6px solid #dc2626; padding:12px 16px; margin:12px 0; }
+  .ok { background:#dcfce7; border-left:6px solid #16a34a; padding:12px 16px; margin:12px 0; }
+  .pending { background:#fef9c3; border-left:6px solid #ca8a04; padding:12px 16px; margin:12px 0; }
+  .info { background:#f0f9ff; border-left:6px solid #0369a1; padding:12px 16px; margin:12px 0; }
+  .important { background:#fce7f3; border-left:6px solid #be185d; padding:12px 16px; margin:12px 0; }
+  pre { background:#f9fafb; border-left:3px solid #2563eb; padding:10px 14px; font-size:12px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:'Consolas',monospace; font-size:13px; }
+  .quote { background:#f9fafb; border-left:4px solid #94a3b8; padding:10px 14px; margin:8px 0; }
+  .footer { margin-top:60px; padding:20px; background:#f1f5f9; border-radius:6px; font-size:13px; color:#475569; }
+  .v2-update { background:#fff7ed; border-left:6px solid #ea580c; padding:12px 16px; margin:12px 0; }
+</style>
+</head>
+<body>
+
+<h1>buntyan 様事案 専用引継書 v2<br>2026-05-26 更新（21:30 改訂） / 担当：TAmJ.Corp 大下</h1>
+
+<p>本書は v1（2026-05-24）の継承＋ 2026-05-26 の重大進展（ｔやるゼ！ Android アプリ URL 誤り原因確定 + buntyan 様による新規 2 アプリクローズドテスト代行案件購入 + 12 人分オプトイン完了）を完全反映した最新版。Android アプリ修正担当 chat および新規 chat 双方で参照される想定。</p>
+
+<div class="v2-update">
+<strong>★v2 での主要更新点（2026-05-26）</strong><br>
+1. ｔやるゼ！ Android アプリの WebView URL 誤り原因が完全確定（e-app.tamjump.com → 正：tyaruze-app.tamjump.com）<br>
+2. buntyan 様が <strong>2 アプリクローズドテスト代行（9,495円・ココナラ別取引）</strong>を新規購入・12 人分オプトイン完了<br>
+3. buntyan 様より <strong>クロテ中の運用ルール文書（PDF）</strong>受領・遵守必須事項を §6 として整理<br>
+4. ｍやるゼ！ ID/PW 共有方針確定 + ｔ修正・親 / 新規 3 アプリの段取り確定<br>
+<br>
+<strong>★21:30 改訂での追加更新点</strong><br>
+5. クロテ期間中の <strong>アップデート可否を Web 実調査で確定</strong>（リセットされない・むしろ審査でプラス）<br>
+6. buntyan 様への返信文の <strong>キャッチボール論点</strong>を §10 に整理（修正する場合は buntyan に連絡）<br>
+7. 「はじめるボタン → ログイン遷移しない」件の判断 3 パターン（A/B/C）を §11 に整理
+</div>
+
+<!-- ========== §1 ========== -->
+<h2>§1 案件全体構造（2026-05-26 時点）</h2>
+
+<h3>1-1. buntyan 様との取引（ココナラ）</h3>
+<table>
+<tr><th>取引 #</th><th>URL</th><th>サービス</th><th>状態</th></tr>
+<tr><td>取引 A（旧）</td><td><code>coconala.com/mypage/direct_message/9727540</code></td><td>テスト用 ID/PW 共有・GPC 設定相談（無償・direct_message）</td><td>進行中</td></tr>
+<tr><td><strong>取引 B（新・★重要）</strong></td><td><code>coconala.com/talkrooms/17714106</code></td><td><strong>2 つのアプリのクローズドテストを代行（9,495円）</strong></td><td><strong>取引中・購入日 5/26・納品予定日 6/10</strong></td></tr>
+</table>
+
+<h3>1-2. 取引 B の詳細（9,495円案件）</h3>
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>サービスタイトル</td><td>2つのアプリのクローズドテストを代行いたします。</td></tr>
+<tr><td>合計金額</td><td>9,495円</td></tr>
+<tr><td>納品予定日</td><td>2026年6月10日</td></tr>
+<tr><td>テスト期間</td><td>14日間（5/27 を 1日目として 6/9 まで）</td></tr>
+<tr><td>テスト対象</td><td>★【1】親「やるゼ！」（プラットフォーム本体）<br>★【2】めやるゼ！（医療介護連携）<br>※ｔやるゼ！は対象外（修正・再依頼）</td></tr>
+<tr><td>提案 URL（やるゼ！親）</td><td><code>https://play.google.com/apps/testing/com.tamjump.??</code>（途切れている・要確認）</td></tr>
+<tr><td>プロジェクト名</td><td>マイプロジェクト</td></tr>
+<tr><td>取引状態</td><td>取引中（購入完了 → 進行中）</td></tr>
+</table>
+
+<h3>1-3. ｍ・ｔ・親 + 新規 3 アプリの全体マップ</h3>
+<table>
+<tr><th>アプリ</th><th>状態</th><th>buntyan 対応</th></tr>
+<tr><td>やるゼ！（親プラットフォーム）</td><td>クロテ Alpha 配信中</td><td>★取引 B で 14日間テスト中（5/27〜6/9）</td></tr>
+<tr><td>ｍやるゼ！（医療介護連携）</td><td>クロテ Alpha 配信中</td><td>★取引 B で 14日間テスト中（5/27〜6/9）</td></tr>
+<tr><td>ｔやるゼ！（施設・ビル管理）</td><td>クロテ Alpha 配信中だが WebView URL 誤り</td><td>★修正完了後に改めて正式依頼</td></tr>
+<tr><td>新規アプリ 1</td><td>開発中</td><td>準備完了後に buntyan 様にクロテ依頼予定</td></tr>
+<tr><td>新規アプリ 2</td><td>開発中</td><td>同上</td></tr>
+<tr><td>新規アプリ 3</td><td>開発中</td><td>同上</td></tr>
+</table>
+
+<!-- ========== §2 ========== -->
+<h2>§2 ｔやるゼ！ Android アプリ URL 誤り（原因確定・要修正）</h2>
+
+<div class="urgent">
+<strong>★Android アプリ修正担当 chat への必読セクション</strong><br>
+ｔやるゼ！の Android アプリ（パッケージ：<code>com.tamjump.onetouch</code>）が <strong>誤った URL</strong> を WebView で読みにいっており、正しい Web 版に接続できていない。Android Studio プロジェクトまたは PWA / TWA 設定の修正が必要。
+</div>
+
+<h3>2-1. 確定した事実</h3>
+<table>
+<tr><th>項目</th><th>確定値</th></tr>
+<tr><td>★Android アプリが現在開いている URL（誤）</td><td><code>https://e-app.tamjump.com</code></td></tr>
+<tr><td>表示される画面</td><td>「オフラインです」（雲マーク・接続不可）</td></tr>
+<tr><td>★本来開くべき URL（正）</td><td><code>https://tyaruze-app.tamjump.com</code></td></tr>
+<tr><td>正常時の画面（PC で動作確認済）</td><td><code>tyaruze-app.tamjump.com/login.html</code>（ｔやるゼ！ロゴ・ログイン画面正常表示）<br><code>tyaruze-app.tamjump.com/contractor-dashboard.html</code>（対応依頼 6件・対応中 7件・完了 2件 全機能正常動作）</td></tr>
+<tr><td>Google Play 申請 URL</td><td>✅ 正常（<code>play.google.com/store/apps/details?id=com.tamjump.onetouch</code> + テスター用 <code>play.google.com/apps/testing/com.tamjump.onetouch</code>）</td></tr>
+<tr><td>テスター用 Google グループ</td><td>✅ 正常（<code>androidtestkkbouu@googlegroups.com</code>）</td></tr>
+<tr><td>クローズドテスト Alpha トラック ID</td><td><code>4699223375785846279</code></td></tr>
+<tr><td>Google Play Console アプリ ID</td><td><code>4972744440536115235</code></td></tr>
+<tr><td>onetouch_app GitHub リポジトリ Web 側</td><td>✅ 完全実装済（contractor-dashboard.html 等 30+ HTML / worker_cloudflare.js 1902 行）</td></tr>
+<tr><td>★修正対象</td><td>Android Studio プロジェクトの WebView URL 設定 OR PWA/TWA の manifest.json の start_url</td></tr>
+</table>
+
+<h3>2-2. Android アプリ修正のためのアクション</h3>
+<table>
+<tr><th>STEP</th><th>内容</th><th>担当</th></tr>
+<tr><td>1</td><td>Android アプリの開発方式を確定<br>★Android Studio / PWABuilder / Bubblewrap / その他のいずれか？</td><td>大下が確認</td></tr>
+<tr><td>2</td><td>該当ソースの URL 部分を <code>https://tyaruze-app.tamjump.com</code> に修正<br>★Native Android：<code>MainActivity.java/kt</code> の <code>webView.loadUrl()</code><br>★PWA / TWA：<code>manifest.json</code> の <code>start_url</code> + <code>twa-manifest.json</code></td><td>修正担当 chat の Claude</td></tr>
+<tr><td>3</td><td>AAB ビルド + 署名</td><td>大下（Android Studio）または PWABuilder で再生成</td></tr>
+<tr><td>4</td><td>Google Play Console にアップロード（クロテ Alpha トラック）<br>★buntyan 様提供の PDF 手順書通り（§6-2 参照）</td><td>大下</td></tr>
+<tr><td>5</td><td>新リリースを審査に送信</td><td>大下</td></tr>
+<tr><td>6</td><td>buntyan 様に「ｔやるゼ！修正完了」連絡 + 14日テスト追加依頼（取引 B の延長 or 取引 C 新規）</td><td>大下 + Claude</td></tr>
+</table>
+
+<h3>2-3. PDF 受領済の修正手順（buntyan 様提供）</h3>
+<p>buntyan 様が「クロテ中のアップデート方法.pdf」をトークルーム 17714106 で送付済（913.5KB）。全 9 ステップ：</p>
+<ol>
+<li>「テストとリリース」をクリック</li>
+<li>「テスト」をクリック</li>
+<li>「クローズドテスト」をクリック</li>
+<li>「トラックを管理」をクリック</li>
+<li>「新しいリリースを作成」をクリック</li>
+<li>「app bundle」を削除（削除できない場合はそのまま次へ）</li>
+<li>「アップロード」もしくはドラッグ＆ドロップで App Bundle をアップロード</li>
+<li>「リリース名」と「リリースノート」を記載 → 「次へ」</li>
+<li>赤色のエラーがないことを確認（あれば buntyan 様にトーク質問可）</li>
+<li>「保存」をクリック</li>
+<li>「概要に移動」をクリック</li>
+<li>「◯件の変更を審査に送信」をクリック</li>
+</ol>
+
+<!-- ========== §3 ========== -->
+<h2>§3 事案の経緯（時系列完全版・v2 拡張）</h2>
+
+<h3>3-1. 過去（v4.1 以前・経緯不明）</h3>
+<div class="urgent">
+<strong>★罠の発生源</strong><br>
+過去のセッションで Claude が大下と画面共有しながら、Google Play Console のテスター設定を行う際に <strong>「メーリングリスト」ラジオボタンを選択</strong>するよう指示。そこに Google グループのアドレス <code>androidtestkkbouu@googlegroups.com</code> を登録した。本来「Google グループ」を選択すべきだった。罠 §37-17 として設計書 v4.1 §39 に永久記録済。
+</div>
+
+<h3>3-2. 2026-05-05 12:19 - 取引 A 1 回目の連絡（direct_message/9727540）</h3>
+<div class="quote">
+buntyan「ご丁寧にありがとうございます。引き続きよろしくお願いいたしますm(__)m」
+</div>
+
+<h3>3-3. 2026-05-08 06:31 - 取引 A 2 回目の連絡（問題発覚）</h3>
+<div class="quote">
+buntyan「現在もアクセスすることができません。<br>
+改めて下記ご確認の程、よろしくお願いいたします。<br>
+・クローズドテストのテスタータブでメーリングリストではなく、Google グループが選択されていること<br>
+・Google グループの入力欄に androidtestkkbouu@googlegroups.com が入力されていること<br>
+・公開の概要ページで審査中の文字があるか？<br>
+・公開の概要ページで 管理対象の公開：オフ になっていること。」
+</div>
+
+<h3>3-4. 2026-05-08 09:28〜09:44 - 大下が画面共有 + 3 アプリ修正完了</h3>
+<p>Claude が画面共有で「メーリングリスト」誤選択を発見。3 アプリ全てで「Google グループ」に切替 + 審査送信完了。</p>
+
+<h3>3-5. 2026-05-08 同日中 - 大下から buntyan へ返信送信</h3>
+<p>修正完了報告。返信送信済。</p>
+
+<h3>3-6. 2026-05-08 11:56 - buntyan から進捗連絡（部分解決）</h3>
+<div class="quote">
+buntyan「アクセスできるようになりました。<br>
+ですが、ｔやるゼ！（施設・ビル管理）だけネイティブ画面の実装が無さそうです。<br>
+ご確認の程、よろしくお願いいたします。」
+</div>
+
+<h3>3-7. 2026-05-08 16:09 - 大下から ｔやるゼ！ ID/PW 共有送信</h3>
+<p>TEST1-admin / test1234 等 3 アカウントを共有。buntyan 既読確認・以降約 16 日間反応なし。</p>
+
+<h3>3-8. 2026-05-24 - HANDOVER v1 作成</h3>
+<p>状況整理 + 推奨返信文「ｍやるゼ！優先テスト依頼 + ID/PW 同梱」テンプレ作成。</p>
+
+<h3>3-9. 2026-05-26 09:32 - buntyan から催促連絡（取引 A）</h3>
+<div class="quote">
+buntyan「ネイティブ画面の実装終わりましたでしょうか？<br>
+先日お伝えした通り、ログインの問題ではなく、ネイティブ画面の実装が ｔやるゼ！（施設・ビル管理）だけされていなかったので、クローズドテストを、始めることができません。」
+</div>
+
+<h3>3-10. 2026-05-26 09:48 - 大下から経緯説明・お詫び（取引 A）</h3>
+<p>「Android 申請の URL に誤りがあり」の謝罪文を送信。後の検証で実際に URL 誤りが事実と確定（§2 参照）。</p>
+
+<h3>3-11. 2026-05-26 10:13 - buntyan から見積り提案（取引 B 新規）</h3>
+<div class="quote">
+「2つのアプリのクローズドテストを代行いたします。」<br>
+購入期限 6/2 / 提案額 9,000円 / 完了予定日 6/10
+</div>
+
+<h3>3-12. 2026-05-26 10:14 - buntyan「ｔやるぜは再度確認するので購入お待ちください」</h3>
+
+<h3>3-13. 2026-05-26 10:17 - buntyan が tyaruze IMG_4092.png 送付</h3>
+<p>Android アプリ起動時のスクショ。URL 表示が <code>e-app.tamjump.com</code>・「オフラインです」表示。<strong>これにより Android アプリ URL 誤りが確定</strong>。</p>
+
+<h3>3-14. 2026-05-26 10:21 - 大下から URL 誤り確定 + 料金変更お詫び + ｍ優先依頼を送信（取引 A）</h3>
+<p>取引 A direct_message 側に最終返信。内容：<br>
+- URL 誤り原因の確定報告 + 謝罪<br>
+- 料金調整をお願いする形となった件のお詫び<br>
+- ｔやるゼ！は修正・再審査完了まで一旦保留<br>
+- ｍやるゼ！ ID/PW 同梱（ADM-TIGER / test1234）<br>
+- 親プラットフォームと ｍやるゼ！を優先依頼<br>
+- 新規 3 アプリも準備整い次第改めて提案</p>
+
+<h3>3-15. 2026-05-26 10:46 - buntyan「ご購入頂きましてありがとうございます」（取引 B）</h3>
+<div class="quote">
+「外出してしまったので、帰宅後にオプトインいたします。<br>
+本日夜に対応予定で、本日中にオプトインいたします。<br>
+オプトイン終わりましたら、ご連絡いたします。」
+</div>
+
+<h3>3-16. 2026-05-26 21:11 - buntyan オプトイン完了報告（取引 B）</h3>
+<div class="quote">
+「大変お待たせ致しました。<br>
+12人分オプトインを行いました。<br>
+ダッシュボードのページに行っていただくと、<br>
+12 人以上のテスターにクローズド テストにオプトインしてもらう<br>
+がクリアしているかと思います。<br>
+なお、この部分では13以上カウントしない形となります。<br>
+正格なインストール数は、「モニタリングと改善」の「リーチとデバイス」の「概要」にて確認することができます。<br>
+※ただし、リアルタイムで反映されるわけではなく、最大で5日ほど反映までに時間がかかることがあります。<br>
+本日を0日目として、明日から14日目となるまで毎日クローズドテストを実施し、報告いたします。<br>
+その中で気になった部分や改善すべき部分等あった際は随時ご報告いたします。」
+</div>
+
+<h3>3-17. 2026-05-26 21:13 - buntyan 早速の発見報告（取引 B）</h3>
+<div class="quote">
+「早速気になった点がありましたので共有致します。<br>
+どちらのアプリもはじめるボタンを押しても、ログイン画面には遷移しませんでした。<br>
+わざとであれば、問題ございません。<br>
+クローズドテスト中にアップデートを頂いてもテスト日数がリセットされるということはありません。<br>
+むしろ、後の審査でプラスに働くことがありますので、心配せずにアップデートを行ってください。<br>
+なお、アプリの修正など依頼したいということがありましたら、その旨、お返事頂けますと幸いです。<br>
+クローズドテスト中のアップデート方法は添付の資料をご確認ください。」<br>
+<br>
++ クロテ中のアップデート方法.pdf（913.5KB）添付
+</div>
+
+<h3>3-18. 2026-05-26 21:14 - buntyan 重要な運用要請（取引 B）</h3>
+<div class="quote">
+「五月雨式に失礼致します。<br>
+クローズドテスト中はネイティブ画面の削除や起動時にネイティブ画面が起動する挙動の変更はしないようお願いいたします。」
+</div>
+
+<!-- ========== §4 ========== -->
+<h2>§4 現在の状況（2026-05-26 21:14 時点）</h2>
+
+<h3>4-1. オープン論点とアクション</h3>
+<table>
+<tr><th>論点</th><th>状態</th><th>次アクション</th></tr>
+<tr><td>取引 A：ｔやるゼ！ Android URL 誤り</td><td>原因確定</td><td>★Android アプリ修正担当 chat で修正実装</td></tr>
+<tr><td>取引 A：ｔやるゼ！ 修正完了後の正式再依頼</td><td>待機中</td><td>修正完了次第、buntyan 様に連絡</td></tr>
+<tr><td>取引 B：14日テスト</td><td>★進行中（5/27 が 1日目）</td><td>毎日 buntyan から報告受信予定</td></tr>
+<tr><td>取引 B：はじめるボタン → ログイン画面遷移しない件</td><td>未対応</td><td>★大下と Claude で「わざと」か「バグ」か確認 → buntyan に返答</td></tr>
+<tr><td>取引 B：クロテ中の挙動変更禁止</td><td>遵守必須</td><td>§6 ルール厳守</td></tr>
+<tr><td>新規アプリ 1〜3</td><td>開発中</td><td>準備完了後に新規取引提案</td></tr>
+</table>
+
+<h3>4-2. ★緊急判断要：「はじめるボタン → ログイン画面遷移しない」の真偽</h3>
+<div class="urgent">
+buntyan 様が「どちらのアプリもはじめるボタンを押しても、ログイン画面には遷移しませんでした。わざとであれば、問題ございません。」と報告。<br>
+<br>
+これが <strong>「意図的な設計（OK）」</strong> なのか、<strong>「修正すべきバグ（NG）」</strong> なのかを大下が確定する必要あり。<br>
+<br>
+返答パターン 2 種：<br>
+・「わざとです」と返す → buntyan は次のテスト項目に進む<br>
+・「バグです」と返す → 修正後にアップデート（取引 B 期間中にアップデート可・テスト日数リセットされない・§3-17 buntyan 発言）
+</div>
+
+<!-- ========== §5 ========== -->
+<h2>§5 全テストアカウント一覧（buntyan 様共有可能リスト）</h2>
+
+<h3>5-1. ｔやるゼ！（施設・ビル管理・★URL 修正完了後に再共有）</h3>
+<table>
+<tr><th>役割</th><th>ログインID</th><th>パスワード</th></tr>
+<tr><td>company_admin（推奨）</td><td><code>TEST1-admin</code></td><td><code>test1234</code></td></tr>
+<tr><td>staff</td><td><code>TEST1-tamj01</code>〜<code>TEST1-tamj04</code></td><td><code>19800101b</code> 等</td></tr>
+<tr><td>contractor_admin</td><td><code>BILL1-admin</code></td><td><code>bill12345</code></td></tr>
+</table>
+
+<h3>5-2. ｍやるゼ！（医療介護連携）</h3>
+<table>
+<tr><th>役割</th><th>ログインID</th><th>パスワード</th></tr>
+<tr><td>admin（Pro・推奨）</td><td><code>ADM-TIGER</code></td><td><code>test1234</code></td></tr>
+<tr><td>admin（Pro テスト用）</td><td><code>ADM-PROTEST</code></td><td><code>test1234</code></td></tr>
+<tr><td>admin（Free）</td><td><code>ADM-FREETEST</code></td><td><code>test1234</code></td></tr>
+</table>
+
+<h3>5-3. やるゼ！（親プラットフォーム）</h3>
+<table>
+<tr><th>役割</th><th>ログインID</th><th>パスワード</th></tr>
+<tr><td>tamj_admin</td><td><code>tamj-admin</code></td><td><code>test1234</code></td></tr>
+<tr><td>Master Reseller（推奨）</td><td><code>sup-test</code></td><td><code>test1234</code></td></tr>
+<tr><td>Reseller</td><td><code>agt-test</code></td><td><code>test1234</code></td></tr>
+</table>
+
+<!-- ========== §6 ========== -->
+<h2>§6 buntyan 様提供のクロテ運用ルール（遵守必須）</h2>
+
+<div class="important">
+<strong>★buntyan 様より受領した遵守必須事項。違反するとテスト失敗・代行料金不当扱いのリスクあり。</strong>
+</div>
+
+<h3>6-1. クローズドテスト中の禁止事項（5/26 21:14 buntyan 様明示）</h3>
+<ul>
+<li>★<strong>ネイティブ画面の削除禁止</strong></li>
+<li>★<strong>起動時にネイティブ画面が起動する挙動の変更禁止</strong></li>
+</ul>
+<p>これは Google Play クロテ審査での「正規アプリ動作」を維持するための要件。挙動を変えると buntyan 様の 14日間オプトインのカウントがリセットされる可能性。</p>
+
+<h3>6-2. クローズドテスト中のアップデート手順（PDF 受領済）</h3>
+<p>buntyan 様より <code>クロテ中のアップデート方法.pdf</code>（913.5KB）受領。要点：</p>
+<ol>
+<li>アップデートしてもテスト日数はリセットされない</li>
+<li>むしろ後の審査でプラスに働くことがある</li>
+<li>修正依頼がある場合は buntyan 様にトーク連絡</li>
+<li>手順は §2-3 を参照（9 ステップ）</li>
+</ol>
+
+<h3>6-3. テスター数カウント仕様（buntyan 様情報）</h3>
+<table>
+<tr><th>場所</th><th>表示</th></tr>
+<tr><td>ダッシュボード「12人以上のテスターにクローズドテストにオプトインしてもらう」</td><td>12 でカウント止まる（13 以上カウントしない）</td></tr>
+<tr><td>「モニタリングと改善」→「リーチとデバイス」→「概要」</td><td>正確なインストール数表示</td></tr>
+<tr><td>反映時間</td><td>最大 5 日</td></tr>
+</table>
+
+<!-- ========== §7 ========== -->
+<h2>§7 Android アプリ修正担当 chat への引継メモ</h2>
+
+<div class="info">
+<strong>このセクションは Android アプリ修正を担当する Claude（別 chat）に向けた特化版引継書。</strong>
+</div>
+
+<h3>7-1. 修正対象の特定</h3>
+<table>
+<tr><th>項目</th><th>値</th></tr>
+<tr><td>パッケージ名</td><td><code>com.tamjump.onetouch</code></td></tr>
+<tr><td>誤った URL</td><td><code>https://e-app.tamjump.com</code></td></tr>
+<tr><td>正しい URL</td><td><code>https://tyaruze-app.tamjump.com</code></td></tr>
+<tr><td>onetouch_app リポジトリ</td><td><code>https://github.com/TAmJump/onetouch_app</code>（Private）</td></tr>
+<tr><td>onetouch_app の中身</td><td>Web 側（HTML/JS）+ Cloudflare Worker のみ。<strong>Android Studio プロジェクトは別の場所にある可能性大</strong></td></tr>
+<tr><td>assetlinks.json SHA-256</td><td><code>C1:EF:CF:C5:4F:01:88:26:6D:21:A8:47:6B:9A:F9:1A:D2:78:AB:DA:7E:BC:04:0B:D1:0B:83:ED:CC:3B:00:E2</code></td></tr>
+</table>
+
+<h3>7-2. 修正方式の特定（要確認）</h3>
+<p>Android アプリの実装方式を大下に確認すること：</p>
+<ol>
+<li><strong>Android Studio Native Project</strong>：<code>MainActivity.java</code> / <code>.kt</code> の <code>webView.loadUrl("https://e-app.tamjump.com")</code> を <code>"https://tyaruze-app.tamjump.com"</code> に置換</li>
+<li><strong>PWABuilder / Bubblewrap（TWA）</strong>：<code>twa-manifest.json</code> の <code>host</code> および <code>startUrl</code> を修正 + onetouch_app/manifest.json の <code>start_url</code> 修正</li>
+<li><strong>その他</strong>：大下確認</li>
+</ol>
+
+<h3>7-3. 修正フロー（決定版）</h3>
+<ol>
+<li>大下から Android プロジェクト所在 + 実装方式の確認</li>
+<li>該当ファイル特定 + URL 部分修正</li>
+<li>★<strong>挙動・画面構造は変更しない</strong>（§6-1 遵守）</li>
+<li>AAB 再ビルド</li>
+<li>Google Play Console にアップロード（§2-3 / §6-2 の手順通り）</li>
+<li>「クローズドテスト Alpha」トラックで審査送信</li>
+<li>審査通過確認</li>
+<li>buntyan 様にトーク連絡（取引 A direct_message 側）</li>
+</ol>
+
+<h3>7-4. 注意事項</h3>
+<ul>
+<li>★<strong>取引 B（やるゼ！親 + ｍやるゼ！）の 14日テスト期間中（5/27〜6/9）に ｔやるゼ！の修正を完了させたい</strong>。取引 B 終了後に「ｔ も追加でテスト依頼」と段取りを組むため</li>
+<li>修正によって ｔ Android アプリの本体機能（contractor-dashboard 等）が動作確認可能になる</li>
+<li>修正後の動作確認は大下が実機で行うこと（buntyan に渡す前に確証取得）</li>
+</ul>
+
+<!-- ========== §8 ========== -->
+<h2>§8 設計書 v4.3 との対応</h2>
+
+<table>
+<tr><th>設計書 v4.3 セクション</th><th>関連内容</th></tr>
+<tr><td>§37-17（罠リスト 17 番目）</td><td>Google Play Console テスター設定でメーリングリスト誤選択</td></tr>
+<tr><td>§39（Google Play Console 運用ガイド）</td><td>10 サブセクションで GPC 操作の決定版</td></tr>
+<tr><td>§34（全テストアカウント一覧）</td><td>本引継書 §5 と同じ ID/PW</td></tr>
+</table>
+
+<p>本引継書 v2 と設計書 v4.3 を併用：buntyan 様事案にだけフォーカスしたい場合は本書、プラットフォーム全体の文脈と合わせたい場合は設計書 v4.3 §39。</p>
+
+<!-- ========== §9 ========== -->
+<h2>§9 新規担当 / 新規 chat への引継チェックリスト</h2>
+
+<ol>
+<li>本引継書（HANDOVER_buntyan_v2_2026-05-26.html）を読む</li>
+<li>設計書 DESIGN_yaruze_v4_3_2026-05-24.html §39 と併せて確認</li>
+<li>取引 A（direct_message/9727540）と取引 B（talkrooms/17714106）の最新メッセージを実際に開いて確認</li>
+<li>取引 B が進行中（14日テスト中）であることを認識</li>
+<li>「はじめるボタン → ログイン画面遷移しない」の判定を §11 で確認 → buntyan に返答</li>
+<li>Android アプリ修正は別 chat に §7 を読ませて修正実装</li>
+<li>修正完了次第、取引 A 側で buntyan に「ｔ修正完了、改めてテスト依頼可能」連絡</li>
+<li>buntyan からの 14日報告を毎日受信 → 設計書 v4.3 / 本引継書 §3 に追記</li>
+<li>新規アプリ 3 つの準備が整い次第、新規取引として buntyan に提案</li>
+</ol>
+
+<!-- ========== §10 ========== -->
+<h2>§10 クロテ期間中のアップデート可否（Web 実調査確定）</h2>
+
+<div class="ok">
+<strong>★結論：期間中の修正・アップデートは「問題なし」どころか「むしろ推奨」</strong><br>
+複数の独立した情報源で一致して確認済。
+</div>
+
+<h3>10-1. 確定事項</h3>
+<table>
+<tr><th>項目</th><th>事実</th></tr>
+<tr><td>テスト日数のリセット</td><td>❌ <strong>リセットされない</strong></td></tr>
+<tr><td>審査への影響</td><td>✅ <strong>むしろプラスに働くことがある</strong></td></tr>
+<tr><td>アップデート頻度の制限</td><td>制限なし。buntyan 様提供 PDF の手順で何度でも可能</td></tr>
+<tr><td>期間中に何もしない場合のリスク</td><td>「テスターの関与が少ない」として <strong>リジェクト → 追加 14日テスト</strong>の可能性</td></tr>
+</table>
+
+<h3>10-2. 根拠（3 情報源で一致）</h3>
+<ol>
+<li><strong>buntyan 様自身の発言（5/26 21:13）</strong>：「クローズドテスト中にアップデートを頂いてもテスト日数がリセットされるということはありません。むしろ、後の審査でプラスに働くことがありますので、心配せずにアップデートを行ってください。」</li>
+<li><strong>実例ブログ「リアル大学生」</strong>（2025/2 投稿）：何も更新しなかったため追加 14日テスト（合計 28 日間）になった実例</li>
+<li><strong>ACTC（Android クローズドテストコミュニティ）報告</strong>：テスターの関与が少ないとリジェクトされる傾向</li>
+</ol>
+
+<h3>10-3. 修正したい場合の連絡先</h3>
+<p>buntyan 様の明示（5/26 21:13）：</p>
+<div class="quote">
+「なお、アプリの修正など依頼したいということがありましたら、その旨、お返事頂けますと幸いです。クローズドテスト中のアップデート方法は添付の資料をご確認ください。」
+</div>
+<p>→ <strong>修正する場合は取引 B トークルーム（talkrooms/17714106）に「修正したい旨」を一報入れる</strong>。buntyan 側でテスト継続性をフォローしてくれる。</p>
+
+<!-- ========== §11 ========== -->
+<h2>§11 「はじめるボタン → ログイン遷移しない」件の判断</h2>
+
+<h3>11-1. buntyan 様からの指摘（5/26 21:13）</h3>
+<div class="quote">
+「早速気になった点がありましたので共有致します。<br>
+どちらのアプリもはじめるボタンを押しても、ログイン画面には遷移しませんでした。<br>
+わざとであれば、問題ございません。」
+</div>
+
+<h3>11-2. 判断オプション 3 通り</h3>
+<table>
+<tr><th>パターン</th><th>方針</th><th>buntyan への返答</th><th>追加アクション</th></tr>
+<tr><td>A：仕様確定</td><td>「そういう動き」として確定・修正しない</td><td>「現状の仕様として、他のボタンやメニューからログイン画面へ進む設計のため、そのままテストを進めてください」</td><td>なし</td></tr>
+<tr><td>B：修正する</td><td>後日アップデートで「はじめるボタン → ログイン画面遷移」に修正</td><td>「ご指摘の通り違和感があるため、修正を進めます。修正版の準備が整い次第、ご連絡の上アップデートします」</td><td>★開発側で修正 + AAB 再ビルド + アップロード（buntyan 様提供 PDF 手順）</td></tr>
+<tr><td>C：保留</td><td>テスト進めながら判断</td><td>「いったんそのまま進めていただき、テスト期間中に判断します」</td><td>テスト中盤で再判断</td></tr>
+</table>
+
+<h3>11-3. キャッチボールのズレについて（2026-05-26 21:30 追記）</h3>
+<div class="urgent">
+buntyan 様の発言（「修正したい場合は連絡してください」「アップデートしても大丈夫」）は <strong>フォロー姿勢</strong>。これに対して「検討します」と返すと、温度差が出る。<br>
+<br>
+推奨：A か B のどちらかで <strong>明確な方針</strong>を返す。C は最後の手段。
+</div>
+
+<h3>11-4. 推奨返信テンプレート（パターン A・仕様確定の場合）</h3>
+<pre>
+buntyan 様
+
+12 人分のオプトイン、誠にありがとうございます。
+ダッシュボード表示も確認いたしました。これから 14 日間のテスト、よろしくお願いいたします。
+
+丁寧に仕様・ルールをご共有いただき、本当に助かります。
+
+【「はじめるボタン」の振る舞いについて】
+ご指摘ありがとうございます。
+「はじめるボタンを押してもログイン画面に遷移しない」件につきましては、現状の仕様として「そういう動き」にしております（他のボタンやメニューからログイン画面へ進む設計のため）。
+そのため、今回はそのままテストを進めていただければ幸いです。
+
+【クローズドテスト中のルール / アップデート方法について】
+ネイティブ画面の削除や起動時の振る舞い変更は行わないよう、遵守いたします。
+アップデート手順の PDF も拝受いたしました、ありがとうございます。
+今後修正が必要になった際は、その旨を buntyan 様にご連絡の上、ご共有いただいた手順に沿って進めさせていただきます。
+
+引き続きよろしくお願いいたしますm(__)m
+
+タムジ
+</pre>
+
+<h3>11-5. 推奨返信テンプレート（パターン B・修正する場合）</h3>
+<pre>
+buntyan 様
+
+12 人分のオプトイン、誠にありがとうございます。
+ダッシュボード表示も確認いたしました。これから 14 日間のテスト、よろしくお願いいたします。
+
+【「はじめるボタン」の振る舞いについて】
+ご指摘ありがとうございます。
+ボタンが反応しないと違和感があるとのこと、確かにその通りですので、開発側で修正を検討させていただきます。
+修正の方針が固まり次第、改めて buntyan 様にご連絡の上、共有いただいた手順に沿ってアップデートを進めます。
+
+【クローズドテスト中のルールについて】
+ネイティブ画面の削除や起動時の振る舞い変更は行わないよう、遵守いたします。
+アップデート手順の PDF も拝受いたしました、ありがとうございます。
+
+引き続きよろしくお願いいたしますm(__)m
+
+タムジ
+</pre>
+
+<!-- ========== Footer ========== -->
+<div class="footer">
+buntyan 様事案 専用引継書 v2<br>
+2026-05-26 更新 / TAmJ.Corp 大下<br>
+プロジェクト：やるゼ！プラットフォーム（親「やるゼ！」+ ｔやるゼ！+ ｍやるゼ！ + 新規 3 アプリ予定）<br>
+連絡チャネル：<br>
+　・取引 A：ココナラ direct_message/9727540<br>
+　・取引 B：ココナラ talkrooms/17714106（9,495円・5/27〜6/9 テスト期間中）<br>
+<br>
+作成支援：Claude（Anthropic）<br>
+関連文書：<br>
+　・DESIGN_yaruze_v4_3_2026-05-24.html §34 / §37-17 / §39（Google Play Console 運用）<br>
+　・HANDOVER_buntyan_2026-05-24.html v1（→ 本 v2 に置き換え）<br>
+　・クロテ中のアップデート方法.pdf（buntyan 様提供）<br>
+<br>
+最新 HEAD：adapt a6a08a1 / medadapt 8cfed70（local commit・未 push）/ onetouch_app 7ce7105
+</div>
+
+</body>
+</html>
