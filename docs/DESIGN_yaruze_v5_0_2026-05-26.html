@@ -676,6 +676,68 @@ expired / superseded / archived</pre>
 <p>これに満たない場合はリリースを 6/1 まで遅延。</p>
 </div>
 
+<!-- ═══════════════════════════════════════ -->
+<h2 id="v502_progress">§19 v5.0.2 進捗パッチ（2026-05-26・アプリ設計㉝）</h2>
+
+<div class="ok">
+<strong>本セッションで完了した実装</strong>
+</div>
+
+<h3>19-1. アセス・指示書の過去引継ぎ（§16 対応）</h3>
+
+<table>
+<tr><th>対象</th><th>関数</th><th>引継ぎ項目</th></tr>
+<tr><td>アセスメント</td><td><code>createAssess</code> / <code>assessDetail</code></td><td>ADL / 医療処置 / リスク / 服薬 / 家族意向 / 受入条件</td></tr>
+<tr><td>サービス担当者会議</td><td><code>showConfModal</code></td><td>出席者 + 残された課題（→「【前回からの継続課題】」プレフィクスで items に転記）</td></tr>
+<tr><td>モニタリング</td><td><code>showMonModal</code></td><td>ADL / 認知 / 排泄 / 皮膚 / 精神 / 介護者状況 / ケアプラン / 要介護度（13フィールド）</td></tr>
+</table>
+
+<p><strong>UI仕様</strong>: 新規作成時に confirm ダイアログで引継ぎの是非を確認。承認後、引継ぎフィールドは薄黄色背景 + 点線枠で視覚化。編集すると通常背景に戻る（<code>onChangeKey</code> で <code>_inherited</code> セットから該当キー除去）。</p>
+
+<p><strong>監査ログ</strong>: <code>copied_from_id</code> に引継ぎ元レコード ID を保存し、<code>addAudit(a.audit, '前回値を引継ぎ', '元: '+prev.date)</code> で操作ログ化。</p>
+
+<h3>19-2. 外部連携BOX UI 骨格（Phase 1〜4 統合）</h3>
+
+<table>
+<tr><th>機能</th><th>関数</th><th>状態</th></tr>
+<tr><td>タブ追加（⑦ 外部連携BOX）</td><td><code>tabList</code> 拡張</td><td><span class="badge-done">完了</span></td></tr>
+<tr><td>文書一覧表示</td><td><code>hubExternalBox(pt)</code></td><td><span class="badge-done">完了</span> ─ 種別/署名レベル/バージョン/保存期限/共有数バッジ</td></tr>
+<tr><td>アップロードモーダル</td><td><code>showExternalDocUploadModal(pt)</code></td><td><span class="badge-done">完了</span> ─ 23種doc_kind / 10種ロール / 6段階署名 / 法定保存設定</td></tr>
+<tr><td>詳細モーダル</td><td><code>showExternalDocDetail(d, pt)</code></td><td><span class="badge-done">完了</span> ─ メタ表示 / 共有先 / 閲覧ログ / 監査ログ / 新版発行</td></tr>
+<tr><td>共有モーダル</td><td><code>showShareModal(d, pt)</code></td><td><span class="badge-done">完了</span> ─ 11ロール / 3段階権限 / メッセージ</td></tr>
+<tr><td>Worker API 連携</td><td>—</td><td><span class="badge-todo">5/27</span> 当面 <code>D.externalDocs</code> に localStorage 保存。フックポイント <code>getExtDocs(pt)</code> を D1 fetch に切替予定。</td></tr>
+</table>
+
+<h3>19-3. D1 マイグレーション v16</h3>
+
+<p>新規ファイル: <code>assets/v16_d1_migration.sql</code>。SQLite メモリDBで構文検証済み。</p>
+
+<table>
+<tr><th>テーブル / ALTER</th><th>用途</th></tr>
+<tr><td><code>medical_document_shares</code></td><td>共有先・権限・状態管理（active/acknowledged/rejected/revoked/expired）</td></tr>
+<tr><td><code>medical_document_access_logs</code></td><td>閲覧/受領/印刷/共有等の全アクションログ（IP・UA 含む）</td></tr>
+<tr><td><code>doctor_profiles</code></td><td>医師資格 + 組織検証 + HPKI フィールド（実連携は半年後）</td></tr>
+<tr><td><code>signed_documents</code> ALTER</td><td>14列追加: 保存期限・署名レベル・発行元情報・バージョン管理</td></tr>
+<tr><td><code>medical_document_versions</code></td><td>新版発行履歴（旧版 ↔ 新版 ↔ 理由）</td></tr>
+</table>
+
+<h3>19-4. Worker (<code>worker_v7_complete.js</code>) 修正</h3>
+
+<p>L2449 <code>allowedKinds</code> を 6 → 23 種類に拡張。コメントでグループ化（既存6 / v5.0新規14 / 歯科介護3）。</p>
+
+<h3>19-5. 残タスク（5/27-28）</h3>
+
+<table>
+<tr><th>項目</th><th>日付</th><th>規模</th></tr>
+<tr><td>D1 v16 を本番 D1 へ適用</td><td>5/27</td><td>小（wrangler コマンド1発）</td></tr>
+<tr><td><code>/medical-docs/*</code> エンドポイント実装（6本）</td><td>5/27</td><td>中（既存パターン流用）</td></tr>
+<tr><td>localStorage → D1 fetch 切替</td><td>5/27</td><td>小（<code>getExtDocs</code> 内 1箇所）</td></tr>
+<tr><td>共有先ロール別アクセス制御 Worker 側</td><td>5/27</td><td>中</td></tr>
+<tr><td>Phase 3 医師認証フォーム（設定画面）</td><td>5/28</td><td>中</td></tr>
+<tr><td>Phase 4 保存期限通知（TODO追加）</td><td>5/28</td><td>小</td></tr>
+<tr><td>QA + 本番デプロイ</td><td>5/28</td><td>—</td></tr>
+</table>
+
 <div class="footer">
 <p>やるゼ！プラットフォーム 統合設計書 v5.0 / 2026-05-26 作成<br>Owner: TAmJ.Corp 代表 / 大下さん</p>
 </div>

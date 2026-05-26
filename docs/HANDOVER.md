@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-26（v5.0.1 / 医師・専門監修パートナー6名追加・既存後藤先生はトップに維持）
+**最終更新**: 2026-05-26（v5.0.2 / 過去引継ぎ機能 + 外部連携BOX UI骨格 + D1 migration v16）
 
 **現状 HEAD**:
-- medadapt: v5.0.1
+- medadapt: v5.0.2
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -11,9 +11,9 @@
 **📌 大下指示書**: 「医師本人確認・医療文書共有・タイムスタンプ機能 追加指示書」+ 10件の追加要件 + 1年以内タスク3件
 
 **📅 5/28 までのロードマップ**:
-- **5/26（今日）**: LP軽微修正5件＋アプリ修正2件＋v5.0設計書 ✅ 完了
-- **5/27**: Phase 1（外部連携BOX：DB+API+UI枠）+ Phase 2 前半
-- **5/28**: Phase 2後半 + Phase 3（医師認証）+ Phase 4（保存期限・新版発行）+ QA + 本番デプロイ
+- **5/26（今日）**: LP軽微修正5件＋アプリ修正2件＋v5.0設計書＋過去引継ぎ＋外部連携BOX UI ✅ 完了
+- **5/27**: Worker /medical-docs/* API実装 + D1 v16 適用 + 共有先ロール別アクセス制御
+- **5/28**: Phase 3（医師認証フォーム）+ Phase 4（保存期限通知）+ QA + 本番デプロイ
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
@@ -114,7 +114,81 @@ grep -nE "4つの中核|6職種|6 つの強み" 対象ファイル
 
 ---
 
-### v5.0.1 セッションでの完了事項（2026-05-26 / 医師・専門監修パートナー6名追加）
+### v5.0.2 セッションでの完了事項（2026-05-26 / 過去引継ぎ + 外部連携BOX UI骨格・アプリ設計㉝）
+
+大下指示: 「全部やって。順番は君に任せる。」を受けて、HANDOVER §16（アセス・指示書の過去引継ぎ）+ 設計書 §3-§6（Phase 1〜4 外部連携BOX）を一括着手。
+
+#### A. アセス・記録の過去引継ぎ機能（§16 対応）
+
+**実装内容** (`app.html`):
+
+1. **`createAssess`** ─ 同一患者の最新アセス（archived除く）があれば、確認ダイアログ → ADL/医療処置/リスク/服薬/家族意向/受入条件 を初期値コピー。`copied_from_id` 記録 + `_inherited` セットで引継ぎ項目を追跡。
+2. **`assessDetail`** ─ 引継ぎバナー（黄色）表示 + 各フィールドに `wrapInh` ラッパで薄黄色背景＋点線枠を付与。編集すると黄色解除（`onChangeKey`）。
+3. **`showConfModal`**（サービス担当者会議）─ 新規作成時、前回の `attendees` + `remaining`（残された課題）を初期値に。「【前回からの継続課題】」プレフィクスで `items` に転記。
+4. **`showMonModal`**（モニタリング）─ 新規作成時、ADL/認知/排泄/皮膚/精神/介護者状況/ケアプラン/要介護度 等 13 フィールドを引継ぎ。
+
+**Playwright 動作検証**:
+- 山田花子患者（既存 periodic アセス あり）で「+ 定期」→ 確認ダイアログ表示 → 承認 → 引継ぎバナー＋黄色背景フィールド表示 ✅
+- トースト「前回値を引継ぎ作成」表示 ✅
+- 引継ぎ項目を編集すると `onChangeKey` で `_inherited` から該当キーが除去され、次回 `rr()` で黄色背景が解除 ✅
+
+#### B. 外部連携BOX UI 骨格（Phase 1〜4 統合）
+
+**実装内容** (`app.html`):
+
+1. **タブ追加**: 患者ハブが「① 概要 / ② 受入れ・移行 / ③ サービス担当者会議 / ④ モニタリング / ⑤ 同意書・帳票 / ⑥ 記録・監査」の **6 タブ → 7 タブ** に拡張。新タブ「**⑦ 外部連携BOX**」を追加。
+2. **定数定義**:
+   - `DOC_KIND_LABELS` ─ 23 種類の doc_kind ラベル（既存6 + 新規14 + 歯科介護3）
+   - `SIGNATURE_LEVELS` ─ 6 段階の署名レベル（none / system_verified / doctor_license_verified / hpki_signed / external_signed_pdf / paper_scan）と表示色
+3. **`hubExternalBox(pt)`** ─ 一覧表示。各カードに「文書種別バッジ + 署名レベルバッジ + バージョン + 保存期限警告（残30日以内で黄色、残30日以下で赤）+ 共有数」を表示。
+4. **`showExternalDocUploadModal(pt)`** ─ 23種類の doc_kind 選択 + 10種類の発行元ロール + 6段階の署名レベル + 法定保存期限チェック（自動計算: 今日 + retention_years）+ 法的根拠入力。
+5. **`showExternalDocDetail(d, pt)`** ─ メタ情報テーブル + 共有先一覧（停止ボタン付き）+ 閲覧/受領ログ表示 + 監査ログ（既存 `auditView` 流用）+ 新版発行・非表示ボタン。
+6. **`showShareModal(d, pt)`** ─ 11 種類の役割ベース共有先指定 + 3 段階権限（view / download / acknowledge）+ メッセージ添付。
+
+**バグ修正（同セッション内発見）**:
+- 閲覧ログ表示で「`[object HTMLSpanElement]`」が出る不具合発見 → `h()` 戻り値を文字列連結していたため。`row.appendChild(h(...))` の正しいパターンに修正 ✅
+
+#### C. D1 migration v16（Phase 1〜4 永続化スキーマ）
+
+**新規ファイル**: `assets/v16_d1_migration.sql`
+
+**内容**:
+
+1. **`medical_document_shares`** ─ 共有テーブル。`from_org_id` / `to_org_id` / `to_role` / `permission`（view/download/acknowledge）/ `share_status`（active/acknowledged/rejected/revoked/expired）/ 各種タイムスタンプ + 理由欄。
+2. **`medical_document_access_logs`** ─ 閲覧・受領ログ。`action`（view/download/print/acknowledge/reject/comment/revoke/verify/share）+ `ip_address` / `user_agent` 記録 + ユーザー削除後の追跡用に `user_name` / `org_name` スナップショット。
+3. **`doctor_profiles`** ─ 医師本人確認用テーブル。`medical_license_number` / `license_verified_status`（pending/verified/rejected）/ `hpki_enabled` / HPKI 証明書情報 4 列 / `signing_authority_status` / `mfa_enabled`。HPKI 実連携は v5.0.2 では UI/フィールドのみで、外部 CA 連携は半年後タスク。
+4. **`signed_documents` への ALTER** ─ 14 列追加（`retention_required` / `retention_years` / `retention_until` / `legal_basis` / `delete_policy` / `signature_level` / `from_org_name` / `from_org_role` / `issued_date` / `received_at` / `version_no` / `parent_document_id` / `superseded_at` / `archived`）。すべて DEFAULT 付きで後方互換。
+5. **`medical_document_versions`** ─ 新版発行履歴テーブル（旧版 → 新版 のリンク + 理由 + 作成者）。
+
+**SQLite 構文検証**: メモリ DB に投入して全テーブル作成成功、`signed_documents` の列数が 14 増加して 17 列に拡大することを確認 ✅。
+
+#### D. Worker (`assets/worker_v7_complete.js`) の `allowedKinds` 拡張
+
+L2449 の `allowedKinds` を 6 → 23 種類に拡張。コメントで「既存 6 種 / v5.0 新規 14 種（医療文書全般）/ v5.0 追加 3 種（歯科・介護保険）」をグループ化して保守性向上。
+
+#### E. 残タスク（5/27-28）
+
+1. **Worker API 実装**（5/27 メイン）:
+   - `POST /medical-docs/upload` ─ 外部文書アップロード（PDF or 構造化データ）
+   - `GET /medical-docs/patient/:patient_id` ─ 患者別文書一覧
+   - `POST /medical-docs/:id/share` ─ 外部機関共有（共有先ロール検証含む）
+   - `GET /medical-docs/shared-with-me` ─ 自組織宛て共有文書一覧
+   - `POST /medical-docs/:id/acknowledge` / `reject` / `revoke`
+   - `GET /medical-docs/:id/access-logs`
+2. **アプリ側 localStorage → D1 移行**（5/27〜）: `D.externalDocs` は localStorage に保存しているが、Worker API ができ次第 `/medical-docs/patient/:pid` 経由で D1 から取得するよう書き換える。フックポイントは `hubExternalBox` 内の `getExtDocs(pt)`。
+3. **Phase 3 医師認証 UI**（5/28）: `doctor_profiles` を編集する画面を「設定」配下に追加。免許証アップロード（画像）+ 確認ステータス表示。
+4. **Phase 4 保存期限通知**（5/28）: 患者ハブ概要 buildTodos に「保存期限30日以内の文書あり」TODO を追加。
+5. **アプリ設計㉝引き継ぎスクショ問題**: 添付の `v501_supervisor_mobile_lower.png` で長橋先生カード上に大空白が見えた件 → Playwright 実機検証で「スクロール途中スクショの錯覚」と確認。レイアウト健全（gap 12px 均一）。**修正不要**。
+
+#### F. 文言ガイドライン遵守チェック
+
+- 「完全」「ゼロ」「100%」: 0 件 ✅
+- 個人名+一般概念: 0 件 ✅
+- 鍼灸単独表記: `massage_acupuncture_provider` / `massage_acupuncture_consent` のみで「訪問マッサージ（鍼灸含む）」表記準拠 ✅
+- 「タブレット 1 台」: 該当箇所なし
+- 数の限定: 「23 種類の doc_kind」「6 段階の署名レベル」「11 種類の役割」等は **DB スキーマ仕様の事実**であり、文言ガイドライン §A の対象外（"4つの中核機能" のような曖昧な広告コピーとは異なる）
+
+
 
 大下指示:
 > 「医監修パートナー」→「医師・専門監修パートナー」に変更

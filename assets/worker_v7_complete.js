@@ -2446,7 +2446,31 @@ async function handleRequest(request, env, json, err) {
     if (!doc_kind || !doc_id || !title || !content) {
       return err('必須項目が不足しています（doc_kind / doc_id / title / content）');
     }
-    const allowedKinds = ['consent_form', 'discharge_notice', 'org_nda', 'treatment_plan', 'acupuncture_report', 'joint_guidance_record'];
+    // v5.0.2: doc_kind を 23 種類に拡張（外部連携BOX対応）
+    // 設計書: DESIGN_yaruze_v5_0_2026-05-26.html §3-1
+    const allowedKinds = [
+      // 既存 6 種
+      'consent_form', 'discharge_notice', 'org_nda', 'treatment_plan', 'acupuncture_report', 'joint_guidance_record',
+      // v5.0 新規 14 種（医療文書全般）
+      'medical_referral',            // 診療情報提供書
+      'discharge_summary',           // 退院サマリ
+      'nursing_summary',             // 看護サマリ
+      'visit_nurse_instruction',     // 訪問看護指示書
+      'special_visit_instruction',   // 特別訪問看護指示書
+      'rehab_instruction',           // リハビリ指示書
+      'pharmacy_info',               // 薬剤情報提供書
+      'care_plan',                   // ケアプラン
+      'service_meeting_record',      // サービス担当者会議記録
+      'monitoring_record',           // モニタリング記録
+      'patient_consent',             // 患者同意書
+      'family_consent',              // 家族同意書
+      'home_medical_instruction',    // 在宅医療指示書
+      'massage_acupuncture_consent', // マッサージ・鍼灸同意書
+      // v5.0 追加 3 種（歯科・介護保険）
+      'dental_referral',             // 歯科診療情報提供書
+      'dental_instruction',          // 歯科指示書
+      'kyotaku_ryoyo_record'         // 居宅療養管理指導記録
+    ];
     if (!allowedKinds.includes(doc_kind)) {
       return err(`doc_kind は ${allowedKinds.join(' / ')} のいずれか`);
     }
