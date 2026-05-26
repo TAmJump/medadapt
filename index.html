@@ -154,8 +154,13 @@ body {
   box-shadow: 0 16px 48px rgba(15,23,42,.18), 0 4px 12px rgba(15,23,42,.08);
   color: var(--ink);
   text-align: left;
-  margin-top: 420px;
+  /* v5.0.6: 画面幅追随で大画面でも人物に被らないよう margin-top を可変に */
+  margin-top: clamp(420px, 38vw, 640px);
   margin-bottom: 70px;
+}
+/* v5.0.6: 大画面では .hero 自体の高さも追随させて、写真領域を確保 */
+@media (min-width: 981px) {
+  .hero { min-height: max(720px, 50vw); }
 }
 .hero-title {
   font-size: clamp(2.6rem, 6.4vw, 4.8rem);
