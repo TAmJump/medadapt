@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-26（v5.0.3 / 大下指示書全項目対応・表記統一・アイコン削除・居宅療養／歯科／診療情報提供書 実装）
+**最終更新**: 2026-05-26（v5.0.4 / Phase 1-4 全実装完了 / Worker API 10本 / 医師認証フォーム / 保存期限通知 / 居宅療養PDF）
 
 **現状 HEAD**:
-- medadapt: v5.0.3
+- medadapt: v5.0.4
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -11,9 +11,9 @@
 **📌 大下指示書**: 「医師本人確認・医療文書共有・タイムスタンプ機能 追加指示書」+ 10件の追加要件 + 1年以内タスク3件
 
 **📅 5/28 までのロードマップ**:
-- **5/26（今日）**: LP軽微修正5件＋アプリ修正2件＋v5.0設計書＋過去引継ぎ＋外部連携BOX UI＋大下指示書全項目（v5.0.3）✅ 完了
-- **5/27**: Worker /medical-docs/* API実装 + D1 v16 適用 + 共有先ロール別アクセス制御
-- **5/28**: Phase 3 医師認証フォーム + Phase 4 保存期限通知 + QA + 本番デプロイ
+- **5/26（今日）**: LP軽微修正5件＋アプリ修正2件＋v5.0設計書＋過去引継ぎ＋外部連携BOX UI＋大下指示書全項目（v5.0.3）＋Worker API 10本＋医師認証＋保存期限通知＋居宅療養PDF（v5.0.4）✅ 完了
+- **5/27**: D1 v16 適用（wrangler）+ Worker デプロイ + 本番動作確認
+- **5/28**: QA + LP/アプリ最終調整 + 本番リリース判定
 
 **作成**: Claude (Anthropic)
 **Owner**: TAmJ.Corp 代表 / 大下さん
@@ -113,6 +113,122 @@ grep -nE "4つの中核|6職種|6 つの強み" 対象ファイル
 | 課題タイル06「監査不安」のテキスト重なり | tile-s 専用のオーバーレイ濃度強化 + text 2行 clamp で可読性向上 | v4.25 |
 
 ---
+
+### v5.0.4 セッションでの完了事項（2026-05-26 / Phase 1-4 全実装・Worker API完結・アプリ設計㉝後半その2）
+
+大下指示: 「全部進めて」を受けて、v5.0.3 で残していた **Worker API 6本（実装後 10本に拡張）/ localStorage→D1切替 / 医師認証フォーム / 保存期限通知 / 居宅療養PDF** をすべて実装。これで設計書 §3〜§6 の全フェーズが完成。
+
+#### A. Worker `/medical-docs/*` API 10本実装
+
+`assets/worker_v7_complete.js` L2683-3083 に追加。設計書では 6 本予定だったが、運用上必要な 4 本を追加して計 10 本：
+
+| エンドポイント | メソッド | 用途 | 設計書 |
+|---|---|---|---|
+| `/medical-docs/upload` | POST | 外部文書アップロード（メタデータ+content+署名レベル+保存期限） | §3-4 |
+| `/medical-docs/patient/:id` | GET | 患者別文書一覧（自組織発行 + 自組織宛て共有のマージ） | §3-4 |
+| `/medical-docs/:id/share` | POST | 外部機関へ共有（ロール別 doc_kind 制限あり） | §4-2 |
+| `/medical-docs/shared-with-me` | GET | 自分／自組織宛ての共有一覧 | §4-2 |
+| `/medical-docs/:id/acknowledge` | POST | 受領確認（共有先が押す） | §4-2 |
+| `/medical-docs/:id/reject` | POST | 差戻し | §4-2 |
+| `/medical-docs/:id/revoke` | POST | 共有停止（共有元のみ） | §4-2 |
+| `/medical-docs/:id/access-logs` | GET | 閲覧ログ取得 | §4-2 |
+| `/medical-docs/:id/view` | POST | 閲覧ログ記録（IP/UA記録） | 追加 |
+| `/medical-docs/:id/new-version` | POST | 新版発行（旧版を archived、versions テーブルに履歴記録） | §6 |
+
+**ロールベース doc_kind 制限**（設計書 §4-1 準拠）:
+
+```js
+const roleAllowedKinds = {
+  hospital: 'ALL', clinic_med: 'ALL',
+  clinic_dent: ['dental_referral','dental_instruction','medical_referral','patient_consent','family_consent','pharmacy_info'],
+  visiting_nurse: ['visit_nurse_instruction','special_visit_instruction','discharge_summary','medical_referral','nursing_summary','home_medical_instruction'],
+  pharmacy: ['pharmacy_info','medical_referral','home_medical_instruction'],
+  care_manager: ['care_plan','discharge_summary','service_meeting_record','monitoring_record','kyotaku_ryoyo_record'],
+  care_facility: ['discharge_summary','nursing_summary','medical_referral','patient_consent','family_consent'],
+  rehab_provider: ['rehab_instruction','discharge_summary'],
+  massage_acupuncture_provider: ['massage_acupuncture_consent','treatment_plan','acupuncture_report'],
+  patient: ['consent_form','patient_consent','medical_referral','discharge_summary'],
+  family: ['family_consent','patient_consent']
+};
+```
+
+例: 訪問看護 (`visiting_nurse`) には「歯科指示書」を共有しようとしても 403 で拒否される。
+
+**監査ログ自動記録**: upload/share/acknowledge/reject/revoke/view すべてのアクションを `medical_document_access_logs` に INSERT（IP/UA 含む）。
+
+#### B. アプリ側 localStorage → D1 fetch 切替
+
+1. **`fetchExtDocsFromWorker(pt)`** ─ `/medical-docs/patient/:id` を呼んでローカルキャッシュにマージ。`_fromWorker` フラグでローカル only データと区別。
+2. **`hubExternalBox(pt)`** ─ 初回表示時に `S._extDocsFetched[pt.id]` ガードで重複呼び出し防止しつつ Worker から取得 → 完了後 `rr()` で再描画。
+3. **`showExternalDocUploadModal`** ─ 「登録」ボタンで Worker `/medical-docs/upload` を await し、成功時は `signed_document_id` をローカルにも保存。失敗時はローカル only。トーストで状態表示（「D1同期済」/「ローカル保存」）。
+4. **`showShareModal`** ─ 「共有する」ボタンで Worker `/medical-docs/:id/share` を await。
+5. **`showSharedWithMeModal()`** 新規 ─ 共有されたBOXモーダル。`/medical-docs/shared-with-me` で取得、各カードに受領確認 / 差戻しボタン。
+
+**オフライン耐性**: Worker API 失敗時もローカル保存で続行可能。`silent404:true` で 404 トースト抑止。
+
+#### C. Phase 3 医師認証フォーム（設定画面）
+
+`settingsPage()` 内、「アカウント情報」カードの直後に「医師認証・署名権限」セクション追加。
+
+**機能**:
+- 医師氏名 / 医籍登録番号 / 所属医療機関 の入力
+- 4 つのステータスバッジ表示（医師資格 / 組織所属 / HPKI / 多要素認証）
+- 「プロフィール保存」「免許証画像アップロード（近日対応）」「多要素認証 ON/OFF」ボタン
+- **管理者のみ**「資格確認済みにする / 取消」ボタン表示（`u.role==='admin'` 条件分岐）
+- 説明文「署名レベルの違い」を末尾に表示（system_verified / doctor_license_verified / hpki_signed / external_signed_pdf）
+
+#### D. Phase 4 保存期限通知
+
+`buildTodos(pt)` 関数に保存期限超過警告を追加。
+
+**ロジック**:
+```js
+const extDocs=(D.externalDocs||[]).filter(d=>d.patientId===pt.id&&!d.archived&&d.retention_until);
+extDocs.forEach(d=>{
+  const daysLeft=Math.floor((new Date(d.retention_until)-Date.now())/86400000);
+  if(daysLeft<0) → 赤色TODO「保存期限切れ」
+  else if(daysLeft<=30) → 黄色TODO「保存期限残N日」
+});
+```
+
+患者ハブ概要タブの「次にやること」に自動表示。クリックで外部連携BOXタブへ遷移。
+
+#### E. 居宅療養管理指導 PDF 出力実装
+
+`genKyotakuPDF(r)` を新規追加（`genAssessPDF` の前に挿入）。
+
+**PDF 構造**:
+1. ヘッダ: 「居宅療養管理指導 記録」+ 作成日時刻
+2. 基本情報テーブル: 利用者名 / 要介護度 / 提供職種（単位） / 当月実施回数 / オンライン実施URL
+3. バイタル表: SBP/DBP/脈拍/体温/SpO2
+4. 状況・指導テーブル: 栄養 / 服薬 / ADL / 指導内容 / 次回訪問予定 / ケアマネ氏名・事業所 / CM共有状況
+5. 電子署名＋タイムスタンプフッタ（e-文書法・電子署名法・SHA-256ハッシュチェーン明示）
+6. 作成組織名 + アプリ名
+
+**自動連動**: `saveDocument('kyotaku_ryoyo_record', ...)` で帳票一覧にも自動保存。
+
+#### F. Playwright 動作検証
+
+- ✅ 全主要ページ smoke test 通過（kyotaku/dental/medical_referral/settings/acu_massage）
+- ✅ Worker API 呼び出し（`/medical-docs/patient/:id`, `/medical-docs/shared-with-me`）が実際に発火することを確認
+- ✅ 設定画面「医師認証・署名権限」セクション正常表示（4バッジ + 4ボタン）
+- ✅ 共有されたBOXモーダル正常表示（API失敗時は適切な空状態）
+- ✅ 居宅療養新規モーダル + 患者選択正常動作
+- ✅ JSエラー: ローカル特有のCORS以外 0件
+
+#### G. 残タスク（5/27-28 持ち越し）
+
+| 項目 | 日付 | 規模 |
+|---|---|---|
+| D1 v16 マイグレーション本番適用 | 5/27 | 小（`wrangler d1 execute` 1発） |
+| Worker `worker_v7_complete.js` 本番デプロイ | 5/27 | 小（既存のCFパイプライン） |
+| 本番でのE2E動作確認（実D1で文書登録→共有→受領） | 5/27 | 中 |
+| 免許証画像アップロード機能（R2 + 署名URL） | 5/28 or 後日 | 中 |
+| HPKI実連携（外部CA） | 半年後 | 大 |
+
+---
+
+
 
 ### v5.0.3 セッションでの完了事項（2026-05-26 / 大下指示書全項目対応・アプリ設計㉝後半）
 

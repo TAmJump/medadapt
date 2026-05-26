@@ -2670,6 +2670,438 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true, signed_document: sd });
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v5.0.3 (アプリ設計㉝): /medical-docs/* 外部連携BOX API 6本
+  // 設計書: DESIGN_yaruze_v5_0_2026-05-26.html §3〜§6
+  // 対応 DB: v16_d1_migration.sql
+  //   - medical_document_shares (共有・権限・状態)
+  //   - medical_document_access_logs (閲覧/受領/印刷ログ)
+  //   - signed_documents (ALTER で from_org_name 等を追加)
+  //   - medical_document_versions (新版発行履歴)
+  // ════════════════════════════════════════════════════════════
+
+  // ── POST /medical-docs/upload ───────────────────────────────
+  // 外部から受領した医療文書を登録（PDF・構造化データ・メタデータ）
+  if (path === '/medical-docs/upload' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const {
+      doc_kind, patient_id, title, content,
+      from_org_name, from_org_role, from_org_id, issued_date,
+      signature_level, retention_required, retention_years, retention_until,
+      legal_basis, version_no, parent_document_id, note
+    } = body;
+    if (!doc_kind || !patient_id) return err('doc_kind と patient_id が必須です');
+    // doc_kind の有効性チェック（v5.0.3 拡張 23 種）
+    const validKinds = [
+      'consent_form','discharge_notice','org_nda','treatment_plan','acupuncture_report','joint_guidance_record',
+      'medical_referral','discharge_summary','nursing_summary','visit_nurse_instruction','special_visit_instruction',
+      'rehab_instruction','pharmacy_info','care_plan','service_meeting_record','monitoring_record',
+      'patient_consent','family_consent','home_medical_instruction','massage_acupuncture_consent',
+      'dental_referral','dental_instruction','kyotaku_ryoyo_record'
+    ];
+    if (!validKinds.includes(doc_kind)) return err('doc_kind が無効です');
+    const orgId = currentUser.org_id || currentUser.id;
+    const now = new Date().toISOString();
+    const sdId = 'SD-' + genUuid();
+    const snapshot = typeof content === 'string' ? content : JSON.stringify(content || {});
+    const contentHash = await sha256Hex(snapshot);
+    try {
+      // signed_documents へ INSERT（v5.0.3 で追加した列も埋める）
+      await env.DB.prepare(`
+        INSERT INTO signed_documents (
+          id, doc_kind, doc_id, title, org_id, content_snapshot, content_hash,
+          tsa_status, chain_index, finalized_at, created_at,
+          from_org_name, from_org_role, issued_date, received_at,
+          signature_level, retention_required, retention_years, retention_until,
+          legal_basis, version_no, parent_document_id, archived
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        sdId, doc_kind, sdId, title || '', orgId, snapshot, contentHash,
+        'pending', 0, now, now,
+        from_org_name || null, from_org_role || null, issued_date || null, now,
+        signature_level || 'none',
+        retention_required ? 1 : 0,
+        retention_years || 5,
+        retention_until || null,
+        legal_basis || null,
+        version_no || 1,
+        parent_document_id || null,
+        0
+      ).run();
+      // 受領アクションを access_logs に記録
+      const logId = 'log_' + genUuid();
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, patient_id, user_id, user_name, org_id, org_name, role, action, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        logId, sdId, patient_id, currentUser.id, currentUser.name || '',
+        orgId, currentUser.org || '', currentUser.role || '', 'upload', now
+      ).run();
+      return json({ ok: true, signed_document_id: sdId, content_hash: contentHash });
+    } catch (e) {
+      console.error('medical-docs/upload error:', e.message);
+      return err('登録に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── GET /medical-docs/patient/:patient_id ───────────────────
+  // 患者別の医療文書一覧（自組織発行＋自組織に共有されたもの）
+  const mdPatientMatch = path.match(/^\/medical-docs\/patient\/([A-Za-z0-9_-]+)$/);
+  if (mdPatientMatch && method === 'GET') {
+    const patientId = mdPatientMatch[1];
+    const orgId = currentUser.org_id || currentUser.id;
+    try {
+      // 自組織発行
+      const own = await env.DB.prepare(`
+        SELECT sd.* FROM signed_documents sd
+        JOIN medical_document_access_logs lg ON lg.signed_document_id=sd.id
+        WHERE sd.org_id=? AND lg.patient_id=? AND sd.archived=0
+        GROUP BY sd.id
+        ORDER BY sd.created_at DESC LIMIT 200
+      `).bind(orgId, patientId).all();
+      // 自組織に共有されたもの
+      const shared = await env.DB.prepare(`
+        SELECT sd.* FROM signed_documents sd
+        JOIN medical_document_shares mds ON mds.signed_document_id=sd.id
+        WHERE (mds.to_org_id=? OR mds.to_user_id=?) AND mds.share_status='active'
+          AND mds.patient_id=? AND sd.archived=0
+        GROUP BY sd.id
+        ORDER BY mds.shared_at DESC LIMIT 200
+      `).bind(orgId, currentUser.id, patientId).all();
+      const merged = [...(own?.results || []), ...(shared?.results || [])];
+      // 重複排除
+      const seen = new Set();
+      const items = merged.filter(r => seen.has(r.id) ? false : (seen.add(r.id), true));
+      return json({ ok: true, items });
+    } catch (e) {
+      console.error('medical-docs/patient error:', e.message);
+      return json({ ok: true, items: [] });
+    }
+  }
+
+  // ── POST /medical-docs/:id/share ────────────────────────────
+  // 外部機関へ共有（ロールベース権限制御）
+  const mdShareMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/share$/);
+  if (mdShareMatch && method === 'POST') {
+    const sdId = mdShareMatch[1];
+    const body = await request.json().catch(() => ({}));
+    const { to_org_id, to_user_id, to_role, to_org_name, permission, expires_at, message } = body;
+    if (!to_role) return err('to_role が必須です');
+    if (!to_org_id && !to_user_id && !to_org_name) return err('共有先（to_org_id / to_user_id / to_org_name のいずれか）が必須です');
+    // 共有元の所有確認（admin / 自組織のみ共有可能）
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (sd.org_id !== orgId && currentUser.role !== 'admin') {
+      return err('この文書を共有する権限がありません', 403);
+    }
+    // ロール別に許可される doc_kind を制限（設計書 §4-1）
+    const roleAllowedKinds = {
+      hospital: 'ALL', clinic_med: 'ALL',
+      clinic_dent: ['dental_referral','dental_instruction','medical_referral','patient_consent','family_consent','pharmacy_info'],
+      visiting_nurse: ['visit_nurse_instruction','special_visit_instruction','discharge_summary','medical_referral','nursing_summary','home_medical_instruction'],
+      pharmacy: ['pharmacy_info','medical_referral','home_medical_instruction'],
+      care_manager: ['care_plan','discharge_summary','service_meeting_record','monitoring_record','kyotaku_ryoyo_record'],
+      care_facility: ['discharge_summary','nursing_summary','medical_referral','patient_consent','family_consent'],
+      rehab_provider: ['rehab_instruction','discharge_summary'],
+      massage_acupuncture_provider: ['massage_acupuncture_consent','treatment_plan','acupuncture_report'],
+      patient: ['consent_form','patient_consent','medical_referral','discharge_summary'],
+      family: ['family_consent','patient_consent']
+    };
+    const allow = roleAllowedKinds[to_role];
+    if (allow !== 'ALL' && Array.isArray(allow) && !allow.includes(sd.doc_kind)) {
+      return err(`この役割（${to_role}）には ${sd.doc_kind} の共有は許可されていません`, 403);
+    }
+    const now = new Date().toISOString();
+    const shareId = 'sh_' + genUuid();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO medical_document_shares (
+          id, signed_document_id, patient_id, from_org_id, from_user_id,
+          to_org_id, to_user_id, to_role, to_org_name, permission, share_status,
+          shared_at, expires_at, message, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        shareId, sdId, sd.patient_id || null, orgId, currentUser.id,
+        to_org_id || null, to_user_id || null, to_role, to_org_name || null,
+        permission || 'view', 'active',
+        now, expires_at || null, message || '', now
+      ).run();
+      // 監査ログ
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, share_id, patient_id, user_id, user_name, org_id, org_name, role, action, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'log_' + genUuid(), sdId, shareId, sd.patient_id || null,
+        currentUser.id, currentUser.name || '', orgId, currentUser.org || '',
+        currentUser.role || '', 'share', now
+      ).run();
+      return json({ ok: true, share_id: shareId });
+    } catch (e) {
+      console.error('medical-docs/share error:', e.message);
+      return err('共有に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── GET /medical-docs/shared-with-me ────────────────────────
+  // 自組織／自分に共有された文書一覧
+  if (path === '/medical-docs/shared-with-me' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    try {
+      const rows = await env.DB.prepare(`
+        SELECT sd.*, mds.id AS share_id, mds.permission, mds.share_status, mds.shared_at, mds.message, mds.expires_at,
+               mds.acknowledged_at, mds.rejected_at, mds.from_user_id, mds.from_org_id
+        FROM medical_document_shares mds
+        JOIN signed_documents sd ON sd.id=mds.signed_document_id
+        WHERE (mds.to_org_id=? OR mds.to_user_id=?) AND mds.share_status='active'
+        ORDER BY mds.shared_at DESC LIMIT 200
+      `).bind(orgId, currentUser.id).all();
+      return json({ ok: true, items: rows?.results || [] });
+    } catch (e) {
+      console.error('shared-with-me error:', e.message);
+      return json({ ok: true, items: [] });
+    }
+  }
+
+  // ── POST /medical-docs/:id/acknowledge ──────────────────────
+  // 受領確認（共有を受けた側が押す）
+  const mdAckMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/acknowledge$/);
+  if (mdAckMatch && method === 'POST') {
+    const sdId = mdAckMatch[1];
+    const orgId = currentUser.org_id || currentUser.id;
+    // 自組織宛ての active share を探す
+    const share = await env.DB.prepare(`
+      SELECT * FROM medical_document_shares
+      WHERE signed_document_id=? AND (to_org_id=? OR to_user_id=?) AND share_status='active'
+      LIMIT 1
+    `).bind(sdId, orgId, currentUser.id).first();
+    if (!share) return err('この文書の受領確認権限がありません', 403);
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(`
+        UPDATE medical_document_shares
+        SET share_status='acknowledged', acknowledged_at=?, acknowledged_by=?
+        WHERE id=?
+      `).bind(now, currentUser.id, share.id).run();
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, share_id, patient_id, user_id, user_name, org_id, org_name, role, action, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'log_' + genUuid(), sdId, share.id, share.patient_id || null,
+        currentUser.id, currentUser.name || '', orgId, currentUser.org || '',
+        currentUser.role || '', 'acknowledge', now
+      ).run();
+      return json({ ok: true, acknowledged_at: now });
+    } catch (e) {
+      console.error('acknowledge error:', e.message);
+      return err('受領確認に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── POST /medical-docs/:id/reject ───────────────────────────
+  // 差戻し（受領拒否）
+  const mdRejectMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/reject$/);
+  if (mdRejectMatch && method === 'POST') {
+    const sdId = mdRejectMatch[1];
+    const body = await request.json().catch(() => ({}));
+    const orgId = currentUser.org_id || currentUser.id;
+    const share = await env.DB.prepare(`
+      SELECT * FROM medical_document_shares
+      WHERE signed_document_id=? AND (to_org_id=? OR to_user_id=?) AND share_status='active'
+      LIMIT 1
+    `).bind(sdId, orgId, currentUser.id).first();
+    if (!share) return err('この文書の差戻し権限がありません', 403);
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(`
+        UPDATE medical_document_shares
+        SET share_status='rejected', rejected_at=?, rejected_by=?, reject_reason=?
+        WHERE id=?
+      `).bind(now, currentUser.id, body.reason || '', share.id).run();
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, share_id, patient_id, user_id, user_name, org_id, org_name, role, action, detail, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'log_' + genUuid(), sdId, share.id, share.patient_id || null,
+        currentUser.id, currentUser.name || '', orgId, currentUser.org || '',
+        currentUser.role || '', 'reject', body.reason || '', now
+      ).run();
+      return json({ ok: true, rejected_at: now });
+    } catch (e) {
+      console.error('reject error:', e.message);
+      return err('差戻しに失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── POST /medical-docs/:id/revoke ───────────────────────────
+  // 共有停止（共有元のみ実行可能）
+  const mdRevokeMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/revoke$/);
+  if (mdRevokeMatch && method === 'POST') {
+    const sdId = mdRevokeMatch[1];
+    const body = await request.json().catch(() => ({}));
+    const { share_id, reason } = body;
+    const orgId = currentUser.org_id || currentUser.id;
+    if (!share_id) return err('share_id が必須です');
+    // 共有元の所有確認
+    const share = await env.DB.prepare(`
+      SELECT * FROM medical_document_shares WHERE id=? AND signed_document_id=?
+    `).bind(share_id, sdId).first();
+    if (!share) return err('共有が見つかりません', 404);
+    if (share.from_org_id !== orgId && currentUser.role !== 'admin') {
+      return err('共有を停止する権限がありません', 403);
+    }
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(`
+        UPDATE medical_document_shares
+        SET share_status='revoked', revoked_at=?, revoked_by=?, revoke_reason=?
+        WHERE id=?
+      `).bind(now, currentUser.id, reason || '', share_id).run();
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, share_id, patient_id, user_id, user_name, org_id, org_name, role, action, detail, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'log_' + genUuid(), sdId, share_id, share.patient_id || null,
+        currentUser.id, currentUser.name || '', orgId, currentUser.org || '',
+        currentUser.role || '', 'revoke', reason || '', now
+      ).run();
+      return json({ ok: true, revoked_at: now });
+    } catch (e) {
+      console.error('revoke error:', e.message);
+      return err('共有停止に失敗しました: ' + e.message, 500);
+    }
+  }
+
+  // ── GET /medical-docs/:id/access-logs ───────────────────────
+  // 閲覧・受領ログ取得（共有元 + 共有先双方が閲覧可能）
+  const mdLogsMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/access-logs$/);
+  if (mdLogsMatch && method === 'GET') {
+    const sdId = mdLogsMatch[1];
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    // 共有元 or 共有先 or admin のみ閲覧可能
+    let allowed = currentUser.role === 'admin' || sd.org_id === orgId;
+    if (!allowed) {
+      const share = await env.DB.prepare(`
+        SELECT id FROM medical_document_shares
+        WHERE signed_document_id=? AND (to_org_id=? OR to_user_id=?) LIMIT 1
+      `).bind(sdId, orgId, currentUser.id).first();
+      allowed = !!share;
+    }
+    if (!allowed) return err('閲覧ログを参照する権限がありません', 403);
+    try {
+      const logs = await env.DB.prepare(`
+        SELECT * FROM medical_document_access_logs
+        WHERE signed_document_id=? ORDER BY created_at DESC LIMIT 500
+      `).bind(sdId).all();
+      return json({ ok: true, logs: logs?.results || [] });
+    } catch (e) {
+      return json({ ok: true, logs: [] });
+    }
+  }
+
+  // ── POST /medical-docs/:id/view ─────────────────────────────
+  // 閲覧時のログ記録（フロントから明示呼び出し）
+  const mdViewMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/view$/);
+  if (mdViewMatch && method === 'POST') {
+    const sdId = mdViewMatch[1];
+    const orgId = currentUser.org_id || currentUser.id;
+    const sd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(sdId).first();
+    if (!sd) return err('文書が見つかりません', 404);
+    // 閲覧権限: 自組織 / 共有先 / admin / 患者本人
+    let allowed = currentUser.role === 'admin' || sd.org_id === orgId;
+    let share_id = null;
+    if (!allowed) {
+      const share = await env.DB.prepare(`
+        SELECT id FROM medical_document_shares
+        WHERE signed_document_id=? AND (to_org_id=? OR to_user_id=?) AND share_status IN ('active','acknowledged')
+        LIMIT 1
+      `).bind(sdId, orgId, currentUser.id).first();
+      if (share) { allowed = true; share_id = share.id; }
+    }
+    if (!allowed) return err('閲覧権限がありません', 403);
+    try {
+      const ip = request.headers.get('cf-connecting-ip') || '';
+      const ua = request.headers.get('user-agent') || '';
+      await env.DB.prepare(`
+        INSERT INTO medical_document_access_logs (
+          id, signed_document_id, share_id, patient_id, user_id, user_name, org_id, org_name, role, action, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'log_' + genUuid(), sdId, share_id, sd.patient_id || null,
+        currentUser.id, currentUser.name || '', orgId, currentUser.org || '',
+        currentUser.role || '', 'view', ip, ua, new Date().toISOString()
+      ).run();
+      return json({ ok: true });
+    } catch (e) {
+      return json({ ok: true }); // ログ失敗は致命的でないため成功扱い
+    }
+  }
+
+  // ── POST /medical-docs/:id/new-version ──────────────────────
+  // 新版発行（旧版を archived、新版に parent_document_id をセット）
+  const mdNewVerMatch = path.match(/^\/medical-docs\/(SD-[A-Za-z0-9-]+)\/new-version$/);
+  if (mdNewVerMatch && method === 'POST') {
+    const oldSdId = mdNewVerMatch[1];
+    const body = await request.json().catch(() => ({}));
+    const { title, content, reason } = body;
+    const orgId = currentUser.org_id || currentUser.id;
+    const oldSd = await env.DB.prepare('SELECT * FROM signed_documents WHERE id=?').bind(oldSdId).first();
+    if (!oldSd) return err('旧版文書が見つかりません', 404);
+    if (oldSd.org_id !== orgId && currentUser.role !== 'admin') return err('新版発行権限がありません', 403);
+    const now = new Date().toISOString();
+    const newSdId = 'SD-' + genUuid();
+    const newVer = (oldSd.version_no || 1) + 1;
+    const snapshot = typeof content === 'string' ? content : JSON.stringify(content || {});
+    const contentHash = await sha256Hex(snapshot);
+    try {
+      // 新版 INSERT
+      await env.DB.prepare(`
+        INSERT INTO signed_documents (
+          id, doc_kind, doc_id, title, org_id, content_snapshot, content_hash,
+          tsa_status, chain_index, finalized_at, created_at,
+          from_org_name, from_org_role, issued_date, received_at,
+          signature_level, retention_required, retention_years, retention_until,
+          legal_basis, version_no, parent_document_id, archived
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        newSdId, oldSd.doc_kind, newSdId, title || oldSd.title, orgId, snapshot, contentHash,
+        'pending', 0, now, now,
+        oldSd.from_org_name, oldSd.from_org_role, oldSd.issued_date, now,
+        oldSd.signature_level || 'none',
+        oldSd.retention_required || 0,
+        oldSd.retention_years || 5,
+        oldSd.retention_until,
+        oldSd.legal_basis,
+        newVer,
+        oldSdId,
+        0
+      ).run();
+      // 旧版を superseded フラグ化
+      await env.DB.prepare(`
+        UPDATE signed_documents SET archived=1, superseded_at=? WHERE id=?
+      `).bind(now, oldSdId).run();
+      // versions テーブルに履歴追加
+      await env.DB.prepare(`
+        INSERT INTO medical_document_versions (
+          id, parent_signed_document_id, new_signed_document_id, version_no, reason, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        'ver_' + genUuid(), oldSdId, newSdId, newVer, reason || '', currentUser.id, now
+      ).run();
+      return json({ ok: true, new_signed_document_id: newSdId, version_no: newVer });
+    } catch (e) {
+      console.error('new-version error:', e.message);
+      return err('新版発行に失敗しました: ' + e.message, 500);
+    }
+  }
+
   return err('Not found', 404);
 }
 

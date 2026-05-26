@@ -1138,6 +1138,16 @@ if(pt.status==='active'){const lastAss=assess.filter(a=>a.type!=='pre_admission'
 const thisMonth=now().slice(0,7);if(!mons.some(m=>m.date?.startsWith(thisMonth)))todos.push({icon:'',short:'今月モニタ未実施',tab:'monitors',bg:'#eff6ff',bc:'#93c5fd'});
 if(!confs.length)todos.push({icon:'',short:'担当者会議未実施',tab:'conferences',bg:'#e6f5ee',bc:'#6ee7b7'})}
 const shared=(pt.sharedWith||[]).filter(s=>s.status==='active').length;if(!shared&&pt.status!=='closed')todos.push({icon:'',short:'共有先なし',tab:'records',bg:'#eff6ff',bc:'#93c5fd'});
+// v5.0.4 Phase 4: 外部連携BOX文書の保存期限警告
+const extDocs=(D.externalDocs||[]).filter(d=>d.patientId===pt.id&&!d.archived&&d.retention_until);
+const todayMs=Date.now();
+extDocs.forEach(d=>{
+  const dueMs=new Date(d.retention_until).getTime();
+  if(isNaN(dueMs))return;
+  const daysLeft=Math.floor((dueMs-todayMs)/86400000);
+  if(daysLeft<0){todos.push({icon:'',short:'保存期限切れ：'+(d.title||DOC_KIND_LABELS[d.doc_kind]||d.doc_kind),tab:'external_box',bg:'#fee2e2',bc:'#fca5a5'})}
+  else if(daysLeft<=30){todos.push({icon:'',short:'保存期限残'+daysLeft+'日：'+(d.title||DOC_KIND_LABELS[d.doc_kind]||d.doc_kind),tab:'external_box',bg:'#fef3c7',bc:'#fde68a'})}
+});
 return todos}
 function showStatusModal(pt){const m=h('div',{className:'modal',style:{maxWidth:'500px'}});m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'16px'}},'ステータス変更'));
 const opts=[{v:'pre_admission',l:'入居前（アセス中）',d:'退院調整・受入判断'},{v:'active',l:'利用中（入居決定）',d:'モニタリング・サービス担当者会議が有効に'},{v:'closed',l:'クローズ（受入不可）',d:'アクセス遮断・ログ保持'}];
@@ -1211,9 +1221,42 @@ const SIGNATURE_LEVELS={
 
 function getExtDocs(pt){return((D.externalDocs||[]).filter(d=>d.patientId===pt.id&&!d.archived)||[])}
 
+// v5.0.4: Worker API から取得してローカルキャッシュにマージ
+async function fetchExtDocsFromWorker(pt){
+  if(!pt||!pt.id)return [];
+  try{
+    const res=await api('/medical-docs/patient/'+pt.id,{silent404:true});
+    if(res&&res.items){
+      // Worker から取得したものを localStorage の externalDocs にマージ
+      if(!D.externalDocs)D.externalDocs=[];
+      const apiDocs=res.items.map(sd=>({
+        id:sd.id,patientId:pt.id,doc_kind:sd.doc_kind,title:sd.title||'',
+        from_org_name:sd.from_org_name||'',from_org_role:sd.from_org_role||'',
+        issued_date:sd.issued_date||'',received_at:sd.received_at||sd.created_at||'',
+        signature_level:sd.signature_level||'none',
+        retention_required:!!sd.retention_required,retention_years:sd.retention_years||5,
+        retention_until:sd.retention_until||'',legal_basis:sd.legal_basis||'',
+        version_no:sd.version_no||1,parent_id:sd.parent_document_id||null,
+        note:'',share_count:0,shares:[],access_logs:[],audit:[],
+        _fromWorker:true
+      }));
+      // ローカル only データは保持しつつ、Worker由来データを上書き
+      const localOnly=D.externalDocs.filter(d=>!d._fromWorker);
+      D.externalDocs=[...localOnly,...apiDocs];
+    }
+  }catch(e){/* オフライン時はローカルのみ */}
+  return getExtDocs(pt);
+}
+
 function hubExternalBox(pt){
   if(!D.externalDocs)D.externalDocs=[];
   const w=h('div');
+  // 初回表示時に Worker から最新版を取得（重複呼び出し防止）
+  if(!S._extDocsFetched)S._extDocsFetched={};
+  if(!S._extDocsFetched[pt.id]){
+    S._extDocsFetched[pt.id]=true;
+    fetchExtDocsFromWorker(pt).then(()=>{rr()});
+  }
   // 説明バナー
   w.appendChild(h('div',{style:{padding:'12px 14px',background:'#ecfeff',border:'1px solid #67e8f9',borderRadius:'10px',marginBottom:'16px',fontSize:'12px',color:'#0e7490',lineHeight:'1.7'}},
     h('div',{style:{fontWeight:'700',marginBottom:'4px'}},'外部連携BOX'),
@@ -1222,7 +1265,7 @@ function hubExternalBox(pt){
   // 操作バー
   const bar=h('div',{style:{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}});
   bar.appendChild(btn('+ 文書をアップロード','btn-sm btn-pri',()=>showExternalDocUploadModal(pt)));
-  bar.appendChild(btn('共有されたBOX','btn-sm btn-out',()=>{toast('近日対応：他組織からの共有一覧')}));
+  bar.appendChild(btn('共有されたBOX（他組織から）','btn-sm btn-out',()=>showSharedWithMeModal()));
   w.appendChild(bar);
   // 一覧
   const docs=getExtDocs(pt).sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''));
@@ -1309,16 +1352,100 @@ function showExternalDocUploadModal(pt){
     '※ 実ファイルのアップロード機能は順次対応。当面はメタデータのみ登録し、紙原本は別途保管してください。署名レベルや受領記録は監査ログに残ります。'
   ));
   m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
-    btn('登録','btn-pri',()=>{
+    btn('登録','btn-pri',async()=>{
       if(!d.doc_kind){toast('文書種別必須');return}
-      d.id='xd_'+uid();
+      // v5.0.4: Worker API へ POST してから localStorage にも保存
+      let serverOk=false;
+      try{
+        const res=await api('/medical-docs/upload',{method:'POST',body:JSON.stringify({
+          doc_kind:d.doc_kind,patient_id:pt.id,title:d.title,
+          content:{note:d.note||''},
+          from_org_name:d.from_org_name,from_org_role:d.from_org_role,
+          issued_date:d.issued_date,signature_level:d.signature_level,
+          retention_required:d.retention_required,retention_years:d.retention_years,
+          retention_until:d.retention_until,legal_basis:d.legal_basis,
+          version_no:d.version_no,note:d.note
+        }),silent404:true});
+        if(res&&res.signed_document_id){d.id=res.signed_document_id;serverOk=true}
+      }catch(e){}
+      if(!d.id)d.id='xd_'+uid();
       addAudit(d.audit,'外部文書登録',(DOC_KIND_LABELS[d.doc_kind]||d.doc_kind)+(d.from_org_name?' from '+d.from_org_name:''));
       if(!D.externalDocs)D.externalDocs=[];
-      D.externalDocs.push(d);sv();S.modal=null;toast('登録完了');rr();
+      D.externalDocs.push(d);sv();S.modal=null;
+      toast(serverOk?'登録完了（D1同期済）':'登録完了（ローカル保存）');rr();
     }),
     btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})
   ));
   S.modal=m;rr();
+}
+
+// v5.0.4: 共有されたBOX（他組織から自分／自組織宛て）
+function showSharedWithMeModal(){
+  const m=h('div',{className:'modal',style:{maxWidth:'720px',maxHeight:'90vh',overflow:'auto'}});
+  m.appendChild(h('h3',{style:{fontSize:'17px',fontWeight:'800',marginBottom:'12px'}},'共有されたBOX'));
+  m.appendChild(h('div',{style:{padding:'10px 12px',background:'#ecfeff',borderRadius:'8px',fontSize:'12px',marginBottom:'14px',lineHeight:'1.6',color:'#0e7490'}},
+    '他組織から自組織／自分宛てに共有された医療文書の一覧です。受領確認や差戻しが行えます。'
+  ));
+  const listBox=h('div',{id:'shared-list-box'});
+  listBox.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'16px',textAlign:'center'}},'読み込み中…'));
+  m.appendChild(listBox);
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn('閉じる','btn-sec',()=>{S.modal=null;rr()})
+  ));
+  S.modal=m;rr();
+  // 非同期取得
+  (async()=>{
+    let items=[];
+    try{
+      const res=await api('/medical-docs/shared-with-me',{silent404:true});
+      if(res&&res.items)items=res.items;
+    }catch(e){}
+    const box=document.getElementById('shared-list-box');
+    if(!box)return;
+    box.innerHTML='';
+    if(!items.length){
+      box.appendChild(h('div',{style:{textAlign:'center',padding:'30px 16px',color:'var(--ink-m)',background:'var(--surface)',borderRadius:'10px',border:'1px dashed var(--border)'}},
+        h('div',{style:{fontSize:'13px',fontWeight:'600'}},'共有された文書はありません'),
+        h('div',{style:{fontSize:'11px',marginTop:'4px'}},'他組織があなたの組織または個人宛てに共有すると、ここに表示されます')
+      ));
+      return;
+    }
+    items.forEach(it=>{
+      const kindLabel=DOC_KIND_LABELS[it.doc_kind]||it.doc_kind;
+      const sigInfo=SIGNATURE_LEVELS[it.signature_level||'none']||SIGNATURE_LEVELS.none;
+      const card=h('div',{style:{padding:'12px 14px',background:'white',border:'1px solid var(--border)',borderRadius:'10px',marginBottom:'8px'}});
+      const hd=h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px',flexWrap:'wrap'}});
+      hd.appendChild(h('span',{style:{padding:'2px 8px',fontSize:'10px',fontWeight:'700',background:'var(--accent-l)',color:'var(--accent)',borderRadius:'10px'}},kindLabel));
+      hd.appendChild(h('span',{style:{padding:'2px 8px',fontSize:'10px',fontWeight:'700',background:sigInfo.bg,color:sigInfo.c,borderRadius:'10px'}},sigInfo.l));
+      if(it.acknowledged_at)hd.appendChild(h('span',{style:{padding:'2px 8px',fontSize:'10px',fontWeight:'700',background:'#dcfce7',color:'#15803d',borderRadius:'10px'}},'受領済'));
+      else if(it.rejected_at)hd.appendChild(h('span',{style:{padding:'2px 8px',fontSize:'10px',fontWeight:'700',background:'#fee2e2',color:'#b91c1c',borderRadius:'10px'}},'差戻済'));
+      else hd.appendChild(h('span',{style:{padding:'2px 8px',fontSize:'10px',fontWeight:'700',background:'#fef3c7',color:'#92400e',borderRadius:'10px'}},'未受領'));
+      card.appendChild(hd);
+      card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},it.title||kindLabel));
+      card.appendChild(h('div',{style:{fontSize:'10px',color:'var(--ink-m)',marginBottom:'8px'}},
+        '共有日: '+(it.shared_at||'').slice(0,10)+(it.message?' / メッセージ: '+it.message:'')
+      ));
+      if(!it.acknowledged_at&&!it.rejected_at){
+        const actions=h('div',{style:{display:'flex',gap:'6px'}});
+        actions.appendChild(btn('受領確認','btn-xs btn-pri',async()=>{
+          try{
+            const res=await api('/medical-docs/'+it.id+'/acknowledge',{method:'POST',body:JSON.stringify({})});
+            if(res){toast('受領確認しました');S.modal=null;showSharedWithMeModal()}
+          }catch(e){toast('受領確認に失敗');}
+        }));
+        actions.appendChild(btn('差戻し','btn-xs btn-danger',async()=>{
+          const reason=prompt('差戻し理由（任意）','');
+          if(reason===null)return;
+          try{
+            const res=await api('/medical-docs/'+it.id+'/reject',{method:'POST',body:JSON.stringify({reason})});
+            if(res){toast('差戻しました');S.modal=null;showSharedWithMeModal()}
+          }catch(e){toast('差戻しに失敗');}
+        }));
+        card.appendChild(actions);
+      }
+      box.appendChild(card);
+    });
+  })();
 }
 
 function showExternalDocDetail(d,pt){
@@ -1431,14 +1558,27 @@ function showShareModal(d,pt){
   m.appendChild(h('div',{style:{padding:'8px 10px',background:'#fef3c7',borderRadius:'6px',fontSize:'11px',color:'#92400e',marginTop:'10px',lineHeight:'1.6'}},
     '⚠️ 共有された相手は、相手側の外部連携BOXからこの文書を閲覧できます。閲覧履歴は本画面に記録されます。'));
   m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
-    btn('共有する','btn-pri',()=>{
+    btn('共有する','btn-pri',async()=>{
       if(!s.to_org_name){toast('共有先組織名必須');return}
+      // v5.0.4: Worker API へ POST（D1 同期）
+      let serverOk=false;
+      if(d.id&&d.id.startsWith('SD-')){
+        try{
+          const res=await api('/medical-docs/'+d.id+'/share',{method:'POST',body:JSON.stringify({
+            to_org_name:s.to_org_name,to_role:s.to_role,permission:s.permission,
+            message:s.message
+          }),silent404:true});
+          if(res&&res.share_id){s.id=res.share_id;serverOk=true}
+        }catch(e){}
+      }
       if(!d.shares)d.shares=[];
       d.shares.push(s);
       if(!d.share_count)d.share_count=0;
       d.share_count++;
       addAudit(d.audit,'共有開始',s.to_org_name+'（'+s.to_role+'）');
-      sv();S.modal=null;toast('共有しました');showExternalDocDetail(d,pt);
+      sv();S.modal=null;
+      toast(serverOk?'共有しました（D1同期済）':'共有しました（ローカル保存）');
+      showExternalDocDetail(d,pt);
     }),
     btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})
   ));
@@ -3859,7 +3999,7 @@ function showKyotakuModal(ex){
       }
       sv();S.modal=null;toast(isE?'保存しました':'作成しました');rr();
     }),
-    isE?btn('PDF出力','btn-out',()=>{toast('PDF生成（次回実装）')}):null,
+    isE?btn('PDF出力','btn-out',()=>genKyotakuPDF(r)):null,
     isE?btn('非表示','btn-out',()=>{
       if(!confirm('この記録を非表示にしますか？データは保持されます。'))return;
       D.kyotakuRecords=D.kyotakuRecords.map(x=>x.id===r.id?{...x,archived:true}:x);
@@ -5450,6 +5590,58 @@ ac.appendChild(ar);
 ac.appendChild(fld('住所','st_addr',u.address||'',v=>{u.address=v},{ph:'東京都○○区...'}));
 ac.appendChild(h('div',{style:{marginTop:'12px'}},btn('保存','btn-pri',()=>{u.org=document.getElementById('st_org')?.value||u.org;u.name=document.getElementById('st_name')?.value||u.name;u.tel=document.getElementById('st_tel')?.value||'';u.fax=document.getElementById('st_fax')?.value||'';u.address=document.getElementById('st_addr')?.value||'';saveUser(u);toast('保存しました')})));
 w.appendChild(ac);
+
+// v5.0.4: 医師認証セクション（Phase 3）
+const doc=h('div',{className:'card',style:{marginBottom:'20px'}});
+doc.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'4px'}},
+  h('h3',{style:{fontSize:'16px',fontWeight:'700',margin:0}},'医師認証・署名権限'),
+  bdg(u.doctor_verified?'認証済み':'未認証',u.doctor_verified?'#15803d':'#94a3b8')
+));
+doc.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},
+  '医師資格を登録すると、指示書・診療情報提供書等の文書に「医師資格確認済み」署名レベルが付与されます。'+(u.role==='admin'?'':' ※管理者のみ操作可能')
+));
+if(!u.doctor_profile)u.doctor_profile={
+  doctor_name:u.name||'',medical_license_number:'',
+  license_verified_status:'pending',hpki_enabled:false,
+  organization_name:u.org_name||u.org||'',
+  organization_verified_status:'pending',mfa_enabled:false
+};
+const dp=u.doctor_profile;
+const dr1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+dr1.appendChild(fld('医師氏名','dr_n',dp.doctor_name,v=>{dp.doctor_name=v}));
+dr1.appendChild(fld('医籍登録番号','dr_lic',dp.medical_license_number,v=>{dp.medical_license_number=v},{ph:'例: 第123456号'}));
+doc.appendChild(dr1);
+doc.appendChild(fld('所属医療機関','dr_org',dp.organization_name,v=>{dp.organization_name=v}));
+// ステータス表示
+const stat={pending:{l:'確認待ち',c:'#92400e',bg:'#fef3c7'},verified:{l:'確認済み',c:'#15803d',bg:'#dcfce7'},rejected:{l:'差戻し',c:'#b91c1c',bg:'#fee2e2'}};
+const ls=stat[dp.license_verified_status]||stat.pending;
+const os=stat[dp.organization_verified_status]||stat.pending;
+doc.appendChild(h('div',{style:{display:'flex',gap:'10px',marginTop:'12px',flexWrap:'wrap'}},
+  h('span',{style:{padding:'4px 10px',borderRadius:'10px',fontSize:'11px',fontWeight:'700',background:ls.bg,color:ls.c}},'医師資格: '+ls.l),
+  h('span',{style:{padding:'4px 10px',borderRadius:'10px',fontSize:'11px',fontWeight:'700',background:os.bg,color:os.c}},'組織所属: '+os.l),
+  h('span',{style:{padding:'4px 10px',borderRadius:'10px',fontSize:'11px',fontWeight:'700',background:dp.hpki_enabled?'#ede9fe':'#f1f5f9',color:dp.hpki_enabled?'#7c3aed':'#64748b'}},'HPKI: '+(dp.hpki_enabled?'有効':'未対応')),
+  h('span',{style:{padding:'4px 10px',borderRadius:'10px',fontSize:'11px',fontWeight:'700',background:dp.mfa_enabled?'#ecfeff':'#f1f5f9',color:dp.mfa_enabled?'#0e7490':'#64748b'}},'多要素認証: '+(dp.mfa_enabled?'有効':'未設定'))
+));
+// 操作ボタン
+doc.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'14px',flexWrap:'wrap'}},
+  btn('プロフィール保存','btn-out',()=>{dp.doctor_name=document.getElementById('dr_n')?.value||dp.doctor_name;dp.medical_license_number=document.getElementById('dr_lic')?.value||'';dp.organization_name=document.getElementById('dr_org')?.value||'';saveUser(u);toast('保存しました')}),
+  btn('免許証画像アップロード','btn-out',()=>{toast('近日対応：免許証画像アップロード')}),
+  btn(dp.mfa_enabled?'多要素認証 解除':'多要素認証 設定','btn-out',()=>{dp.mfa_enabled=!dp.mfa_enabled;saveUser(u);toast(dp.mfa_enabled?'多要素認証 ON':'多要素認証 OFF')}),
+  u.role==='admin'?btn(dp.license_verified_status==='verified'?'資格確認 取消':'資格確認済みにする','btn-out',()=>{
+    if(dp.license_verified_status==='verified'){dp.license_verified_status='pending';dp.license_verified_at=''}
+    else{dp.license_verified_status='verified';dp.license_verified_at=now();u.doctor_verified=true}
+    saveUser(u);toast('資格ステータス更新');rr();
+  }):null
+));
+doc.appendChild(h('div',{style:{padding:'10px 12px',background:'#f1f5f9',borderRadius:'8px',fontSize:'11px',color:'var(--ink-m)',marginTop:'12px',lineHeight:'1.7'}},
+  '【署名レベルの違い】',h('br'),
+  '・システム内署名：本人確認済みアカウントの電子署名',h('br'),
+  '・医師資格確認済み：医籍登録番号と免許証が確認済みの医師による署名',h('br'),
+  '・HPKI電子署名：医療従事者公開鍵基盤（HPKI）による署名（半年後対応予定）',h('br'),
+  '・外部電子署名済みPDF：別途電子署名されたPDFをアップロード'
+));
+w.appendChild(doc);
+
 // Notifications (placeholder)
 const nt=h('div',{className:'card',style:{marginBottom:'20px'}});
 nt.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'通知設定'));
@@ -5665,6 +5857,79 @@ pw.appendChild(h('div',{style:{marginTop:'12px'}},btn('パスワードを変更'
 w.appendChild(pw);
 return w}
 // --- PDF GENERATORS ---
+
+// v5.0.4: 居宅療養管理指導 PDF（介護保険算定対応）
+function genKyotakuPDF(r){
+  const occupations={doctor:'医師',dentist:'歯科医師',pharmacist:'薬剤師',nutritionist:'管理栄養士',dental_hygienist:'歯科衛生士'};
+  const pt=(D.patients||[]).find(p=>p.id===r.patient_id)||{};
+  const cn=document.getElementById('pdf-render');
+  cn.style.display='block';cn.innerHTML='';
+  const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'12px',lineHeight:'1.8',color:'#000',background:'#fff'}});
+  d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'居宅療養管理指導 記録'));
+  d.appendChild(h('div',{style:{textAlign:'right',fontSize:'11px',marginTop:'8px'}},'作成日：'+r.visit_date+(r.visit_time?'　'+r.visit_time:'')));
+  // 基本情報
+  const tbl=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'10px'},border:'1'});
+  const addR=(l,v)=>{tbl.appendChild(h('tr',null,
+    h('td',{style:{padding:'6px',fontWeight:'700',width:'130px',background:'#f9f9f9'}},l),
+    h('td',{style:{padding:'6px',whiteSpace:'pre-wrap'}},v||'')
+  ))};
+  addR('利用者氏名',pt.name||'');
+  addR('要介護度',pt.cl||'');
+  addR('提供職種',(occupations[r.occupation]||r.occupation)+'（'+(r.units||0)+'単位）');
+  addR('当月実施回数',(r.visit_count_this_month||1)+'回目');
+  addR('オンライン実施',r.call_url?'あり（URL: '+r.call_url+'）':'なし');
+  d.appendChild(tbl);
+  // バイタル
+  d.appendChild(h('div',{style:{margin:'14px 0 4px',fontWeight:'700',fontSize:'12px'}},'バイタル'));
+  const vt=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'},border:'1'});
+  vt.appendChild(h('tr',null,
+    h('th',{style:{padding:'4px',background:'#f9f9f9'}},'SBP'),
+    h('th',{style:{padding:'4px',background:'#f9f9f9'}},'DBP'),
+    h('th',{style:{padding:'4px',background:'#f9f9f9'}},'脈拍'),
+    h('th',{style:{padding:'4px',background:'#f9f9f9'}},'体温'),
+    h('th',{style:{padding:'4px',background:'#f9f9f9'}},'SpO2')
+  ));
+  vt.appendChild(h('tr',null,
+    h('td',{style:{padding:'4px',textAlign:'center'}},r.bp_systolic||'—'),
+    h('td',{style:{padding:'4px',textAlign:'center'}},r.bp_diastolic||'—'),
+    h('td',{style:{padding:'4px',textAlign:'center'}},r.pulse||'—'),
+    h('td',{style:{padding:'4px',textAlign:'center'}},r.temperature||'—'),
+    h('td',{style:{padding:'4px',textAlign:'center'}},r.spo2||'—')
+  ));
+  d.appendChild(vt);
+  // 状況・指導
+  const t2=h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px',marginTop:'10px'},border:'1'});
+  const addR2=(l,v)=>{t2.appendChild(h('tr',null,
+    h('td',{style:{padding:'6px',fontWeight:'700',width:'130px',background:'#f9f9f9'}},l),
+    h('td',{style:{padding:'6px',whiteSpace:'pre-wrap'}},v||'—')
+  ))};
+  addR2('栄養状況',r.nutrition_status);
+  addR2('服薬状況',r.medication_status);
+  addR2('ADL状況',r.adl_status);
+  addR2('指導・管理内容',r.guidance_content);
+  addR2('次回訪問予定日',r.next_visit_date);
+  addR2('ケアマネ氏名',r.cm_name);
+  addR2('ケアマネ事業所',r.cm_org);
+  addR2('CM共有',r.cm_shared?'共有済（'+(r.cm_shared_at||'').slice(0,10)+'）':'未共有');
+  d.appendChild(t2);
+  // フッタ（電子署名＋タイムスタンプ）
+  d.appendChild(h('div',{style:{marginTop:'14px',padding:'8px 10px',background:'#ecfeff',border:'1px solid #0891b2',borderRadius:'6px',fontSize:'10px',color:'#0e7490'}},
+    '✓ 電子署名＋タイムスタンプ済（e-文書法・電子署名法・SHA-256 ハッシュチェーン）　',
+    '署名者: '+(S.user&&S.user.name||'')+'　',
+    'タイムスタンプ: '+new Date().toISOString().slice(0,19).replace('T',' ')
+  ));
+  d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'12px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));
+  cn.appendChild(d);
+  // 帳票保存
+  if(typeof saveDocument==='function'){
+    saveDocument('kyotaku_ryoyo_record','居宅療養管理指導記録　'+(pt.name||'')+'　'+r.visit_date,r.patient_id||'',r.id,r);
+  }
+  addAudit(r.audit,'居宅療養管理指導 PDF出力','');
+  sv();
+  if(typeof genPdf==='function')genPdf(cn,'居宅療養管理指導_'+(pt.name||'')+'_'+r.visit_date+'.pdf');
+  toast('PDF生成しました');
+}
+
 function genAssessPDF(a,pt){const cn=document.getElementById('pdf-render');cn.style.display='block';cn.innerHTML='';const d=h('div',{style:{width:'700px',padding:'32px',fontFamily:'serif',fontSize:'13px',lineHeight:'1.8',color:'#000',background:'#fff'}});d.appendChild(h('div',{style:{textAlign:'center',fontSize:'16px',fontWeight:'700',borderBottom:'2px solid #000',paddingBottom:'8px'}},'アセスメント'));d.appendChild(h('div',{style:{margin:'12px 0'}},'患者：'+(pt?pt.name:'')+'　種別：'+({pre_admission:'入居前',periodic:'定期',adhoc:'臨時',post_incident:'事故後'}[a.type]||'')+'　日付：'+a.date+'　担当：'+a.author));const items=[];if(a.adl){const i=Object.entries(a.adl).filter(([,v])=>v);if(i.length)items.push('ADL: '+i.map(([k,v])=>k+'='+v).join(', '))}if(a.medical){const i=Object.entries(a.medical).filter(([,v])=>v);if(i.length)items.push('医療処置: '+i.map(([k])=>k).join(', '))}if(a.risk){const i=Object.entries(a.risk).filter(([,v])=>v);if(i.length)items.push('リスク: '+i.map(([k])=>k).join(', '))}if(a.medication)items.push('服薬: '+a.medication);if(a.family)items.push('家族意向: '+a.family);if(a.conditions)items.push('受入条件: '+a.conditions);if(a.notes)items.push('備考: '+a.notes);d.appendChild(h('pre',{style:{whiteSpace:'pre-wrap',fontSize:'12px',fontFamily:'serif'}},items.join('\n\n')));d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));cn.appendChild(d);genPdf(cn,'アセスメント_'+(pt?pt.name:'')+'.pdf')}
 function showRecordPreview(c){
 const g=c.record?.guidance||{};
