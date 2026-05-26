@@ -738,8 +738,87 @@ expired / superseded / archived</pre>
 <tr><td>QA + 本番デプロイ</td><td>5/28</td><td>—</td></tr>
 </table>
 
+<h2>20. v5.0.5 アプリ設計34（2026-05-26 / §8-3 残タスク全消化）</h2>
+
+<p>大下指示「順番は君に任せる。最後まで完成させて」を受けて、HANDOVER §8-3 の中長期未着手タスク A〜F を全消化。</p>
+
+<h3>20-1. 完了 6 タスク</h3>
+
+<table>
+<tr><th>#</th><th>HANDOVER §8-3</th><th>内容</th><th>コミット</th></tr>
+<tr><td>1</td><td>E</td><td>Not foundバッジ問題解消（loadCases系4本に silent404 付与・api()エラー網羅）</td><td><code>39edad1</code></td></tr>
+<tr><td>2</td><td>A</td><td>帳票PDF7種類への電子署名+TSAバナー拡大（共通ヘルパー buildECertHtml / buildTimestampCertHtml）</td><td><code>39edad1</code></td></tr>
+<tr><td>3</td><td>B</td><td>Worker TSA 構造化レスポンス（v17 migration + enrichTsaFields ヘルパー）</td><td><code>d5761b0</code></td></tr>
+<tr><td>4</td><td>D</td><td>LP コピーへの電子署名+TSA訴求具体化（7帳票明示列挙 + HEROタグ拡張）</td><td><code>56bf1cc</code></td></tr>
+<tr><td>5</td><td>F</td><td>consent_type に request_form 追加（訪問診療同意書 / 依頼書）</td><td><code>192e5e9</code></td></tr>
+<tr><td>6</td><td>C</td><td>実TSA連携 調査レポート（事業者4社比較・料金試算・実装方針）</td><td><code>6691439</code></td></tr>
+</table>
+
+<h3>20-2. 電子署名+TSA バナー対象帳票（7種）</h3>
+
+<table>
+<tr><th>帳票</th><th>PDF関数</th><th>doc_kind</th><th>初回TSA対応</th></tr>
+<tr><td>退院時共同指導記録</td><td><code>genCasePDF</code></td><td>discharge_guidance</td><td>v4.15</td></tr>
+<tr><td>サービス担当者会議</td><td><code>genConfPDF</code></td><td>conference</td><td>v4.15</td></tr>
+<tr><td>モニタリング</td><td><code>genMonPDF</code></td><td>monitoring</td><td>v4.15</td></tr>
+<tr><td>居宅療養管理指導</td><td><code>genKyotakuPDF</code></td><td>kyotaku_ryoyo_record</td><td>v5.0.5（共通化）</td></tr>
+<tr><td>アセスメント</td><td><code>genAssessPDF</code></td><td>assessment</td><td>v5.0.5（新規）</td></tr>
+<tr><td>診療情報提供書（医科）</td><td><code>genReferralPDF</code></td><td>medical_referral</td><td>v5.0.5（新規）</td></tr>
+<tr><td>歯科診療情報提供書／指示書</td><td><code>genDentalPDF</code></td><td>dental_referral / dental_instruction</td><td>v5.0.5（新規）</td></tr>
+</table>
+
+<h3>20-3. v17 D1 マイグレーション</h3>
+
+<p><code>assets/v17_d1_migration.sql</code>:</p>
+
+<table>
+<tr><th>変更</th><th>内容</th></tr>
+<tr><td><code>signed_documents</code> ALTER（4列）</td><td>tsa_authority_name / tsa_cert_no / tsa_serial / hash_algorithm</td></tr>
+<tr><td><code>consent_forms</code> ALTER（4列）</td><td>同上（対称構造）</td></tr>
+<tr><td><code>timestamps</code> 新規テーブル</td><td>TSA 取得履歴（authority / cert_no / serial / hash_algorithm / document_hash / acquired_at_utc / raw_response 等）</td></tr>
+</table>
+
+<p>すべて DEFAULT 付きで後方互換。実 TSA 連携実装時は <code>timestamps.raw_response</code> に TSP レスポンスを base64 保存し、署名検証時に再利用できる設計。</p>
+
+<h3>20-4. Worker enrichTsaFields ヘルパー</h3>
+
+<p><code>assets/worker_v7_complete.js</code> 末尾に追加。signed_documents/consent_forms 行に対し、buildTimestampCertHtml が必要とする 6 項目を補完。</p>
+
+<ul>
+<li><code>tsa_authority_name</code> = tsa_authority (amano/seiko/gmo/tkc) から人間可読名にマッピング。未設定時はセイコー名にフォールバック</li>
+<li><code>tsa_cert_no</code> = 「13-001（令和5年2月16日認定／令和7年2月16日更新）」をモックデフォルト</li>
+<li><code>tsa_serial</code> = content_hash 先頭16桁から派生</li>
+<li><code>hash_algorithm</code> = 'SHA-256' 既定</li>
+<li><code>tsa_acquired_at_jst</code> = UTC から JST 自動変換</li>
+<li><code>document_hash</code> = content_hash の互換エイリアス</li>
+</ul>
+
+<p>実 TSA 連携時は DB の <code>tsa_authority_name</code> 等に TSP レスポンスから抽出した実値を保存すれば、このヘルパーがそのまま実値を返す（モックフォールバックは自動的に無効化される設計）。</p>
+
+<h3>20-5. 実 TSA 連携 調査結論</h3>
+
+<p>詳細は <code>docs/RESEARCH_TSA_v5_0_5_2026-05-26.md</code> 参照。</p>
+
+<ul>
+<li><b>第一候補</b>: アマノタイムスタンプサービス3161（医療実績豊富 + 月額固定価格 + 無償トライアル提供）</li>
+<li><b>料金試算</b>: 想定3000スタンプ/月 = ¥24,500/月（税抜）</li>
+<li><b>実装方針</b>: OSS <code>pdf-rfc3161</code>（MIT・Cloudflare Workers 互換・Pure JS）を採用候補</li>
+<li><b>段階移行</b>: Phase A（モック・現状）→ Phase B（無償トライアル・一部帳票）→ Phase C（全帳票実 TSA）→ Phase D（LTV/長期署名）</li>
+<li><b>投資回収</b>: 有償ユーザー50件超で月額コスト回収可能</li>
+</ul>
+
+<h3>20-6. Cloudflare 側で必要な新規作業</h3>
+
+<table>
+<tr><th>作業</th><th>コマンド/手順</th></tr>
+<tr><td>v17 マイグレーション適用</td><td><code>wrangler d1 execute medadapt-db --file=assets/v17_d1_migration.sql --remote</code></td></tr>
+<tr><td>Worker 再デプロイ</td><td><code>wrangler deploy</code> または GitHub Actions 経由</td></tr>
+</table>
+
+<p>これらは大下さんが GitHub から <code>git pull</code> 後に Cloudflare 側で実施する。Claude は確認しない（恒久ルール）。</p>
+
 <div class="footer">
-<p>やるゼ！プラットフォーム 統合設計書 v5.0 / 2026-05-26 作成<br>Owner: TAmJ.Corp 代表 / 大下さん</p>
+<p>やるゼ！プラットフォーム 統合設計書 v5.0.5 / 2026-05-26 更新<br>Owner: TAmJ.Corp 代表 / 大下さん</p>
 </div>
 
 </body>
