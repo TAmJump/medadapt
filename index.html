@@ -300,11 +300,18 @@ body {
 .prob-tile:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(15,23,42,.18); }
 .prob-tile::after {
   content:''; position:absolute; inset:0;
-  background: linear-gradient(180deg, rgba(15,23,42,.05) 0%, rgba(15,23,42,.25) 45%, rgba(15,23,42,.85) 100%);
+  background: linear-gradient(180deg, rgba(15,23,42,.05) 0%, rgba(15,23,42,.30) 40%, rgba(15,23,42,.92) 100%);
   z-index: 1;
   transition: background .35s ease;
 }
-.prob-tile:hover::after { background: linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(8,145,178,.35) 45%, rgba(8,145,178,.92) 100%); }
+.prob-tile:hover::after { background: linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(8,145,178,.45) 45%, rgba(8,145,178,.95) 100%); }
+/* 小タイル(tile-s)はテキスト領域がタイトなので下側のオーバーレイをさらに濃く */
+.prob-tile.tile-s::after {
+  background: linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(15,23,42,.55) 50%, rgba(15,23,42,.96) 100%);
+}
+.prob-tile.tile-s:hover::after {
+  background: linear-gradient(180deg, rgba(15,23,42,.15) 0%, rgba(8,145,178,.55) 50%, rgba(8,145,178,.98) 100%);
+}
 
 .prob-tile-num {
   position:absolute; top:14px; left:16px; z-index:2;
@@ -333,6 +340,9 @@ body {
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* 小タイル(tile-s)の textは2行までで強制クランプ（heading との被り防止） */
+.prob-tile.tile-s .prob-tile-text { -webkit-line-clamp: 2; font-size: 11px; line-height: 1.6; }
+.prob-tile.tile-s .prob-tile-heading { margin-bottom: 5px; }
 
 /* グリッド配置：7枚 → 大小ミックスで動きを出す */
 /* row1: [大2x2][小1x1][小1x1] + [大2x2] = 6cols / 2rows */
@@ -596,7 +606,7 @@ body {
         </h1>
         <p class="hero-subtitle hero-subtitle-red anim-up anim-up-d1">医療介護連携OS</p>
         <p class="hero-desc anim-up anim-up-d2">
-          ＃日程調整　＃アセスメント　＃サービス担当者会議　＃退院時共同指導　＃居宅療養管理指導　＃NDA　＃同意書　＃モニタリング　＃退院通知　＃訪問マッサージ（鍼灸含む）連携　＃多職種カンファレンス　＃電子署名＋タイムスタンプ　＃ハッシュチェーン　＃療養費同意書交付料(B013)　＃退院時共同指導加算(B004)　＃記録生成支援
+          ＃日程調整　＃アセスメント　＃サービス担当者会議　＃退院時共同指導　＃居宅療養管理指導　＃NDA　＃同意書　＃モニタリング　＃退院通知　＃訪問マッサージ（鍼灸含む）連携　＃多職種カンファレンス　＃電子署名＋タイムスタンプ　＃ハッシュチェーン　＃記録生成支援
         </p>
         <div class="hero-actions anim-up anim-up-d3">
           <a href="app.html#signup" class="btn-primary">会員登録して始める →</a>
@@ -716,7 +726,7 @@ body {
       <div class="hero-band-overlay"></div>
       <div class="hero-band-text">
         <div class="hero-band-eyebrow">多職種連携</div>
-        <h3 class="hero-band-title">病院や訪問診療、訪問歯科、薬局、介護、福祉、コ・メディカル等を、<br>ひとつのチームに。</h3>
+        <h3 class="hero-band-title">病院・訪問診療・訪問歯科・訪問看護・訪問介護・薬局・ケアマネ・福祉用具などのコ・メディカルを、<br>ひとつのチームに。</h3>
         <p class="hero-band-desc">退院前カンファレンス、共同指導、情報共有を ICT で完結。会えなくても、書類が崩れることはありません。</p>
       </div>
     </div>
@@ -726,7 +736,7 @@ body {
       <div class="hero-band-text">
         <div class="hero-band-eyebrow">在宅・訪問</div>
         <h3 class="hero-band-title">通院困難なご家族にも、<br>同じ医療の温度を。</h3>
-        <p class="hero-band-desc">訪問診療・訪問歯科・訪問看護・訪問介護・訪問薬剤、ケアマネ・福祉用具などのコ・メディカル。それぞれの専門職が在宅で連携できる仕組みを支えます。</p>
+        <p class="hero-band-desc">在宅で関わる多職種が、それぞれの専門性を活かして連携できる仕組みを支えます。</p>
       </div>
     </div>
   </div>
@@ -903,7 +913,7 @@ body {
   <div class="container">
     <span class="sec-label-c">Before / After</span>
     <h2 class="sec-title-c">同じ業務、こう変わる。</h2>
-    <p class="sec-sub-c">紙・電話・手書き・移動・押印で疲れていた現場が、<br>ｍやるゼ！導入後は「タブレット1台」に集約されます。</p>
+    <p class="sec-sub-c">紙・電話・手書き・移動・押印で疲れていた現場が、<br>ｍやるゼ！導入後は「タブレット／スマホ 1台」に集約されます。</p>
     <div class="ba-grid">
       <!-- 1. 日程調整 -->
       <div class="ba-card">
@@ -955,7 +965,7 @@ body {
         <div class="ba-body">
           <div class="ba-eyebrow">REMOTE COLLAB</div>
           <h3 class="ba-title">月40時間の移動 → オンライン同席</h3>
-          <p class="ba-desc">病院に集まる必要なし。訪問診療・訪問歯科・訪問看護・訪問介護・薬局・ケアマネ・福祉用具などのコ・メディカルが、それぞれの場所から共同指導を実施。算定要件に沿って運用できます。</p>
+          <p class="ba-desc">病院に集まる必要なし。多職種が、それぞれの場所から共同指導を実施。算定要件に沿って運用できます。</p>
         </div>
       </div>
 
@@ -1009,7 +1019,7 @@ body {
         <div class="ba-body">
           <div class="ba-eyebrow">TEAM CARE</div>
           <h3 class="ba-title">バラバラ情報 → ひとつのチーム</h3>
-          <p class="ba-desc">病院・訪問診療・訪問歯科・訪問看護・訪問介護・薬局・ケアマネ・福祉用具などのコ・メディカル。多職種が同じ画面を見ながら患者・利用者をひとつのチームで支えます。</p>
+          <p class="ba-desc">多職種が同じ画面を見ながら、患者・利用者をひとつのチームで支えます。</p>
         </div>
       </div>
     </div>
@@ -1146,7 +1156,7 @@ body {
   <div class="container">
     <span class="sec-label-c">Who is it for?</span>
     <h2 class="sec-title-c">ｍやるゼ！は、医療系・在宅医療系・介護系・在宅介護系・コ・メディカル系のためのアプリです。</h2>
-    <p class="sec-sub-c">「現場が違えば、抱える課題も違う」<br>病院・訪問診療・訪問歯科・訪問看護・訪問介護・薬局・ケアマネ・福祉用具など、各職種の業務に最適化した画面・帳票・通知を、ひとつのアプリの中で切り替えます。</p>
+    <p class="sec-sub-c">「現場が違えば、抱える課題も違う」<br>多職種それぞれの業務に最適化した画面・帳票・通知を、ひとつのアプリの中で切り替えます。</p>
 
     <div class="persona-grid">
       <div class="persona-card">
@@ -1309,7 +1319,7 @@ body {
         <div class="fh-body">
           <span class="fh-eyebrow">NDA MANAGEMENT</span>
           <h3 class="fh-title">法人間 NDA・改ざん防止</h3>
-          <p class="fh-desc">病院・訪問診療・訪問歯科・薬局・介護事業所・福祉用具などのコ・メディカル。法人間で締結する秘密保持契約をオンラインで完結。締結と同時に改ざん検知ハッシュチェーンへ登録されます。</p>
+          <p class="fh-desc">多職種・法人間で締結する秘密保持契約をオンラインで完結。締結と同時に改ざん検知ハッシュチェーンへ登録されます。</p>
           <ul class="fh-points">
             <li>テンプレート・カスタム文面 両対応</li>
             <li>当事者型電子署名 + パスワード認証</li>
@@ -1517,7 +1527,7 @@ body {
   <div class="container">
     <span class="sec-label-c">In the Real World</span>
     <h2 class="sec-title-c">実際の現場で、こう使われています。</h2>
-    <p class="sec-sub-c">病棟・在宅・施術所・面談室。<br>それぞれの場面に最適化された画面が、タブレット 1 台で完結します。</p>
+    <p class="sec-sub-c">病棟・在宅・施術所・面談室。<br>それぞれの場面に最適化された画面が、タブレット／スマホ 1 台で完結します。</p>
 
     <!-- Row 1: 病棟ラウンド -->
     <div class="ui-row">
@@ -1684,7 +1694,7 @@ body {
     <div>
       <div style="font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--blue);text-transform:uppercase;margin-bottom:12px;">01 — ケース管理</div>
       <h3 style="font-size:1.6rem;font-weight:800;line-height:1.4;margin-bottom:16px;">退院調整の全情報を<br>1画面で把握。</h3>
-      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">患者ごとのケース管理、通話URL、同意書、参加者、監査ログまでタブで即アクセス。電話・FAX・移動をゼロに。</p>
+      <p style="font-size:.9rem;color:var(--ink-m);line-height:1.8;">患者ごとのケース管理、通話URL、同意書、参加者、監査ログまでタブで即アクセス。電話・FAX・移動の負荷を大幅に削減します。</p>
     </div>
     <div style="border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15);max-width:340px;width:100%;margin:0 auto;">
       <img src="images/screen2.jpg" style="width:100%;display:block;" alt="退院調整ケース管理">
