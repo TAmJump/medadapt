@@ -112,24 +112,25 @@ body {
   isolation: isolate;
   min-height: 720px;
 }
-/* チーム写真背景（全面・トリミングなし） */
+/* チーム写真背景（全面・トリミングなし）v5.0.6: 彩度を落として透け感を出す */
 .hero::before {
   content: ''; position: absolute;
   inset: 0;
   background-image: url('assets/img/generated/v2/team_yaruze_hero.jpg');
   background-size: cover;
   background-position: center 18%;
+  filter: saturate(0.75) brightness(1.05);
   z-index: -2;
 }
-/* 全面薄白オーバーレイ（写真透けOK・下半分はテキストの可読性のため濃く） */
+/* 全面薄白オーバーレイ（写真透けOK・下半分はテキストの可読性のため濃く） v5.0.6: 上部やや濃くして淡い印象に */
 .hero::after {
   content: ''; position: absolute;
   inset: 0;
   background:
     linear-gradient(180deg,
-      rgba(255,255,255,.12) 0%,
-      rgba(255,255,255,.12) 40%,
-      rgba(255,255,255,.55) 58%,
+      rgba(255,255,255,.22) 0%,
+      rgba(255,255,255,.22) 40%,
+      rgba(255,255,255,.60) 58%,
       rgba(248,250,252,.92) 78%,
       rgba(248,250,252,1.0) 100%
     );
@@ -215,6 +216,7 @@ body {
     background-position: top center;
     background-repeat: no-repeat;
     background-color: #f8fafc;
+    filter: saturate(0.75) brightness(1.05); /* v5.0.6: 彩度を落として透け感 */
   }
   .hero::after {
     /* nav の真下から始める。写真領域(56.25vw)の下端から白くフェード */
