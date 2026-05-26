@@ -203,19 +203,22 @@ body {
 /* ─────────────────────────────────────────────
    モバイル（980px以下）: 写真を「全員見える」アスペクト比固定表示に切り替え
    写真は16:9（1600×900）。画面幅いっぱいに横並べ → 高さ = 幅 / 1.778
-   写真の下にテキストカードを自然な余白で配置する。
+   v4.26: 写真の上端を nav (position:fixed, height 64px) の真下に揃える。
+          こうしないと写真上部（万歳ポーズの手・建物）がナビバーに覆われて見えない。
    ───────────────────────────────────────────── */
 @media (max-width:980px) {
-  .hero { min-height: 0; }
+  .hero { min-height: 0; padding-top: 64px; /* nav の高さ分の余白 */ }
   .hero::before {
-    /* 写真は画面上部に幅100%・高さは16:9で固定。残りは下側オーバーレイで埋める */
+    /* 写真は nav 直下から幅100%・高さは16:9で固定。残りは下側オーバーレイで埋める */
+    inset: 64px 0 0 0;
     background-size: 100% auto;
     background-position: top center;
     background-repeat: no-repeat;
     background-color: #f8fafc;
   }
   .hero::after {
-    /* 写真領域（画面上部の 16:9 ＝ 幅100% × 56.25vw）から下にかけて白くフェード */
+    /* nav の真下から始める。写真領域(56.25vw)の下端から白くフェード */
+    inset: 64px 0 0 0;
     background:
       linear-gradient(180deg,
         rgba(255,255,255,0) 0%,

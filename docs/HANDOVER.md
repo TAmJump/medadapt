@@ -1,9 +1,9 @@
 # 🚀 やるゼ！プラットフォーム 引き継ぎ書（HANDOVER）
 
-**最終更新**: 2026-05-26（v4.25 / 課題タイル06テキスト重なり解消＋タブレット/スマホ表記＋B013/B004 HEROタグ削除＋コ・メディカル列挙の一本化）
+**最終更新**: 2026-05-26（v4.26 / モバイルHERO 写真上部がナビバーに隠れていた問題を解消）
 
 **現状 HEAD**:
-- medadapt: `bece721`（v4.25）
+- medadapt: v4.26
 - adapt: `c2511db`（v4.15 HERO顔と文字の完全分離）
 - one-touch: `a03ea94`（v4.15 HERO顔と文字の完全分離）
 
@@ -105,6 +105,39 @@ grep -nE "4つの中核|6職種|6 つの強み" 対象ファイル
 | 課題タイル06「監査不安」のテキスト重なり | tile-s 専用のオーバーレイ濃度強化 + text 2行 clamp で可読性向上 | v4.25 |
 
 ---
+
+### v4.26 セッションでの完了事項（2026-05-26 / モバイルHERO 写真上部 nav バー隠れの修正）
+
+**問題**: v4.25 デプロイ後の Pixel 7 実機スクショで、HEROの写真上部（両手を高く上げているメンバーの手・後ろの EMERGENCY HOSPITAL の建物）が見えていなかった。
+
+**根本原因**: `.nav { position:fixed; top:0; height:64px; }` で画面上端固定。v4.24 で `.hero::before { inset:0 }` のまま `background-position: top center` にしたため、写真の上端は `hero` の `top:0` から始まる → これは画面の `top:0` と同じ位置 → そこを **64px の nav が覆い隠していた**。半透明白(`rgba(255,255,255,.85)`) + blur のため、写真上部が薄っすら見えても完全には見えない状態だった。
+
+**修正** (`index.html` L208-216):
+
+```css
+@media (max-width:980px) {
+  .hero { min-height: 0; padding-top: 64px; }      /* nav 高さ分の余白を hero 上部に確保 */
+  .hero::before {
+    inset: 64px 0 0 0;                              /* 写真は nav の真下から始める */
+    background-size: 100% auto;
+    background-position: top center;
+    ...
+  }
+  .hero::after {
+    inset: 64px 0 0 0;                              /* オーバーレイも nav の真下から */
+    ...
+  }
+}
+```
+
+**検証** (Playwright):
+- Pixel 7 (412×915): nav 直下から写真開始、11人全員＋万歳ポーズの手の先＋EMERGENCY HOSPITAL 完全表示 ✅
+- iPhone SE (375×667): 同上 ✅
+- 600px: 同上 ✅
+- タブレット (768×1024): 同上 ✅
+- デスクトップ (1366×900): v4.25 のレイアウト維持（981px以上のクエリは変更なし） ✅
+
+**教訓**: position:fixed のナビバーがあるサイトで「写真を画面上端から表示したい」場合は、必ず nav 高さを写真開始位置に加算する。今後 HERO レイアウト調整時は `.nav` の `position:fixed` を念頭に置くこと。
 
 ### v4.25 セッションでの完了事項（2026-05-26 / LP最終クリーンアップ）
 
