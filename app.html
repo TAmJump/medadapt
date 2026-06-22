@@ -642,6 +642,30 @@ function revokeShareOnNG(c){
 function saveUser(u){D.users=D.users.filter(x=>x.email!==u.email);D.users.push(u);sv()}
 function findUser(email){return D.users.find(u=>u.email===email)}
 // === SEED DEMO DATA ===
+// v5.2.3: デモ/一括用の保険情報ジェネレータ（pt.id から決定的に生成）
+function genDemoInsurance(pt){
+  const seed=String(pt.id||pt.name||'x');let _hh=0;for(let i=0;i<seed.length;i++)_hh=(_hh*31+seed.charCodeAt(i))>>>0;
+  const rnd=()=>{_hh=(_hh*1103515245+12345)>>>0;return _hh/4294967296};
+  const pad=(n,len)=>String(Math.floor(Math.abs(n))).padStart(len,'0').slice(-len);
+  const age=pt.age||80;const elderly=age>=75;
+  const mtype=elderly?'後期高齢者医療':(rnd()<0.55?'国民健康保険':'健康保険（被用者保険）');
+  const mcopay=elderly?(rnd()<0.85?'1割':(rnd()<0.6?'2割':'3割')):(age>=70?(rnd()<0.7?'2割':'3割'):'3割');
+  const insurerNo=elderly?('39'+pad(rnd()*1000000,6)):(mtype==='国民健康保険'?pad(rnd()*1000000,6):pad(13000000+rnd()*86000000,8));
+  const symbol=elderly?'':pad(rnd()*9999+1,4);
+  const number=pad(rnd()*9999999+1,7);
+  const branchNo=elderly?'':(rnd()<0.6?'00':pad(rnd()*4,2));
+  const ccopay=elderly?(rnd()<0.8?'1割':(rnd()<0.7?'2割':'3割')):'1割';
+  const careNo=pad(1000000000+rnd()*8999999999,10);
+  const Y=new Date().getFullYear();
+  const certFrom=(Y-1)+'-'+pad(Math.floor(rnd()*12)+1,2)+'-01';
+  const certUntil=(Y+1)+'-'+pad(Math.floor(rnd()*12)+1,2)+'-28';
+  const validUntil=(Y+1)+'-12-31';
+  const pub=[];const pr=rnd();
+  if(pr<0.08)pub.push({kind:'生活保護（医療扶助）',payerNo:'12'+pad(rnd()*1000000,6),recipientNo:pad(rnd()*9999999,7),validUntil:''});
+  else if(pr<0.16)pub.push({kind:'自立支援医療（精神通院等）',payerNo:'21'+pad(rnd()*1000000,6),recipientNo:pad(rnd()*9999999,7),validUntil:validUntil});
+  const by=(typeof S!=='undefined'&&S.user&&(S.user.org_name||S.user.org))||'デモ入力';
+  return {medical:{type:mtype,insurerNo:insurerNo,symbol:symbol,number:number,branchNo:branchNo,holderName:pt.name||'',relationship:'本人',copayRate:mcopay,validUntil:validUntil,mynaVerified:true,verifiedAt:new Date().toISOString(),verifiedBy:by},care:{insuredNo:careNo,careLevel:pt.cl||'',certFrom:certFrom,certUntil:certUntil,copayRate:ccopay},publicAid:pub,note:'',updatedAt:new Date().toISOString(),updatedBy:by};
+}
 function seedDemoData(email){
 if(D.patients.some(p=>p.ownerEmail===email))return;
 const oe=email,org=email==='pro@test.com'?'テスト介護施設':'テスト病院';
@@ -675,6 +699,7 @@ const pts=[
 {id:mk('p'),name:'森田 トシ',age:84,sex:'female',cl:'要介護2',diagnosis:'変形性股関節症',dd:dF(10),room:'',status:'pre_admission',startDate:'',managerOrg:'順天堂大学病院',members:[mm('堀医師','順天堂大学病院','hospital')],flags:{},ownerEmail:oe,sharedWith:[],audit:[au('患者登録','入居前')]}
 ];
 D.patients.push(...pts);
+pts.forEach(p=>{if(!p.insurance)p.insurance=genDemoInsurance(p)});
 const cs=(pid,pn,dd,st,url,apt,sl,pa,con,rec,aud)=>({id:mk('c'),patientId:pid,pn,dd,st,ca:usr,callUrl:url||'',apt:apt||null,slots:sl||[],parts:pa||[],consent:con||{},record:rec||{generated:false,text:''},audit:aud||[au('ケース作成','')]});
 // Cases: 8 cases across patients
 D.cases.push(cs(pts[0].id,'田中 タムジ',dF(3),'confirmed','https://meet.medadapt.jp/d1',{date:dF(2),time:'14:00'},[{id:'s1',date:dF(2),time:'14:00',st:'confirmed'}],[{name:'鈴木医師',org:'東京中央病院'},{name:usr,org:org}],{explained:true,name:'田中タム子',relationship:'配偶者',agreed:true,signed:true,signed_at:dI(3),sigDataUrl:''},null,[au('ケース作成',''),au('日程確定',''),au('同意取得','田中タム子')]));
