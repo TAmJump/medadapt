@@ -1113,8 +1113,9 @@ const fn={overview:()=>{const sec=h('div');
   actionBar.appendChild(btn('訪問マッサージ（鍼灸）ハブ','btn-xs btn-out',()=>{S.page='acu_massage';S.preselectPatientId=pt.id;rr()}));
   actionBar.appendChild(btn('退院通知作成','btn-xs btn-out',()=>{S.page='discharge_new';S.preselectPatientId=pt.id;rr()}));
   actionBar.appendChild(btn('加算管理を見る','btn-xs btn-out',()=>{S.page='claims';rr()}));
+  actionBar.appendChild(btn('当日状態報告','btn-xs btn-out',()=>showStatusReportModal(pt)));
   sec.appendChild(actionBar);
-  sec.appendChild(hubTimeline(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),consent_docs:()=>hubConsentTab(pt),records:()=>{const sec=h('div');
+  sec.appendChild(hubTimeline(pt));sec.appendChild(hubStatusReports(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),consent_docs:()=>hubConsentTab(pt),records:()=>{const sec=h('div');
 // 帳票一覧（D1保存）
 const docSection=h('div',{style:{marginBottom:'24px'}});
 docSection.appendChild(h('div',{className:'section-label',style:{marginBottom:'12px'}},'保存済み帳票'));
@@ -1171,11 +1172,133 @@ extDocs.forEach(d=>{
   if(daysLeft<0){todos.push({icon:'',short:'保存期限切れ：'+(d.title||DOC_KIND_LABELS[d.doc_kind]||d.doc_kind),tab:'external_box',bg:'#fee2e2',bc:'#fca5a5'})}
   else if(daysLeft<=30){todos.push({icon:'',short:'保存期限残'+daysLeft+'日：'+(d.title||DOC_KIND_LABELS[d.doc_kind]||d.doc_kind),tab:'external_box',bg:'#fef3c7',bc:'#fde68a'})}
 });
+// v5.1.0: 当日の中止・要相談を最上位タスクに
+const todayStr=now().slice(0,10);
+(pt.statusReports||[]).filter(r=>r.date===todayStr&&(r.decision==='cancel'||r.decision==='consult')).forEach(r=>{
+  const dec=srDecMeta(r.decision);
+  todos.unshift({icon:'',short:'当日'+(r.decision==='cancel'?'中止':'要相談')+'：'+(r.service||'サービス'),tab:'overview',bg:r.decision==='cancel'?'#fee2e2':'#fef3c7',bc:r.decision==='cancel'?'#fca5a5':'#fde68a'});
+});
 return todos}
 function showStatusModal(pt){const m=h('div',{className:'modal',style:{maxWidth:'500px'}});m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'16px'}},'ステータス変更'));
 const opts=[{v:'pre_admission',l:'入居前（アセス中）',d:'退院調整・受入判断'},{v:'active',l:'利用中（入居決定）',d:'モニタリング・サービス担当者会議が有効に'},{v:'closed',l:'クローズ（受入不可）',d:'アクセス遮断・ログ保持'}];
 opts.forEach(o=>{const card=h('div',{style:{padding:'14px',border:'2px solid '+(pt.status===o.v?'var(--accent)':'var(--border)'),borderRadius:'12px',cursor:'pointer',marginBottom:'8px',background:pt.status===o.v?'var(--accent-l)':'transparent'},onClick:()=>{const oldSt=pt.status;pt.status=o.v;if(o.v==='closed'){(pt.sharedWith||[]).forEach(s=>{if(s.status==='active'){s.status='revoked';addAudit(pt.audit||[],'共有自動停止（クローズ）',s.email)}});if(!pt.closeReason){pt.closeReason=prompt('クローズ理由（任意）','')||''}}if(o.v==='active'&&!pt.startDate){pt.startDate=now().slice(0,10)}addAudit(pt.audit||[],'ステータス変更',stBdg(oldSt).l+'→'+stBdg(o.v).l);D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();S.modal=null;toast('変更完了');rr()}});card.appendChild(h('div',{style:{fontWeight:'700',fontSize:'14px'}},o.l));card.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},o.d));m.appendChild(card)});
 m.appendChild(btn('閉じる','btn-sec',()=>{S.modal=null;rr()}));S.modal=m;rr()}
+// --- 当日状態報告（事前キャンセル連絡）v5.1.0 ---
+const SR_SERVICES=['訪問入浴','デイサービス','訪問リハビリ','訪問看護','訪問介護','訪問診療','その他'];
+const SR_DECISIONS=[{v:'proceed',l:'予定どおり実施',c:'var(--accent)'},{v:'cancel',l:'当日中止（訪問見送り）',c:'#dc2626'},{v:'consult',l:'要相談（実施可否を確認）',c:'#d97706'}];
+function srDecMeta(v){return SR_DECISIONS.find(d=>d.v===v)||SR_DECISIONS[2]}
+function srTargets(pt){const t=[];(pt.sharedWith||[]).filter(s=>s.status==='active').forEach(s=>t.push({key:'share:'+(s.id||s.email),label:(s.org||s.email),email:s.email||''}));(pt.members||[]).filter(m=>m.active!==false&&m.name).forEach(m=>t.push({key:'member:'+(m.id||m.name),label:roleLabel(m.role)+'　'+m.name,email:m.email||''}));return t}
+function showStatusReportModal(pt){
+  if(!pt.statusReports)pt.statusReports=[];
+  const targets=srTargets(pt);
+  const rep={id:'sr_'+uid(),date:now().slice(0,10),service:'',vitals:{bp:'',temp:'',spo2:'',pulse:''},condition:'',decision:'consult',note:'',notify:{}};
+  targets.forEach(t=>rep.notify[t.key]=true);
+  const m=h('div',{className:'modal',style:{maxWidth:'560px',maxHeight:'90vh',overflow:'auto'}});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'当日状態報告'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px',lineHeight:'1.8'}},'当日の体調・バイタルにより、訪問入浴・デイ等のサービス可否を関係機関へ事前に連絡します。無駄な訪問・移動を抑えるための機能です。'));
+  const r0=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+  r0.appendChild(fld('報告日','sr_date',rep.date,v=>{rep.date=v},{type:'date'}));
+  r0.appendChild(fld('対象サービス','sr_svc',rep.service,v=>{rep.service=v},{opts:SR_SERVICES.map(s=>({v:s,l:s})),req:true}));
+  m.appendChild(r0);
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'当日のバイタル'));
+  const vg=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px'}});
+  vg.appendChild(fld('血圧','sr_bp',rep.vitals.bp,v=>{rep.vitals.bp=v},{ph:'128/82'}));
+  vg.appendChild(fld('体温','sr_temp',rep.vitals.temp,v=>{rep.vitals.temp=v},{ph:'36.8'}));
+  vg.appendChild(fld('SpO2','sr_spo2',rep.vitals.spo2,v=>{rep.vitals.spo2=v},{ph:'97'}));
+  vg.appendChild(fld('脈拍','sr_pulse',rep.vitals.pulse,v=>{rep.vitals.pulse=v},{ph:'72'}));
+  m.appendChild(vg);
+  m.appendChild(fld('体調メモ','sr_cond',rep.condition,v=>{rep.condition=v},{ta:true,rows:'2',ph:'例）朝から血圧高め、めまいの訴えあり'}));
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'判定'));
+  const dg=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}});
+  SR_DECISIONS.forEach(d=>{const sel=()=>rep.decision===d.v;const card=h('div',{style:{flex:'1 1 30%',minWidth:'140px',padding:'12px',border:'2px solid '+(sel()?d.c:'var(--border)'),borderRadius:'10px',cursor:'pointer',background:sel()?d.c+'14':'transparent',fontWeight:'700',fontSize:'13px',textAlign:'center',color:sel()?d.c:'var(--ink)'},onClick:()=>{rep.decision=d.v;S.modal=null;showStatusReportModalWith(pt,rep,targets)}},d.l);dg.appendChild(card)});
+  m.appendChild(dg);
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'連絡先（関係機関）'));
+  if(!targets.length)m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'8px 12px',background:'var(--surface)',borderRadius:'8px'}},'共有先・主担当が未設定です。記録は残せますが、連絡先はありません。'));
+  else targets.forEach(t=>{m.appendChild(chk(t.label+(t.email?'（'+t.email+'）':''),rep.notify[t.key],v=>{rep.notify[t.key]=v}))});
+  m.appendChild(fld('備考','sr_note',rep.note,v=>{rep.note=v},{ta:true,rows:'2'}));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn('連絡を記録','btn-pri',()=>{
+      if(!rep.service){toast('対象サービスを選択してください');return}
+      rep.notifiedTargets=targets.filter(t=>rep.notify[t.key]).map(t=>({label:t.label,email:t.email}));
+      rep.created=now();rep.by=S.user?(S.user.org_name||S.user.org||''):'';
+      delete rep.notify;
+      pt.statusReports.push(rep);
+      const dec=srDecMeta(rep.decision);
+      addAudit(pt.audit||[],'当日状態報告',rep.service+'／'+dec.l+(rep.notifiedTargets.length?'／連絡'+rep.notifiedTargets.length+'件':''));
+      D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();S.modal=null;toast('当日状態報告を記録しました');rr();
+    }),
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})
+  ));
+  S.modal=m;rr();
+}
+// 判定の選択状態を保ったまま再描画するためのラッパ
+function showStatusReportModalWith(pt,rep,targets){
+  if(!pt.statusReports)pt.statusReports=[];
+  const m=h('div',{className:'modal',style:{maxWidth:'560px',maxHeight:'90vh',overflow:'auto'}});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'当日状態報告'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px',lineHeight:'1.8'}},'当日の体調・バイタルにより、訪問入浴・デイ等のサービス可否を関係機関へ事前に連絡します。無駄な訪問・移動を抑えるための機能です。'));
+  const r0=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+  r0.appendChild(fld('報告日','sr_date',rep.date,v=>{rep.date=v},{type:'date'}));
+  r0.appendChild(fld('対象サービス','sr_svc',rep.service,v=>{rep.service=v},{opts:SR_SERVICES.map(s=>({v:s,l:s})),req:true}));
+  m.appendChild(r0);
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'当日のバイタル'));
+  const vg=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px'}});
+  vg.appendChild(fld('血圧','sr_bp',rep.vitals.bp,v=>{rep.vitals.bp=v},{ph:'128/82'}));
+  vg.appendChild(fld('体温','sr_temp',rep.vitals.temp,v=>{rep.vitals.temp=v},{ph:'36.8'}));
+  vg.appendChild(fld('SpO2','sr_spo2',rep.vitals.spo2,v=>{rep.vitals.spo2=v},{ph:'97'}));
+  vg.appendChild(fld('脈拍','sr_pulse',rep.vitals.pulse,v=>{rep.vitals.pulse=v},{ph:'72'}));
+  m.appendChild(vg);
+  m.appendChild(fld('体調メモ','sr_cond',rep.condition,v=>{rep.condition=v},{ta:true,rows:'2',ph:'例）朝から血圧高め、めまいの訴えあり'}));
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'判定'));
+  const dg=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}});
+  SR_DECISIONS.forEach(d=>{const sel=()=>rep.decision===d.v;const card=h('div',{style:{flex:'1 1 30%',minWidth:'140px',padding:'12px',border:'2px solid '+(sel()?d.c:'var(--border)'),borderRadius:'10px',cursor:'pointer',background:sel()?d.c+'14':'transparent',fontWeight:'700',fontSize:'13px',textAlign:'center',color:sel()?d.c:'var(--ink)'},onClick:()=>{rep.decision=d.v;S.modal=null;showStatusReportModalWith(pt,rep,targets)}},d.l);dg.appendChild(card)});
+  m.appendChild(dg);
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'8px 0 6px'}},'連絡先（関係機関）'));
+  if(!targets.length)m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'8px 12px',background:'var(--surface)',borderRadius:'8px'}},'共有先・主担当が未設定です。記録は残せますが、連絡先はありません。'));
+  else targets.forEach(t=>{m.appendChild(chk(t.label+(t.email?'（'+t.email+'）':''),rep.notify[t.key],v=>{rep.notify[t.key]=v}))});
+  m.appendChild(fld('備考','sr_note',rep.note,v=>{rep.note=v},{ta:true,rows:'2'}));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn('連絡を記録','btn-pri',()=>{
+      if(!rep.service){toast('対象サービスを選択してください');return}
+      rep.notifiedTargets=targets.filter(t=>rep.notify[t.key]).map(t=>({label:t.label,email:t.email}));
+      rep.created=now();rep.by=S.user?(S.user.org_name||S.user.org||''):'';
+      delete rep.notify;
+      pt.statusReports.push(rep);
+      const dec=srDecMeta(rep.decision);
+      addAudit(pt.audit||[],'当日状態報告',rep.service+'／'+dec.l+(rep.notifiedTargets.length?'／連絡'+rep.notifiedTargets.length+'件':''));
+      D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();S.modal=null;toast('当日状態報告を記録しました');rr();
+    }),
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})
+  ));
+  S.modal=m;rr();
+}
+// 患者ハブ概要：当日状態報告の一覧
+function hubStatusReports(pt){
+  const w=h('div',{style:{marginTop:'24px'}});
+  const head=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}});
+  head.appendChild(h('div',{className:'section-label'},'当日状態報告'));
+  head.appendChild(btn('+ 当日報告','btn-xs btn-pri',()=>showStatusReportModal(pt)));
+  w.appendChild(head);
+  const reps=(pt.statusReports||[]).slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+  if(!reps.length){w.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'12px',background:'var(--surface)',borderRadius:'10px'}},'当日状態報告はまだありません。当日の体調により訪問入浴・デイ等を見送る場合は、事前にここから関係機関へ連絡できます。'));return w}
+  reps.slice(0,6).forEach(r=>{
+    const dec=srDecMeta(r.decision);
+    const card=h('div',{style:{padding:'12px 14px',border:'1px solid var(--border)',borderLeft:'4px solid '+dec.c,borderRadius:'10px',marginBottom:'8px',fontSize:'12px'}});
+    card.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}},
+      h('span',{style:{fontWeight:'800'}},r.date),
+      h('span',{style:{fontWeight:'700'}},r.service||'—'),
+      h('span',{style:{padding:'2px 8px',borderRadius:'6px',background:dec.c+'18',color:dec.c,fontWeight:'700',fontSize:'11px'}},dec.l)
+    ));
+    const vt=[];if(r.vitals){if(r.vitals.bp)vt.push('血圧 '+r.vitals.bp);if(r.vitals.temp)vt.push('体温 '+r.vitals.temp);if(r.vitals.spo2)vt.push('SpO2 '+r.vitals.spo2);if(r.vitals.pulse)vt.push('脈拍 '+r.vitals.pulse)}
+    if(vt.length)card.appendChild(h('div',{style:{color:'var(--ink-m)'}},vt.join('　')));
+    if(r.condition)card.appendChild(h('div',{style:{color:'var(--ink-m)',marginTop:'2px'}},r.condition));
+    if(r.notifiedTargets&&r.notifiedTargets.length)card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'連絡先：'+r.notifiedTargets.map(t=>t.label).join('、')));
+    if(r.note)card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'備考：'+r.note));
+    card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'10px'}},(r.created||'').slice(0,16).replace('T',' ')+(r.by?'　'+r.by:'')));
+    w.appendChild(card);
+  });
+  return w;
+}
 // --- TIMELINE ---
 function hubTimeline(pt){const w=h('div');const todos=buildTodos(pt);
 w.appendChild(h('div',{className:'section-label'},'次にやること'));if(!todos.length)w.appendChild(h('div',{className:'todo-card'},h('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'var(--accent)',flexShrink:0,marginTop:'4px'}}),h('div',{className:'todo-content'},h('div',{className:'todo-title'},'すべて完了'),h('div',{className:'todo-desc'},'現在対応が必要な項目はありません'))));
