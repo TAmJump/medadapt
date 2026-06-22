@@ -1132,13 +1132,23 @@ const tabs=h('div',{className:'tabs'});const tabList=[{id:'overview',l:'① 概�
 tabList.forEach(t=>{const cls='tab'+(S.hubTab===t.id?' active':'');tabs.appendChild(h('div',{className:cls,onClick:()=>{S.hubTab=t.id;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},t.l))});w.appendChild(tabs);
 const fn={overview:()=>{const sec=h('div');
   // v4.16: この患者で操作 ─ 各機能への直接導線
-  const actionBar=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',padding:'14px 16px',background:'linear-gradient(135deg,#ecfeff 0%,#f0fdfa 100%)',border:'1px solid rgba(8,145,178,.25)',borderRadius:'12px',marginBottom:'20px'}});
-  actionBar.appendChild(h('div',{style:{width:'100%',fontSize:'11px',fontWeight:'700',color:'#0e7490',marginBottom:'6px'}},'この患者で操作'));
-  actionBar.appendChild(btn('医師交付同意書を発行','btn-xs btn-pri',()=>{S.page='consent_new';S.preselectPatientId=pt.id;rr()}));
-  actionBar.appendChild(btn('訪問マッサージ（鍼灸）ハブ','btn-xs btn-out',()=>{S.page='acu_massage';S.preselectPatientId=pt.id;rr()}));
-  actionBar.appendChild(btn('退院通知作成','btn-xs btn-out',()=>{S.page='discharge_new';S.preselectPatientId=pt.id;rr()}));
-  actionBar.appendChild(btn('加算管理を見る','btn-xs btn-out',()=>{S.page='claims';rr()}));
-  actionBar.appendChild(btn('当日状態報告','btn-xs btn-out',()=>showStatusReportModal(pt)));
+  const actionBar=h('div',{style:{padding:'14px 16px',background:'linear-gradient(135deg,#ecfeff 0%,#f0fdfa 100%)',border:'1px solid rgba(8,145,178,.25)',borderRadius:'12px',marginBottom:'20px'}});
+  actionBar.appendChild(h('div',{style:{fontSize:'11px',fontWeight:'700',color:'#0e7490',marginBottom:'8px'}},'この患者で操作'));
+  const agRow=(label,...btns)=>{const row=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'8px'}});row.appendChild(h('span',{style:{fontSize:'10px',fontWeight:'700',color:'#64748b',minWidth:'62px'}},label));btns.filter(Boolean).forEach(b=>row.appendChild(b));return row};
+  actionBar.appendChild(agRow('医療文書',
+    btn('医師交付同意書','btn-xs btn-pri',()=>{S.page='consent_new';S.preselectPatientId=pt.id;rr()}),
+    btn('診療情報提供書','btn-xs btn-out',()=>showReferralModal(null,pt.id)),
+    btn('歯科 提供書/指示書','btn-xs btn-out',()=>showDentalModal(null,'dental_referral',pt.id))
+  ));
+  actionBar.appendChild(agRow('介護・在宅',
+    btn('居宅療養管理指導','btn-xs btn-out',()=>showKyotakuModal(null,pt.id)),
+    btn('訪問マッサージ','btn-xs btn-out',()=>{S.page='acu_massage';S.preselectPatientId=pt.id;rr()}),
+    btn('退院通知','btn-xs btn-out',()=>{S.page='discharge_new';S.preselectPatientId=pt.id;rr()}),
+    btn('当日状態報告','btn-xs btn-out',()=>showStatusReportModal(pt))
+  ));
+  actionBar.appendChild(agRow('管理',
+    btn('加算管理','btn-xs btn-out',()=>{S.page='claims';rr()})
+  ));
   sec.appendChild(actionBar);
   sec.appendChild(hubInsurance(pt));
   sec.appendChild(hubTimeline(pt));sec.appendChild(hubStatusReports(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),consent_docs:()=>hubConsentTab(pt),records:()=>{const sec=h('div');
@@ -4215,7 +4225,7 @@ function kyotakuPage(){
   return w;
 }
 
-function showKyotakuModal(ex){
+function showKyotakuModal(ex,presetPid){
   if(!D.kyotakuRecords)D.kyotakuRecords=[];
   const isE=!!ex;
   const r=ex?{...ex}:{
@@ -4231,6 +4241,7 @@ function showKyotakuModal(ex){
   m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'12px'}},isE?'居宅療養管理指導 記録（編集）':'居宅療養管理指導 記録（新規）'));
   // 患者選択
   const pts=(D.patients||[]).filter(p=>p.status==='active'||p.status==='pre_admission');
+  if(!isE&&presetPid)r.patient_id=presetPid;
   m.appendChild(fld('対象者','kt_pt',r.patient_id,v=>{r.patient_id=v},{opts:[{v:'',l:'-- 選択 --'},...pts.map(p=>({v:p.id,l:p.name+(p.cl?'（'+p.cl+'）':'')}))],req:true}));
   const r1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px'}});
   r1.appendChild(fld('訪問日','kt_d',r.visit_date,v=>{r.visit_date=v},{type:'date',req:true}));
@@ -4355,7 +4366,7 @@ function dentalPage(){
   return w;
 }
 
-function showDentalModal(ex,docKind){
+function showDentalModal(ex,docKind,presetPid){
   if(!D.dentalRecords)D.dentalRecords=[];
   const isE=!!ex;
   const r=ex?{...ex}:{
@@ -4378,6 +4389,7 @@ function showDentalModal(ex,docKind){
     {v:'dental_instruction',l:'歯科訪問診療指示書（歯科衛生士向け）'}
   ]}));
   const pts=(D.patients||[]).filter(p=>p.status==='active'||p.status==='pre_admission');
+  if(!isE&&presetPid)r.patient_id=presetPid;
   m.appendChild(fld('対象患者','dn_pt',r.patient_id,v=>{r.patient_id=v},{opts:[{v:'',l:'-- 選択 --'},...pts.map(p=>({v:p.id,l:p.name}))],req:true}));
   const r1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
   r1.appendChild(fld('発行日','dn_d',r.issued_date,v=>{r.issued_date=v},{type:'date'}));
@@ -4475,7 +4487,7 @@ function medicalReferralPage(){
   return w;
 }
 
-function showReferralModal(ex){
+function showReferralModal(ex,presetPid){
   if(!D.medicalReferrals)D.medicalReferrals=[];
   const isE=!!ex;
   const r=ex?{...ex}:{
@@ -4492,6 +4504,7 @@ function showReferralModal(ex){
   const m=h('div',{className:'modal',style:{maxWidth:'700px',maxHeight:'90vh',overflow:'auto'}});
   m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'12px'}},'診療情報提供書'+(isE?'（編集）':'（新規発行）')));
   const pts=(D.patients||[]).filter(p=>p.status==='active'||p.status==='pre_admission');
+  if(!isE&&presetPid)r.patient_id=presetPid;
   m.appendChild(fld('対象患者','rf_pt',r.patient_id,v=>{r.patient_id=v},{opts:[{v:'',l:'-- 選択 --'},...pts.map(p=>({v:p.id,l:p.name}))],req:true}));
   const r1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
   r1.appendChild(fld('発行日','rf_d',r.issued_date,v=>{r.issued_date=v},{type:'date'}));
