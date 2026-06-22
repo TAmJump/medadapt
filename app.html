@@ -1115,6 +1115,7 @@ const fn={overview:()=>{const sec=h('div');
   actionBar.appendChild(btn('加算管理を見る','btn-xs btn-out',()=>{S.page='claims';rr()}));
   actionBar.appendChild(btn('当日状態報告','btn-xs btn-out',()=>showStatusReportModal(pt)));
   sec.appendChild(actionBar);
+  sec.appendChild(hubInsurance(pt));
   sec.appendChild(hubTimeline(pt));sec.appendChild(hubStatusReports(pt));sec.appendChild(h('div',{style:{marginTop:'24px'}}));sec.appendChild(hubMembers(pt));return sec},transition:()=>{const sec=h('div');sec.appendChild(hubCases(pt));sec.appendChild(h('div',{style:{marginTop:'32px',paddingTop:'20px',borderTop:'1px solid var(--border)'}}));sec.appendChild(hubAssess(pt));return sec},conferences:()=>hubConfs(pt),monitors:()=>hubMons(pt),consent_docs:()=>hubConsentTab(pt),records:()=>{const sec=h('div');
 // 帳票一覧（D1保存）
 const docSection=h('div',{style:{marginBottom:'24px'}});
@@ -1298,6 +1299,133 @@ function hubStatusReports(pt){
     w.appendChild(card);
   });
   return w;
+}
+// --- 保険情報（医療・介護・公費）v5.2.0 ---
+// マイナ保険証移行後、医療機関以外の事業所はオンライン資格確認ができず保険情報の取得に時間を要する。
+// 医療機関が確認した保険情報をここに記録し、共有先（介護事業所等）が閲覧できるようにする。
+const INS_MED_TYPES=['国民健康保険','健康保険（被用者保険）','後期高齢者医療','共済組合','その他'];
+const INS_COPAY=['1割','2割','3割'];
+const INS_RELATION=['本人','被扶養者（家族）'];
+const INS_CARE_LEVELS=['非該当','要支援1','要支援2','要介護1','要介護2','要介護3','要介護4','要介護5'];
+const INS_PUBLIC_KINDS=['自立支援医療（精神通院等）','生活保護（医療扶助）','難病医療費助成','障害者医療','原爆被爆者','小児慢性特定疾病','その他'];
+function insDefault(pt){return{medical:{type:'',insurerNo:'',symbol:'',number:'',branchNo:'',holderName:'',relationship:'',copayRate:'',validUntil:'',mynaVerified:false,verifiedAt:'',verifiedBy:''},care:{insuredNo:'',careLevel:pt?pt.cl||'':'',certFrom:'',certUntil:'',copayRate:''},publicAid:[],note:'',updatedAt:'',updatedBy:''}}
+function insHas(pt){const i=pt.insurance;if(!i)return false;const m=i.medical||{},c=i.care||{};return!!(m.type||m.insurerNo||m.number||c.insuredNo||c.careLevel||(i.publicAid&&i.publicAid.length)||i.note)}
+function hubInsurance(pt){
+  const w=h('div',{style:{marginTop:'24px'}});
+  const i=pt.insurance;
+  const head=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px',flexWrap:'wrap',gap:'8px'}});
+  const titleWrap=h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}});
+  titleWrap.appendChild(h('div',{className:'section-label',style:{marginBottom:0}},'保険情報'));
+  if(i&&i.medical&&i.medical.mynaVerified)titleWrap.appendChild(h('span',{style:{padding:'2px 8px',borderRadius:'6px',background:'var(--accent)18',color:'var(--accent)',fontWeight:'700',fontSize:'11px'}},'マイナ資格確認済'));
+  head.appendChild(titleWrap);
+  head.appendChild(btn(insHas(pt)?'編集':'+ 保険情報を登録','btn-xs btn-pri',()=>showInsuranceModal(pt)));
+  w.appendChild(head);
+  if(!insHas(pt)){
+    w.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',padding:'12px',background:'var(--surface)',borderRadius:'10px',lineHeight:'1.8'}},'保険情報は未登録です。マイナ保険証への移行後、医療機関以外の事業所は資格確認に時間を要します。医療機関が確認した保険情報をここに記録すると、共有先の事業所も閲覧でき、無駄な待ち時間を抑えられます。'));
+    return w;
+  }
+  const box=h('div',{style:{border:'1px solid var(--border)',borderRadius:'12px',padding:'14px 16px',fontSize:'12px',lineHeight:'1.9'}});
+  const m=i.medical||{},c=i.care||{};
+  const rowKV=(label,val)=>h('div',{style:{display:'flex',gap:'10px'}},h('span',{style:{minWidth:'104px',color:'var(--ink-m)',fontWeight:'600'}},label),h('span',{style:{fontWeight:'600'}},val||'—'));
+  if(m.type||m.insurerNo||m.number){
+    box.appendChild(h('div',{style:{fontWeight:'800',color:'var(--accent)',marginBottom:'4px'}},'医療保険'));
+    box.appendChild(rowKV('保険種別',m.type));
+    box.appendChild(rowKV('保険者番号',m.insurerNo));
+    const sym=[m.symbol&&('記号 '+m.symbol),m.number&&('番号 '+m.number),m.branchNo&&('枝番 '+m.branchNo)].filter(Boolean).join('　');
+    box.appendChild(rowKV('記号・番号',sym));
+    box.appendChild(rowKV('被保険者',(m.holderName||'')+(m.relationship?'（'+m.relationship+'）':'')));
+    box.appendChild(rowKV('負担割合',m.copayRate));
+    box.appendChild(rowKV('有効期限',m.validUntil));
+    if(m.mynaVerified)box.appendChild(rowKV('資格確認',(m.verifiedAt?m.verifiedAt.slice(0,10)+' ':'')+'オンライン資格確認済'+(m.verifiedBy?'（'+m.verifiedBy+'）':'')));
+  }
+  if(c.insuredNo||c.careLevel){
+    box.appendChild(h('div',{style:{fontWeight:'800',color:'var(--accent)',margin:'10px 0 4px'}},'介護保険'));
+    box.appendChild(rowKV('被保険者番号',c.insuredNo));
+    box.appendChild(rowKV('要介護度',c.careLevel));
+    box.appendChild(rowKV('認定有効期間',[c.certFrom,c.certUntil].filter(Boolean).join(' 〜 ')));
+    box.appendChild(rowKV('負担割合',c.copayRate));
+  }
+  if(i.publicAid&&i.publicAid.length){
+    box.appendChild(h('div',{style:{fontWeight:'800',color:'var(--accent)',margin:'10px 0 4px'}},'公費負担'));
+    i.publicAid.forEach(p=>{
+      const line=[p.kind,p.payerNo&&('負担者 '+p.payerNo),p.recipientNo&&('受給者 '+p.recipientNo),p.validUntil&&('期限 '+p.validUntil)].filter(Boolean).join('　');
+      box.appendChild(h('div',{style:{fontWeight:'600'}},line||'—'));
+    });
+  }
+  if(i.note)box.appendChild(h('div',{style:{marginTop:'8px',color:'var(--ink-m)'}},'備考：'+i.note));
+  if(i.updatedAt)box.appendChild(h('div',{style:{marginTop:'8px',fontSize:'10px',color:'var(--ink-l)'}},'更新：'+i.updatedAt.slice(0,16).replace('T',' ')+(i.updatedBy?'　'+i.updatedBy:'')));
+  w.appendChild(box);
+  return w;
+}
+function showInsuranceModal(pt){
+  const i=JSON.parse(JSON.stringify(pt.insurance||insDefault(pt)));
+  if(!i.medical)i.medical=insDefault(pt).medical;if(!i.care)i.care=insDefault(pt).care;if(!i.publicAid)i.publicAid=[];
+  const m=h('div',{className:'modal',style:{maxWidth:'620px',maxHeight:'90vh',overflow:'auto'}});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'保険情報'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px',lineHeight:'1.8'}},'医療機関が確認した保険情報を記録します。共有先（介護事業所等）も閲覧でき、資格確認の待ち時間を抑えられます。'));
+  // 医療保険
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'4px 0 6px'}},'医療保険'));
+  const g1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  g1.appendChild(fld('保険種別','i_mtype',i.medical.type,v=>{i.medical.type=v},{opts:INS_MED_TYPES.map(x=>({v:x,l:x}))}));
+  g1.appendChild(fld('保険者番号','i_minsurer',i.medical.insurerNo,v=>{i.medical.insurerNo=v}));
+  m.appendChild(g1);
+  const g2=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}});
+  g2.appendChild(fld('記号','i_msym',i.medical.symbol,v=>{i.medical.symbol=v}));
+  g2.appendChild(fld('番号','i_mnum',i.medical.number,v=>{i.medical.number=v}));
+  g2.appendChild(fld('枝番','i_mbr',i.medical.branchNo,v=>{i.medical.branchNo=v},{ph:'2桁'}));
+  m.appendChild(g2);
+  const g3=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}});
+  g3.appendChild(fld('被保険者氏名','i_mhold',i.medical.holderName,v=>{i.medical.holderName=v}));
+  g3.appendChild(fld('続柄','i_mrel',i.medical.relationship,v=>{i.medical.relationship=v},{opts:INS_RELATION.map(x=>({v:x,l:x}))}));
+  g3.appendChild(fld('負担割合','i_mcopay',i.medical.copayRate,v=>{i.medical.copayRate=v},{opts:INS_COPAY.map(x=>({v:x,l:x}))}));
+  m.appendChild(g3);
+  m.appendChild(fld('有効期限','i_mvalid',i.medical.validUntil,v=>{i.medical.validUntil=v},{type:'date'}));
+  m.appendChild(chk('オンライン資格確認で確認済み（マイナ保険証）',i.medical.mynaVerified,v=>{i.medical.mynaVerified=v}));
+  // 介護保険
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'12px 0 6px'}},'介護保険'));
+  const g4=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}});
+  g4.appendChild(fld('被保険者番号','i_cins',i.care.insuredNo,v=>{i.care.insuredNo=v}));
+  g4.appendChild(fld('要介護度','i_clevel',i.care.careLevel,v=>{i.care.careLevel=v},{opts:INS_CARE_LEVELS.map(x=>({v:x,l:x}))}));
+  m.appendChild(g4);
+  const g5=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}});
+  g5.appendChild(fld('認定開始','i_cfrom',i.care.certFrom,v=>{i.care.certFrom=v},{type:'date'}));
+  g5.appendChild(fld('認定終了','i_cuntil',i.care.certUntil,v=>{i.care.certUntil=v},{type:'date'}));
+  g5.appendChild(fld('負担割合','i_ccopay',i.care.copayRate,v=>{i.care.copayRate=v},{opts:INS_COPAY.map(x=>({v:x,l:x}))}));
+  m.appendChild(g5);
+  // 公費（複数）
+  m.appendChild(h('div',{style:{fontSize:'13px',fontWeight:'700',color:'var(--accent)',margin:'12px 0 6px'}},'公費負担（複数可）'));
+  const paWrap=h('div');
+  const renderPaRow=(p)=>{
+    const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',marginBottom:'8px'}});
+    const top=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}});
+    const sel=fld('種別','i_pk_'+uid(),p.kind,v=>{p.kind=v},{opts:INS_PUBLIC_KINDS.map(x=>({v:x,l:x}))});
+    sel.style.flex='1';top.appendChild(sel);
+    top.appendChild(btn('×','btn-xs btn-danger',()=>{const idx=i.publicAid.indexOf(p);if(idx>=0)i.publicAid.splice(idx,1);paWrap.removeChild(card)}));
+    card.appendChild(top);
+    const g=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px'}});
+    g.appendChild(fld('公費負担者番号','i_ppay_'+uid(),p.payerNo,v=>{p.payerNo=v}));
+    g.appendChild(fld('受給者番号','i_prec_'+uid(),p.recipientNo,v=>{p.recipientNo=v}));
+    g.appendChild(fld('有効期限','i_pval_'+uid(),p.validUntil,v=>{p.validUntil=v},{type:'date'}));
+    card.appendChild(g);
+    paWrap.appendChild(card);
+  };
+  i.publicAid.forEach(renderPaRow);
+  m.appendChild(paWrap);
+  m.appendChild(btn('+ 公費を追加','btn-xs btn-out',()=>{const p={kind:'',payerNo:'',recipientNo:'',validUntil:''};i.publicAid.push(p);renderPaRow(p)}));
+  m.appendChild(fld('備考','i_note',i.note,v=>{i.note=v},{ta:true,rows:'2'}));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn('保存','btn-pri',()=>{
+      i.publicAid=i.publicAid.filter(p=>p.kind||p.payerNo||p.recipientNo);
+      if(i.medical.mynaVerified&&!i.medical.verifiedAt){i.medical.verifiedAt=now();i.medical.verifiedBy=S.user?(S.user.org_name||S.user.org||''):''}
+      if(!i.medical.mynaVerified){i.medical.verifiedAt='';i.medical.verifiedBy=''}
+      i.updatedAt=now();i.updatedBy=S.user?(S.user.org_name||S.user.org||''):'';
+      pt.insurance=i;
+      addAudit(pt.audit||[],'保険情報更新',(i.medical.type||'')+(i.medical.mynaVerified?'／資格確認済':''));
+      D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();S.modal=null;toast('保険情報を保存しました');rr();
+    }),
+    btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})
+  ));
+  S.modal=m;rr();
 }
 // --- TIMELINE ---
 function hubTimeline(pt){const w=h('div');const todos=buildTodos(pt);
