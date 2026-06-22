@@ -6187,6 +6187,10 @@ function genKyotakuPDF(r){
   addR('提供職種',(occupations[r.occupation]||r.occupation)+'（'+(r.units||0)+'単位）');
   addR('当月実施回数',(r.visit_count_this_month||1)+'回目');
   addR('オンライン実施',r.call_url?'あり（URL: '+r.call_url+'）':'なし');
+  const _ins=pt.insurance;
+  if(_ins&&_ins.care&&(_ins.care.insuredNo||_ins.care.copayRate)){const cc=_ins.care;addR('介護保険',[cc.insuredNo&&('被保険者番号 '+cc.insuredNo),cc.copayRate&&('負担 '+cc.copayRate),(cc.certFrom||cc.certUntil)&&('認定期間 '+[cc.certFrom,cc.certUntil].filter(Boolean).join('〜'))].filter(Boolean).join('　'))}
+  if(_ins&&_ins.medical&&(_ins.medical.type||_ins.medical.insurerNo)){const mm=_ins.medical;addR('医療保険',[mm.type,mm.insurerNo&&('保険者番号 '+mm.insurerNo),mm.copayRate&&('負担 '+mm.copayRate),mm.mynaVerified?'資格確認済':''].filter(Boolean).join('　'))}
+  if(_ins&&_ins.publicAid&&_ins.publicAid.length){addR('公費負担',_ins.publicAid.map(p=>[p.kind,p.payerNo&&('負担者 '+p.payerNo),p.recipientNo&&('受給者 '+p.recipientNo)].filter(Boolean).join(' ')).join(' ／ '))}
   d.appendChild(tbl);
   // バイタル
   d.appendChild(h('div',{style:{margin:'14px 0 4px',fontWeight:'700',fontSize:'12px'}},'バイタル'));
@@ -6339,6 +6343,9 @@ function genDentalPDF(r){
   ))};
   addR('患者氏名',(pt.name||'')+' 様');
   addR('生年月日・年齢',(pt.age?pt.age+'歳':'')+(pt.sex?'　'+(pt.sex==='female'?'女性':'男性'):''));
+  const _ins=pt.insurance;
+  if(_ins&&_ins.medical&&(_ins.medical.type||_ins.medical.insurerNo||_ins.medical.number)){const mm=_ins.medical;addR('医療保険',[mm.type,mm.insurerNo&&('保険者番号 '+mm.insurerNo),(mm.symbol||mm.number||mm.branchNo)&&('記号番号 '+[mm.symbol,mm.number,mm.branchNo].filter(Boolean).join('-')),mm.copayRate&&('負担 '+mm.copayRate),mm.mynaVerified?'資格確認済':''].filter(Boolean).join('　'))}
+  if(_ins&&_ins.publicAid&&_ins.publicAid.length){addR('公費負担',_ins.publicAid.map(p=>[p.kind,p.payerNo&&('負担者 '+p.payerNo),p.recipientNo&&('受給者 '+p.recipientNo)].filter(Boolean).join(' ')).join(' ／ '))}
   addR('主訴',r.chief_complaint);
   addR('既往歴・現病歴',r.medical_history);
   addR('口腔内所見',r.oral_findings);
