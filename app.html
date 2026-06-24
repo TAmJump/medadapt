@@ -1348,7 +1348,7 @@ function insHas(pt){const i=pt.insurance;if(!i)return false;const m=i.medical||{
 // v5.4.0: 保険情報の安全表示（マスク／全表示ログ／資格確認鮮度）
 function fmtMask(val,head,tail){if(val==null||val==='')return '';val=String(val);head=head||0;tail=tail||0;if(val.length<=head+tail)return val.charAt(0)+'＊'.repeat(Math.max(val.length-1,1));return val.slice(0,head)+'＊'.repeat(val.length-head-tail)+(tail?val.slice(-tail):'')}
 function insStaleDays(i){if(!i||!i.medical)return null;const ref=i.medical.verifiedAt||i.updatedAt;if(!ref)return null;const d=Math.floor((Date.now()-new Date(ref).getTime())/86400000);return isNaN(d)?null:d}
-function canRevealInsurance(pt){if(!S.user)return false;if((S.user.role==='admin'||S.user.role==='staff')&&(pt.ownerEmail===getOwnerEmail()||pt.ownerEmail===S.user.email||!pt.ownerEmail))return true;return (pt.sharedWith||[]).some(s=>s.email===S.user.email&&s.status==='active')}
+function canRevealInsurance(pt){if(!S.user)return false;if(S.user.role==='admin'||S.user.role==='staff')return true;return (pt.sharedWith||[]).some(s=>s.email===S.user.email&&s.status==='active')}
 function hubInsurance(pt){
   if(!S.insReveal)S.insReveal={};
   const w=h('div',{style:{marginTop:'24px'}});
