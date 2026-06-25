@@ -152,7 +152,7 @@ const APP_CONFIG = {
 };
 const WHEREBY_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmFwcGVhci5pbiIsImF1ZCI6Imh0dHBzOi8vYXBpLmFwcGVhci5pbi92MSIsImV4cCI6OTAwNzE5OTI1NDc0MDk5MSwiaWF0IjoxNzc2MTM4NTA4LCJvcmdhbml6YXRpb25JZCI6MzM4NTAyLCJqdGkiOiI5NWExNjQ1ZC00YjkzLTQ0ZjQtYTE0Ni0xZTBiZDMxN2EzMjkifQ.Zj3MJ92mLCp-wpY6Jw00ul0Ka6HLy4tpcVHTlyOPXIo';
 
-let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[]};
+let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[],medLinks:[],disaster:{active:false},emergencyContacts:[],safetyReports:[],broadcasts:[],opLog:[]};
 let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,notifList:null,noticeId:null,noticeData:null,ndaList:null,dischargeList:null,
   ptId:null,hubTab:'overview',caseId:null,caseTab:'schedule',confId:null,confTab:'info',monId:null,monTab:'status',assId:null,
   modal:null,signed:false,np:{n:'',r:''},shareStep:1,ptFilter:'all',token:null,pendingShares:[]};
@@ -960,7 +960,7 @@ w.appendChild(cd);return w;}
 function changepwScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('div',{style:{fontSize:'22px',fontWeight:'800'}},'パスワード変更'),h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'8px'}},'初回ログインのため、パスワードを変更してください')));cd.appendChild(fld('新しいパスワード','c_newpw','',()=>{},{type:'password',ph:'8文字以上'}));cd.appendChild(fld('確認','c_newpw2','',()=>{},{type:'password',ph:'もう一度入力'}));cd.appendChild(h('div',{style:{marginTop:'12px'}},btn('変更して利用開始','btn-pri btn-full',async()=>{const pw=document.getElementById('c_newpw')?.value?.trim(),pw2=document.getElementById('c_newpw2')?.value?.trim();if(!pw||pw.length<8){toast('8文字以上');return}if(pw!==pw2){toast('パスワードが一致しません');return}const res=await api('/auth/change-password',{method:'POST',body:JSON.stringify({newPassword:pw})});if(res&&res.success){S.user.must_change_pw=0;await loadPatients();S.scr='app';S.page='patients';toast('パスワード変更完了');rr()}})));w.appendChild(cd);return w}
 // --- APP SHELL ---
 function appShell(){const u=S.user,shell=h('div',{className:'app-shell'});const sb=h('div',{className:'sidebar'});const logoLink=h('a',{href:'index.html',style:{textDecoration:'none',color:'var(--yellow)'},className:'sidebar-logo'},APP_CONFIG.name);sb.appendChild(logoLink);const nav=h('div',{className:'sidebar-nav'});
-[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'consent',l:'同意書（訪問診療）'},{id:'acu_massage',l:'訪問マッサージ（鍼灸）'},{id:'medical_referral',l:'診療情報提供書'},{id:'kyotaku',l:'居宅療養管理指導'},{id:'dental',l:'歯科診療・指示書'},{id:'claims',l:'加算管理'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},it.l))});
+[{id:'patients',l:'患者・利用者'},{id:'admin',l:'ダッシュボード'},{id:'staff',l:'スタッフ管理'},{id:'discharge',l:'退院通知'},{id:'nda',l:'NDA管理'},{id:'consent',l:'同意書（訪問診療）'},{id:'acu_massage',l:'訪問マッサージ（鍼灸）'},{id:'medical_referral',l:'診療情報提供書'},{id:'kyotaku',l:'居宅療養管理指導'},{id:'dental',l:'歯科診療・指示書'},{id:'claims',l:'加算管理'},{id:'disaster',l:'災害時モード'},{id:'settings',l:'設定'}].forEach(it=>{if(it.id==='staff'&&S.user&&S.user.role!=='admin')return;const _dz=(it.id==='disaster'&&isDisaster());nav.appendChild(h('div',{className:'sidebar-item'+(S.page===it.id||(S.page==='hub'&&it.id==='patients')?' active':''),style:_dz?{color:'#fecaca',fontWeight:'800'}:null,onClick:()=>{S.page=it.id;S.ptId=null;S.caseId=null;S.confId=null;S.monId=null;S.assId=null;rr()}},_dz?'● '+it.l:it.l))});
 sb.appendChild(nav);
 // 今月の使用状況ウィジェット（中央の空白部分）
 if(u.plan==='free'){
@@ -1030,6 +1030,7 @@ else if(S.page==='patients'){main.appendChild(patientsPage())}
 else if(S.page==='admin'){main.appendChild(adminPage())}
 else if(S.page==='staff'){main.appendChild(staffPage())}
 else if(S.page==='integrations'){main.appendChild(integPage())}
+else if(S.page==='disaster'){main.appendChild(disasterPage())}
 else if(S.page==='settings'){main.appendChild(settingsPage())}
 else if(S.page==='notifications'){main.appendChild(notificationsPage())}
 else if(S.page==='discharge'){main.appendChild(dischargePage())}
@@ -1105,13 +1106,14 @@ m.appendChild(fld('氏名','p_name',p.name,v=>{p.name=v},{req:true}));const rn=h
 if(p.status==='pre_admission'){m.appendChild(fld('移行予定日','p_dd',p.dd,v=>{p.dd=v},{type:'date'}))}
 if(p.status==='active'){m.appendChild(fld('入居/利用開始日','p_sd',p.startDate,v=>{p.startDate=v},{type:'date'}));m.appendChild(h('div',{className:'section-label',style:{marginTop:'12px'}},'重要フラグ'));const fg=h('div',{className:'assess-grid'});['転倒','誤嚥','褥瘡','認知','経管栄養','吸引','酸素','インスリン'].forEach(f=>{fg.appendChild(chk(f,p.flags?.[f]||false,v=>{if(!p.flags)p.flags={};p.flags[f]=v}))});m.appendChild(fg)}
 m.appendChild(fld('管理主体（法人名）','p_mo',p.managerOrg,v=>{p.managerOrg=v},{ph:S.user?S.user.org:''}));
-m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},btn(isE?'保存':'登録','btn-pri',()=>{p.name=document.getElementById('p_name')?.value||p.name;p.room=document.getElementById('p_room')?.value||p.room||'';if(!p.name){toast('氏名必須');return}if(!isE){p.id='pt_'+uid();p.created=now();if(!p.audit)p.audit=[];addAudit(p.audit,'患者登録',p.name+'（'+stBdg(p.status).l+'）');D.patients.push(p)}else{D.patients=D.patients.map(x=>x.id===p.id?p:x)}sv();S.modal=null;toast('完了');rr()}),btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})));S.modal=m;rr()}
+m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},btn(isE?'保存':'登録','btn-pri',()=>{p.name=document.getElementById('p_name')?.value||p.name;p.room=document.getElementById('p_room')?.value||p.room||'';if(!p.name){toast('氏名必須');return}if(!isE){p.id='pt_'+uid();p.created=now();if(!p.audit)p.audit=[];addAudit(p.audit,'患者登録',p.name+'（'+stBdg(p.status).l+'）');logOp('患者登録',p.name||'');D.patients.push(p)}else{D.patients=D.patients.map(x=>x.id===p.id?p:x)}sv();S.modal=null;toast('完了');rr()}),btn('キャンセル','btn-sec',()=>{S.modal=null;rr()})));S.modal=m;rr()}
 function showImportModal(){const m=h('div',{className:'modal'});m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'16px'}},'CSV取り込み'));const zone=h('div',{className:'import-zone'});const fi=h('input',{type:'file',accept:'.csv',style:{display:'none'},onChange:e=>{const file=e.target.files[0];if(!file)return;const r2=new FileReader();r2.onload=ev=>{const lines=ev.target.result.split('\n').filter(l=>l.trim());let cnt=0;for(let i=1;i<lines.length;i++){const c=lines[i].split(',').map(x=>x.trim().replace(/^"|"$/g,''));if(!c[0])continue;D.patients.push({id:'pt_'+uid(),name:c[0],age:Number(c[1])||0,sex:(c[2]||'').includes('女')?'female':'male',cl:c[3]||'',diagnosis:c[4]||'',dd:c[5]||'',status:c[6]||'active',startDate:'',managerOrg:S.user.org,members:[],ownerEmail:getOwnerEmail(),sharedWith:[],audit:[],flags:{},created:now()});cnt++}sv();S.modal=null;toast(cnt+'件完了');rr()};r2.readAsText(file,'UTF-8')}});zone.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'600',marginBottom:'8px'}},'CSVファイルを選択'));zone.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginBottom:'12px'}},'形式: 氏名,年齢,性別,介護認定,診断名,退院日,ステータス'));zone.appendChild(fi);zone.appendChild(btn('ファイル選択','btn-out',()=>fi.click()));m.appendChild(zone);m.appendChild(h('div',{style:{marginTop:'12px'}},btn('閉じる','btn-sec',()=>{S.modal=null;rr()})));S.modal=m;rr()}
 // --- PATIENT HUB ---
 function patientHub(){const pt=D.patients.find(p=>p.id===S.ptId);if(!pt)return h('div',null,'患者が見つかりません');const w=h('div');
 w.appendChild(h('div',{style:{marginBottom:'12px'}},h('span',{style:{cursor:'pointer',fontSize:'13px',color:'var(--accent)',fontWeight:'600'},onClick:()=>{S.page='patients';S.ptId=null;rr()}},'← 患者一覧')));
 // --- Header: Name + Status + Manager + Primary Members + Next Tasks ---
 const hdr=h('div',{className:'pt-header'});const hdrTop=h('div',{className:'pt-hdr-top',style:{display:'flex',alignItems:'center',gap:'16px',marginBottom:'12px'}});const info=h('div',{style:{flex:1}});const sb2=stBdg(pt.status);info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},pt.room?h('span',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}},pt.room):null,h('span',{style:{fontSize:'20px',fontWeight:'800'}},pt.name),bdg(sb2.l,sb2.c),pt.cl?bdg(pt.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(pt.age?pt.age+'歳':'')+(pt.sex==='male'?' 男性':pt.sex==='female'?' 女性':'')+(pt.diagnosis?' '+pt.diagnosis:'')+(pt.dd?' 退院：'+pt.dd:'')));hdrTop.appendChild(info);hdrTop.appendChild(h('div',{style:{display:'flex',gap:'6px'}},btn('編集','btn-xs btn-out',()=>showPatientModal(pt)),
+    btn('薬剤情報を確認','btn-xs btn-out',()=>showMedLinkPicker(pt)),
     pt.status!=='closed'?btn('ステータス変更','btn-xs btn-out',()=>showStatusModal(pt)):null,
     !pt.archived?btn('非表示にする','btn-xs btn-out',()=>{
       if(!confirm(pt.name+'を非表示にしますか？\n患者一覧から見えなくなりますが、「非表示を含む」から復元できます。'))return;
@@ -1363,7 +1365,7 @@ function hubInsurance(pt){
   head.appendChild(titleWrap);
   const btnWrap=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}});
   if(insHas(pt)&&canReveal)btnWrap.appendChild(btn(revealed?'マスク表示に戻す':'全表示','btn-xs btn-out',()=>{
-    if(!revealed){S.insReveal[pt.id]=true;addAudit(pt.audit||[],'保険番号 全表示',((S.user&&(S.user.org_name||S.user.org))||'')+'／資格確認・請求等');D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();}
+    if(!revealed){S.insReveal[pt.id]=true;addAudit(pt.audit||[],'保険番号 全表示',((S.user&&(S.user.org_name||S.user.org))||'')+'／資格確認・請求等');logOp('保険番号 全表示',(pt.name||''));D.patients=D.patients.map(x=>x.id===pt.id?pt:x);sv();}
     else{S.insReveal[pt.id]=false;}
     rr();
   }));
@@ -5971,10 +5973,13 @@ w.appendChild(h('div',{className:'page-title'},'設定'));
   }
   cc.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'12px',flexWrap:'wrap'}},
     btn('誓約内容を再確認 / 再同意','btn-out btn-sm',()=>{try{localStorage.removeItem(consentStoreKey())}catch(e){}S.scr='app';rr();}),
-    (u.role==='admin'?btn('同意ログ（'+((D.consentLog||[]).length)+'件）を表示','btn-out btn-sm',()=>showConsentLogModal()):null)));
+    (u.role==='admin'?btn('同意ログ（'+((D.consentLog||[]).length)+'件）を表示','btn-out btn-sm',()=>showConsentLogModal()):null),
+    (u.role==='admin'?btn('操作ログ（'+((D.opLog||[]).length)+'件）を表示','btn-out btn-sm',()=>showOpLogModal()):null)));
   cc.appendChild(h('div',{style:{marginTop:'10px',fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.6'}},'※ 同意ログには、同意者・所属・日時・誓約書バージョン・同意文面のハッシュ値・端末情報を記録します。マイナンバー等は保存しません。'));
   w.appendChild(cc);
 })();
+// 薬剤連携・外部アプリ（管理者）
+if(u.role==='admin'){w.appendChild(medLinksSettingsCard());}
 // Account
 const ac=h('div',{className:'card',style:{marginBottom:'20px'}});
 ac.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},h('h3',{style:{fontSize:'16px',fontWeight:'700',margin:0}},'アカウント情報'),bdg(u.plan==='pro'?'Pro':'Free',u.plan==='pro'?'#0891b2':'#94a3b8')));
@@ -6234,7 +6239,7 @@ const dm=h('div',{className:'card'});
 dm.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'データ管理'));
 dm.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
 btn('全データCSVエクスポート','btn-out',()=>{const rows=[['種別','患者名','日付','ステータス','詳細']];D.patients.filter(p=>p.ownerEmail===getOwnerEmail()||p.ownerEmail===u.email||!p.ownerEmail).forEach(p=>{rows.push(['患者',p.name,p.created||'',p.status,p.diagnosis||''])});D.cases.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['退院ケース',c.pn,c.dd||'',c.st,''])});D.conferences.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['サービス担当者会議',c.userName,c.date||'','',c.agenda||''])});D.monitors.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['モニタリング',c.userName,c.date||'',c.cl||'',''])});downloadCSV(rows,'medadapt_export.csv');toast('エクスポート完了')}),
-btn('全データリセット','btn-danger',()=>{if(confirm('全データを初期化しますか？\n（アカウント情報は保持されます）')){D={users:D.users,patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:D.consentLog||[]};sv();toast('リセット完了');rr()}})));
+btn('全データリセット','btn-danger',()=>{if(confirm('全データを初期化しますか？\n（アカウント情報は保持されます）')){D={users:D.users,patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:D.consentLog||[],medLinks:D.medLinks||[],disaster:{active:false},emergencyContacts:D.emergencyContacts||[],safetyReports:[],broadcasts:[],opLog:D.opLog||[]};sv();toast('リセット完了');rr()}})));
 w.appendChild(dm);
 // パスワード変更セクション
 const pw=h('div',{className:'card',style:{marginBottom:'20px'}});
@@ -6762,6 +6767,7 @@ async function recordConsent(){
   // 監査用：D.consentLogへ追記（端末＋同期）。最新200件保持。
   if(!Array.isArray(D.consentLog))D.consentLog=[];
   D.consentLog.push(rec);
+  logOp('誓約に同意',Object.values(CONSENT_VERSIONS).join('/'));
   if(D.consentLog.length>200)D.consentLog=D.consentLog.slice(-200);
   sv();
   return rec;
@@ -6830,6 +6836,230 @@ function showConsentLogModal(){
     }),
     btn('閉じる','btn-sec btn-sm',()=>{S.modal=null;rr()})));
   S.modal=m;rr();
+}
+// ============================================================
+// 操作ログ（Phase1残・フロント記録版）
+// ※ 改ざん不可の訂正履歴方式（サーバ強制）はWorker/D1側で担保
+// ============================================================
+function logOp(action,detail){
+  try{
+    const u=S.user||{};
+    if(!Array.isArray(D.opLog))D.opLog=[];
+    D.opLog.push({at:now(),staffId:u.login_id||u.email||u.id||'',name:u.name||'',org:u.org_name||u.org||'',role:u.role||'',action:action||'',detail:detail||''});
+    if(D.opLog.length>500)D.opLog=D.opLog.slice(-500);
+    // sv()は呼び出し側の処理に同梱されることが多いが、単独操作でも残す
+    try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
+  }catch(e){}
+}
+function showOpLogModal(){
+  const logs=(D.opLog||[]).slice().reverse();
+  const m=h('div',{className:'modal',style:{maxWidth:'760px'}});
+  m.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+    h('h3',{style:{fontSize:'18px',fontWeight:'800',margin:0}},'操作ログ'),h('span',{style:{fontSize:'12px',color:'var(--ink-m)'}},logs.length+'件')));
+  m.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginBottom:'10px',lineHeight:'1.6'}},'ログイン・登録・保険情報の全表示・同意・災害時操作など、主要な操作の記録です。改ざん不可の訂正履歴方式（サーバ側強制）は別途対応予定です。'));
+  if(!logs.length){m.appendChild(h('div',{style:{padding:'20px',textAlign:'center',color:'var(--ink-m)'}},'まだ操作ログはありません。'));}
+  else{
+    const box=h('div',{style:{maxHeight:'56vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:'6px'}});
+    logs.forEach(r=>{const row=h('div',{style:{border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',lineHeight:'1.6'}});
+      row.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}},h('span',{style:{fontWeight:'700'}},r.action),h('span',{style:{color:'var(--ink-m)'}},(r.at||'').replace('T',' ').slice(0,16))));
+      row.appendChild(h('div',{style:{color:'var(--ink-m)'}},(r.name||'')+'（'+(r.org||'')+'）'+(r.detail?'　'+r.detail:'')));
+      box.appendChild(row);});
+    m.appendChild(box);
+  }
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'12px'}},
+    btn('CSV書き出し','btn-out btn-sm',()=>{
+      const head=['at','staffId','name','org','role','action','detail'];
+      const rows=(D.opLog||[]).map(r=>[r.at,r.staffId,r.name,r.org,r.role,r.action,r.detail].map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(','));
+      const csv=[head.join(',')].concat(rows).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='op_log.csv';a.click();}),
+    btn('閉じる','btn-sec btn-sm',()=>{S.modal=null;rr()})));
+  S.modal=m;rr();
+}
+
+// ============================================================
+// Phase2 薬剤連携（外部アプリへのリンク導線）
+// 設計：URLに患者名・病名は載せず、トークン/IDのみを渡す
+// ============================================================
+function ptToken(pt){return (pt&&pt.id?String(pt.id):'').replace(/[^a-zA-Z0-9_-]/g,'')}
+function buildMedUrl(tpl,pt){
+  const tok=ptToken(pt);
+  let u=String(tpl||'');
+  if(u.includes('{id}')||u.includes('{token}')){u=u.replace(/\{id\}|\{token\}/g,encodeURIComponent(tok));}
+  else{u=u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(tok);}
+  return u;
+}
+function showMedLinkPicker(pt){
+  const links=(D.medLinks||[]).filter(l=>l.url);
+  const m=h('div',{className:'modal'});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'6px'}},'薬剤情報を確認'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},'連携先の薬剤管理アプリを別タブで開きます。連携先には患者IDのみを渡し、氏名・病名はURLに含めません。'));
+  if(!links.length){
+    m.appendChild(h('div',{style:{padding:'18px',textAlign:'center',color:'var(--ink-m)',fontSize:'13px',border:'1px dashed var(--border)',borderRadius:'10px'}},'連携先が未設定です。'+(S.user&&S.user.role==='admin'?'［設定 → 薬剤連携・外部アプリ］から追加してください。':'管理者に連携先の登録を依頼してください。')));
+  }else{
+    const box=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+    links.forEach(l=>{box.appendChild(h('button',{className:'btn btn-out btn-full',style:{justifyContent:'space-between',display:'flex',alignItems:'center'},onClick:()=>{
+      const url=buildMedUrl(l.url,pt);logOp('薬剤連携を開く',(l.label||'')+'／'+(pt.name||''));addAudit(pt.audit||[],'薬剤連携を開く',l.label||'');sv();window.open(url,'_blank','noopener');toast('別タブで開きました');}},
+      h('span',{style:{fontWeight:'700'}},l.label||'薬剤管理アプリ'),h('span',{style:{fontSize:'11px',color:'var(--accent)'}},'開く →')));});
+    m.appendChild(box);
+  }
+  m.appendChild(h('div',{style:{marginTop:'14px'}},btn('閉じる','btn-sec btn-sm',()=>{S.modal=null;rr()})));
+  S.modal=m;rr();
+}
+function medLinksSettingsCard(){
+  const c=h('div',{className:'card',style:{marginBottom:'20px'}});
+  c.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},h('h3',{style:{fontSize:'16px',fontWeight:'700',margin:0}},'薬剤連携・外部アプリ'),bdg((D.medLinks||[]).length+'件','#0891b2')));
+  c.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.6'}},'患者ハブの「薬剤情報を確認」から開く外部アプリを登録します。URLに {id} を含めると患者IDに置換します（例：https://example.com/p/{id}）。氏名・病名はURLに含めません。'));
+  (D.medLinks||[]).forEach(l=>{const row=h('div',{style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'8px',flexWrap:'wrap'}});
+    row.appendChild(h('input',{type:'text',value:l.label||'',placeholder:'表示名（例：お薬手帳アプリ）',style:{flex:'1',minWidth:'160px',padding:'8px',fontSize:'12px'},onInput:e=>{l.label=e.target.value}}));
+    row.appendChild(h('input',{type:'text',value:l.url||'',placeholder:'https://example.com/p/{id}',style:{flex:'2',minWidth:'200px',padding:'8px',fontSize:'12px'},onInput:e=>{l.url=e.target.value}}));
+    row.appendChild(btn('削除','btn-xs btn-danger',()=>{D.medLinks=(D.medLinks||[]).filter(x=>x!==l);sv();rr()}));
+    c.appendChild(row);});
+  c.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}},
+    btn('+ 連携先を追加','btn-out btn-sm',()=>{if(!Array.isArray(D.medLinks))D.medLinks=[];D.medLinks.push({id:'ml_'+uid(),label:'',url:''});rr()}),
+    btn('保存','btn-pri btn-sm',()=>{(D.medLinks||[]).forEach(l=>{l.label=(l.label||'').trim();l.url=(l.url||'').trim()});D.medLinks=(D.medLinks||[]).filter(l=>l.label||l.url);logOp('薬剤連携先を更新',(D.medLinks||[]).length+'件');sv();toast('保存しました');rr()})));
+  return c;
+}
+
+// ============================================================
+// Phase3 災害時モード（安否・連絡・薬剤・記録 中心）
+// ※ オフラインキャッシュ/SW・プッシュはWorker/SW側（JIN領域）
+// ============================================================
+function isDisaster(){return !!(D.disaster&&D.disaster.active)}
+function myStaffId(){const u=S.user||{};return u.login_id||u.email||u.id||''}
+function disasterToggle(on){
+  if(!D.disaster)D.disaster={};
+  D.disaster.active=!!on;
+  if(on){D.disaster.activatedAt=now();D.disaster.activatedBy=(S.user&&S.user.name)||'';}
+  else{D.disaster.deactivatedAt=now();}
+  logOp(on?'災害時モードON':'災害時モードOFF','');sv();toast(on?'災害時モードをONにしました':'災害時モードをOFFにしました');rr();
+}
+function setMySafety(status,note){
+  if(!Array.isArray(D.safetyReports))D.safetyReports=[];
+  const u=S.user||{};const id=myStaffId();
+  const ex=D.safetyReports.find(r=>r.staffId===id);
+  const rec={staffId:id,name:u.name||'',org:u.org_name||u.org||'',status,note:note||'',at:now()};
+  if(ex){Object.assign(ex,rec);}else{D.safetyReports.push(rec);}
+  logOp('安否報告',({safe:'無事',need_help:'要支援',unknown:'不明'}[status]||status));sv();toast('安否を報告しました');rr();
+}
+function postBroadcast(text,scope){
+  if(!text)return;
+  if(!Array.isArray(D.broadcasts))D.broadcasts=[];
+  D.broadcasts.push({id:'bc_'+uid(),at:now(),by:(S.user&&S.user.name)||'',byOrg:(S.user&&(S.user.org_name||S.user.org))||'',scope:scope||'全体',text,reads:[]});
+  logOp('一斉通知を送信',text.slice(0,40));sv();toast('一斉通知を送信しました');rr();
+}
+function markBroadcastRead(bc){
+  const id=myStaffId();if(!bc.reads)bc.reads=[];
+  if(!bc.reads.some(r=>r.staffId===id)){bc.reads.push({staffId:id,name:(S.user&&S.user.name)||'',at:now()});sv();rr();}
+}
+function disasterPage(){
+  const w=h('div');const u=S.user||{};const active=isDisaster();
+  // ヘッダ
+  const head=h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}});
+  head.appendChild(h('div',{className:'page-title',style:{margin:0}},'災害時モード'));
+  if(u.role==='admin'){
+    head.appendChild(active
+      ? btn('災害時モードを解除','btn-sm',()=>{if(confirm('災害時モードを解除しますか？'))disasterToggle(false)})
+      : h('button',{className:'btn btn-sm',style:{background:'#dc2626',color:'#fff',fontWeight:'800'},onClick:()=>{if(confirm('災害時モードをONにします。所属内の表示が災害用に切り替わります。よろしいですか？'))disasterToggle(true)}},'災害時モードをON'));
+  }
+  w.appendChild(head);
+  // 状態バナー
+  w.appendChild(active
+    ? h('div',{style:{background:'#fef2f2',border:'2px solid #dc2626',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
+        h('div',{style:{fontWeight:'800',color:'#dc2626',fontSize:'15px',marginBottom:'4px'}},'● 災害時モード 稼働中'),
+        h('div',{style:{fontSize:'12px',color:'#991b1b'}},'低帯域表示（画像オフ）／安否・連絡・薬剤・記録を優先。'+(D.disaster.activatedAt?'開始: '+D.disaster.activatedAt.replace('T',' ').slice(0,16):'')))
+    : h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
+        h('div',{style:{fontWeight:'700',color:'#15803d',fontSize:'14px'}},'平常運用中'),
+        h('div',{style:{fontSize:'12px',color:'#166534',marginTop:'2px'}},'災害発生時は管理者がモードをONにすると、安否確認・一斉通知・緊急連絡が前面に出ます。')));
+
+  // 安否確認（ワンタップ）
+  const my=(D.safetyReports||[]).find(r=>r.staffId===myStaffId());
+  const sc=h('div',{className:'card',style:{marginBottom:'16px'}});
+  sc.appendChild(h('h3',{style:{fontSize:'15px',fontWeight:'800',marginBottom:'4px'}},'あなたの安否'));
+  sc.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'10px'}},my?'現在の報告：'+({safe:'無事',need_help:'要支援',unknown:'不明'}[my.status]||my.status)+'（'+(my.at||'').replace('T',' ').slice(11,16)+'）':'未報告です。ワンタップで報告できます。'));
+  const sb=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}});
+  sb.appendChild(h('button',{className:'btn',style:{background:'#16a34a',color:'#fff',fontWeight:'800',flex:'1',minWidth:'90px'},onClick:()=>setMySafety('safe')},'無事'));
+  sb.appendChild(h('button',{className:'btn',style:{background:'#dc2626',color:'#fff',fontWeight:'800',flex:'1',minWidth:'90px'},onClick:()=>{const n=prompt('要支援の内容（任意）','');setMySafety('need_help',n||'')}},'要支援'));
+  sb.appendChild(h('button',{className:'btn btn-out',style:{flex:'1',minWidth:'90px'},onClick:()=>setMySafety('unknown')},'状況不明'));
+  sc.appendChild(sb);
+  w.appendChild(sc);
+
+  // 安否一覧
+  const reps=D.safetyReports||[];
+  if(reps.length){
+    const lc=h('div',{className:'card',style:{marginBottom:'16px'}});
+    const cnt={safe:0,need_help:0,unknown:0};reps.forEach(r=>{cnt[r.status]=(cnt[r.status]||0)+1});
+    lc.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px',flexWrap:'wrap',gap:'8px'}},
+      h('h3',{style:{fontSize:'15px',fontWeight:'800',margin:0}},'安否状況'),
+      h('div',{style:{display:'flex',gap:'6px'}},bdg('無事 '+(cnt.safe||0),'#16a34a'),bdg('要支援 '+(cnt.need_help||0),'#dc2626'),bdg('不明 '+(cnt.unknown||0),'#94a3b8'))));
+    reps.slice().sort((a,b)=>(a.status==='need_help'?-1:1)).forEach(r=>{
+      const color={safe:'#16a34a',need_help:'#dc2626',unknown:'#94a3b8'}[r.status]||'#94a3b8';
+      lc.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border-l)',fontSize:'13px',gap:'8px',flexWrap:'wrap'}},
+        h('span',{style:{fontWeight:'600'}},(r.name||'')+'　',h('span',{style:{fontSize:'11px',color:'var(--ink-m)'}},r.org||'')),
+        h('span',{style:{display:'flex',gap:'8px',alignItems:'center'}},(r.note?h('span',{style:{fontSize:'11px',color:'#991b1b'}},r.note):null),h('span',{style:{fontWeight:'700',color}},{safe:'無事',need_help:'要支援',unknown:'不明'}[r.status]||r.status))));
+    });
+    w.appendChild(lc);
+  }
+
+  // 緊急連絡先
+  const ec=h('div',{className:'card',style:{marginBottom:'16px'}});
+  ec.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},h('h3',{style:{fontSize:'15px',fontWeight:'800',margin:0}},'緊急連絡先'),(u.role==='admin'?btn('+ 追加','btn-xs btn-out',()=>{if(!Array.isArray(D.emergencyContacts))D.emergencyContacts=[];D.emergencyContacts.push({id:'ec_'+uid(),label:'',org:'',tel:''});rr()}):null)));
+  const ecs=D.emergencyContacts||[];
+  if(!ecs.length){ec.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'未登録です。'+(u.role==='admin'?'「+ 追加」から医師・施設・家族・薬局・訪看・行政・消防等を登録してください。':'')));}
+  ecs.forEach(c=>{
+    if(u.role==='admin'){
+      const row=h('div',{style:{display:'flex',gap:'6px',marginBottom:'6px',flexWrap:'wrap'}});
+      row.appendChild(h('input',{type:'text',value:c.label||'',placeholder:'区分（医師/家族等）',style:{flex:'1',minWidth:'110px',padding:'7px',fontSize:'12px'},onInput:e=>{c.label=e.target.value}}));
+      row.appendChild(h('input',{type:'text',value:c.org||'',placeholder:'名称',style:{flex:'1.2',minWidth:'120px',padding:'7px',fontSize:'12px'},onInput:e=>{c.org=e.target.value}}));
+      row.appendChild(h('input',{type:'tel',value:c.tel||'',placeholder:'電話番号',style:{flex:'1',minWidth:'120px',padding:'7px',fontSize:'12px'},onInput:e=>{c.tel=e.target.value}}));
+      row.appendChild(btn('×','btn-xs btn-danger',()=>{D.emergencyContacts=ecs.filter(x=>x!==c);sv();rr()}));
+      ec.appendChild(row);
+    }else{
+      const tel=(c.tel||'').replace(/[^0-9+]/g,'');
+      ec.appendChild(h('a',{href:tel?'tel:'+tel:'#',style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',border:'1px solid var(--border)',borderRadius:'10px',marginBottom:'6px',textDecoration:'none',color:'var(--ink)'}},
+        h('span',{},h('span',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:'700',marginRight:'8px'}},c.label||'連絡先'),h('span',{style:{fontWeight:'600'}},c.org||'')),
+        h('span',{style:{fontWeight:'700',color:'var(--accent)'}},c.tel||'')));
+    }
+  });
+  if(u.role==='admin'&&ecs.length)ec.appendChild(h('div',{style:{marginTop:'6px'}},btn('保存','btn-pri btn-sm',()=>{D.emergencyContacts=ecs.filter(c=>c.label||c.org||c.tel);logOp('緊急連絡先を更新',ecs.length+'件');sv();toast('保存しました');rr()})));
+  w.appendChild(ec);
+
+  // 一斉通知
+  const bc=h('div',{className:'card',style:{marginBottom:'16px'}});
+  bc.appendChild(h('h3',{style:{fontSize:'15px',fontWeight:'800',marginBottom:'10px'}},'一斉通知'));
+  if(u.role==='admin'){
+    const ta=h('textarea',{id:'bc_text',rows:'2',placeholder:'施設・スタッフ・家族への連絡事項',style:{width:'100%',padding:'8px',fontSize:'13px',marginBottom:'8px'}});
+    bc.appendChild(ta);
+    bc.appendChild(btn('送信','btn-pri btn-sm',()=>{const t=document.getElementById('bc_text');if(!t||!t.value.trim()){toast('内容を入力してください');return}postBroadcast(t.value.trim())}));
+  }
+  const bcs=(D.broadcasts||[]).slice().reverse();
+  if(bcs.length){
+    const box=h('div',{style:{marginTop:'12px',display:'flex',flexDirection:'column',gap:'8px'}});
+    bcs.forEach(b=>{const read=(b.reads||[]).some(r=>r.staffId===myStaffId());
+      const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px'}});
+      card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}},h('span',{style:{fontSize:'11px',color:'var(--ink-m)'}},(b.by||'')+(b.byOrg?'（'+b.byOrg+'）':'')+'　'+(b.at||'').replace('T',' ').slice(0,16)),(u.role==='admin'?h('span',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:'700'}},'既読 '+((b.reads||[]).length)):null)));
+      card.appendChild(h('div',{style:{fontSize:'13px',lineHeight:'1.7',whiteSpace:'pre-wrap'}},b.text));
+      card.appendChild(h('div',{style:{marginTop:'8px'}},read?h('span',{style:{fontSize:'11px',color:'#16a34a',fontWeight:'700'}},'✓ 既読'):btn('既読にする','btn-xs btn-out',()=>markBroadcastRead(b))));
+      box.appendChild(card);});
+    bc.appendChild(box);
+  }
+  w.appendChild(bc);
+
+  // 音声通話（低帯域）
+  const vc=h('div',{className:'card',style:{marginBottom:'16px'}});
+  vc.appendChild(h('h3',{style:{fontSize:'15px',fontWeight:'800',marginBottom:'6px'}},'音声通話（低帯域）'));
+  vc.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'10px',lineHeight:'1.6'}},'災害時はカメラOFF・音声のみを推奨します。通信が不安定な場合は電話・SMSへ切り替えてください。'));
+  if(u.role==='admin'){
+    vc.appendChild(h('div',{style:{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}},
+      h('input',{type:'text',id:'dz_room',value:(D.disaster&&D.disaster.roomUrl)||'',placeholder:'WherebyルームURL（任意）',style:{flex:'1',minWidth:'200px',padding:'8px',fontSize:'12px'}}),
+      btn('保存','btn-out btn-sm',()=>{if(!D.disaster)D.disaster={active:false};D.disaster.roomUrl=(document.getElementById('dz_room')?.value||'').trim();sv();toast('保存しました');rr()})));
+  }
+  const room=(D.disaster&&D.disaster.roomUrl)||'';
+  vc.appendChild(room
+    ? h('a',{href:room+(room.includes('?')?'&':'?')+'audio=on&video=off',target:'_blank',rel:'noopener',className:'btn btn-pri btn-sm',style:{display:'inline-flex'},onClick:()=>logOp('災害時 音声通話を開く','')},'音声通話に参加（カメラOFF）')
+    : h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'ルームURLが未設定です。'+(u.role==='admin'?'上で登録できます。':'管理者に確認してください。')));
+  w.appendChild(vc);
+
+  w.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.7',marginTop:'8px'}},'※ 端末へのオフライン保存・プッシュ通知・基本画面のキャッシュ（Service Worker）は別途サーバ/アプリ側の対応で強化します。本画面の安否・通知・連絡先は通信復旧後に自動同期されます。'));
+  return w;
 }
 // --- ROUTER ---
 function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='app'){if(S.user&&needsConsent()){app.appendChild(consentGateScr())}else{app.appendChild(appShell())}};if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
