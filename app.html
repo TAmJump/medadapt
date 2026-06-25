@@ -152,7 +152,7 @@ const APP_CONFIG = {
 };
 const WHEREBY_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmFwcGVhci5pbiIsImF1ZCI6Imh0dHBzOi8vYXBpLmFwcGVhci5pbi92MSIsImV4cCI6OTAwNzE5OTI1NDc0MDk5MSwiaWF0IjoxNzc2MTM4NTA4LCJvcmdhbml6YXRpb25JZCI6MzM4NTAyLCJqdGkiOiI5NWExNjQ1ZC00YjkzLTQ0ZjQtYTE0Ni0xZTBiZDMxN2EzMjkifQ.Zj3MJ92mLCp-wpY6Jw00ul0Ka6HLy4tpcVHTlyOPXIo';
 
-let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[]};
+let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[]};
 let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,notifList:null,noticeId:null,noticeData:null,ndaList:null,dischargeList:null,
   ptId:null,hubTab:'overview',caseId:null,caseTab:'schedule',confId:null,confTab:'info',monId:null,monTab:'status',assId:null,
   modal:null,signed:false,np:{n:'',r:''},shareStep:1,ptFilter:'all',token:null,pendingShares:[]};
@@ -5955,6 +5955,26 @@ function settingsPage(){const w=h('div');const u=S.user;
 // 初回表示時：契約情報未取得なら取得して再描画
 if(!SQ.infoLoaded){SQ.infoLoaded=true;refreshBillingInfo().then(()=>rr());}
 w.appendChild(h('div',{className:'page-title'},'設定'));
+// 誓約・秘密保持（v5.5.0）
+(function(){const rec=getConsentRecord();const cc=h('div',{className:'card',style:{marginBottom:'20px'}});
+  cc.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},h('h3',{style:{fontSize:'16px',fontWeight:'700',margin:0}},'誓約・秘密保持'),bdg(rec?'同意済':'未同意',rec?'#10b981':'#ef4444')));
+  if(rec){
+    const grid=h('div',{style:{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 14px',fontSize:'12px',lineHeight:'1.8'}});
+    const row=(k,v)=>{grid.appendChild(h('span',{style:{color:'var(--ink-m)'}},k));grid.appendChild(h('span',{style:{fontWeight:'600',wordBreak:'break-all'}},v))};
+    row('同意者',(rec.name||'')+'（'+(rec.staffId||'')+'）');
+    row('所属',rec.org_name||rec.org||'');
+    row('同意日時',(rec.at||'').replace('T',' ').slice(0,16));
+    row('誓約書ver',Object.entries(rec.versions||{}).map(([k,v])=>k+':'+v).join(' / '));
+    row('同意ハッシュ',h('span',{style:{fontFamily:'monospace',fontSize:'10px'}},(rec.hash||'').slice(0,32)+'…'));
+    cc.appendChild(grid);
+    if(needsConsent())cc.appendChild(h('div',{style:{marginTop:'10px',fontSize:'12px',color:'#b45309',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:'8px',padding:'8px 12px'}},'⚠ 誓約書の更新または再同意の時期です。次回操作時に再同意画面を表示します。'));
+  }
+  cc.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'12px',flexWrap:'wrap'}},
+    btn('誓約内容を再確認 / 再同意','btn-out btn-sm',()=>{try{localStorage.removeItem(consentStoreKey())}catch(e){}S.scr='app';rr();}),
+    (u.role==='admin'?btn('同意ログ（'+((D.consentLog||[]).length)+'件）を表示','btn-out btn-sm',()=>showConsentLogModal()):null)));
+  cc.appendChild(h('div',{style:{marginTop:'10px',fontSize:'11px',color:'var(--ink-l)',lineHeight:'1.6'}},'※ 同意ログには、同意者・所属・日時・誓約書バージョン・同意文面のハッシュ値・端末情報を記録します。マイナンバー等は保存しません。'));
+  w.appendChild(cc);
+})();
 // Account
 const ac=h('div',{className:'card',style:{marginBottom:'20px'}});
 ac.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},h('h3',{style:{fontSize:'16px',fontWeight:'700',margin:0}},'アカウント情報'),bdg(u.plan==='pro'?'Pro':'Free',u.plan==='pro'?'#0891b2':'#94a3b8')));
@@ -6214,7 +6234,7 @@ const dm=h('div',{className:'card'});
 dm.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'データ管理'));
 dm.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
 btn('全データCSVエクスポート','btn-out',()=>{const rows=[['種別','患者名','日付','ステータス','詳細']];D.patients.filter(p=>p.ownerEmail===getOwnerEmail()||p.ownerEmail===u.email||!p.ownerEmail).forEach(p=>{rows.push(['患者',p.name,p.created||'',p.status,p.diagnosis||''])});D.cases.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['退院ケース',c.pn,c.dd||'',c.st,''])});D.conferences.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['サービス担当者会議',c.userName,c.date||'','',c.agenda||''])});D.monitors.filter(c=>D.patients.some(p=>p.id===c.patientId&&p.ownerEmail===u.email)).forEach(c=>{rows.push(['モニタリング',c.userName,c.date||'',c.cl||'',''])});downloadCSV(rows,'medadapt_export.csv');toast('エクスポート完了')}),
-btn('全データリセット','btn-danger',()=>{if(confirm('全データを初期化しますか？\n（アカウント情報は保持されます）')){D={users:D.users,patients:[],cases:[],conferences:[],monitors:[],assessments:[]};sv();toast('リセット完了');rr()}})));
+btn('全データリセット','btn-danger',()=>{if(confirm('全データを初期化しますか？\n（アカウント情報は保持されます）')){D={users:D.users,patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:D.consentLog||[]};sv();toast('リセット完了');rr()}})));
 w.appendChild(dm);
 // パスワード変更セクション
 const pw=h('div',{className:'card',style:{marginBottom:'20px'}});
@@ -6677,8 +6697,142 @@ function genMonPDF(m2){saveDocument('monitoring','モニタリング記録　'+m
   genPdf(cn,'モニタリング_'+m2.userName+'.pdf');
 })();
 }
+// --- STAFF CONSENT / 誓約・秘密保持（v5.5.0 / Phase1） ---
+const CONSENT_EFFECTIVE='2026-06-22';
+const CONSENT_VERSIONS={terms:'v1.0',privacy:'v1.0',nda:'v1.0',fairuse:'v1.0'};
+const CONSENT_REconsent_DAYS=365;
+const CONSENT_DOCS=[
+  {key:'terms',title:'1. 利用規約',ver:'v1.0',body:[
+    '本アプリのアカウントは、登録された本人のみが使用できます。ID・パスワード・認証コード・ログイン済み端末を第三者に貸与、共有、譲渡することを禁止します。',
+    '本アプリは、所属法人の業務目的の範囲内でのみ利用してください。',
+    '退職・契約終了・異動後は、本アプリを利用しないでください。']},
+  {key:'privacy',title:'2. 個人情報・要配慮情報の保護',ver:'v1.0',body:[
+    '本アプリで取り扱う氏名・病歴・心身の状態・介護状況等は、要配慮個人情報を含みます。一般の個人情報より慎重に取り扱います。',
+    '業務上必要な範囲を超えて、患者・利用者・家族・関係者の情報を閲覧・利用しません。',
+    'スクリーンショット・外部送信・私物端末への保存は、施設規程に従い、制限・禁止されます。']},
+  {key:'nda',title:'3. 秘密保持',ver:'v1.0',body:[
+    '本アプリを通じて知り得た情報を、在職中・退職後を問わず、第三者に開示・漏えいしません。',
+    '退職・異動の際に、情報を持ち出しません。']},
+  {key:'fairuse',title:'4. なりすまし・改ざん・不正利用の禁止',ver:'v1.0',body:[
+    '利用者・患者・家族・医療従事者・介護従事者・施設職員・管理者その他の第三者になりすまして利用する行為を禁止します。',
+    '記録・説明内容・同意情報・連絡内容・通話実施記録等について、虚偽入力・無断変更・改ざん・削除・隠ぺいを行いません。',
+    '違反が確認された場合、当社はアカウントの停止、所属法人または管理者への報告、利用履歴の確認等を行うことがあります。違反により損害が生じた場合、民事・刑事・行政上の責任が生じる可能性があります。']}
+];
+async function sha256Hex(str){
+  try{
+    if(window.crypto&&crypto.subtle){
+      const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){}
+  // fallback（crypto.subtle非対応環境）
+  let h1=0;for(let i=0;i<str.length;i++){h1=(Math.imul(31,h1)+str.charCodeAt(i))|0}
+  return 'fallback'+(h1>>>0).toString(16);
+}
+function consentText(){return CONSENT_DOCS.map(d=>d.title+'（'+d.ver+'）\n'+d.body.join('\n')).join('\n\n')+'\n\n施行日: '+CONSENT_EFFECTIVE}
+function consentStoreKey(){const u=S.user||{};return 'medadapt-consent-'+(u.login_id||u.email||u.id||'anon')}
+function getConsentRecord(){try{const s=localStorage.getItem(consentStoreKey());return s?JSON.parse(s):null}catch(e){return null}}
+function needsConsent(){
+  if(!S.user)return false;
+  const r=getConsentRecord();
+  if(!r||!r.versions)return true;
+  for(const k of Object.keys(CONSENT_VERSIONS)){if(r.versions[k]!==CONSENT_VERSIONS[k])return true}
+  // 年1回 再同意
+  const at=r.at?new Date(r.at).getTime():0;
+  if(!at||(Date.now()-at)>CONSENT_REconsent_DAYS*86400000)return true;
+  return false;
+}
+async function recordConsent(){
+  const u=S.user||{};
+  const text=consentText();
+  const hash=await sha256Hex(text);
+  const rec={
+    staffId:u.login_id||u.email||u.id||'',
+    name:u.name||'',
+    org:u.org||'',
+    org_name:u.org_name||u.org||'',
+    role:u.role||'',
+    at:now(),
+    ua:(navigator.userAgent||'').slice(0,180),
+    versions:{...CONSENT_VERSIONS},
+    effective:CONSENT_EFFECTIVE,
+    hash
+  };
+  try{localStorage.setItem(consentStoreKey(),JSON.stringify(rec))}catch(e){}
+  // 監査用：D.consentLogへ追記（端末＋同期）。最新200件保持。
+  if(!Array.isArray(D.consentLog))D.consentLog=[];
+  D.consentLog.push(rec);
+  if(D.consentLog.length>200)D.consentLog=D.consentLog.slice(-200);
+  sv();
+  return rec;
+}
+function consentGateScr(){
+  const u=S.user||{};
+  const w=h('div',{className:'auth-bg',style:{padding:'24px 12px',overflowY:'auto'}});
+  const cd=h('div',{className:'card',style:{width:'100%',maxWidth:'640px',padding:'28px',margin:'0 auto'}});
+  cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'8px'}},
+    h('div',{style:{fontSize:'20px',fontWeight:'800',color:'var(--accent)'}},'ご利用前のご同意'),
+    h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'6px'}},'スタッフ誓約・秘密保持・不正利用防止に関する内容です。ご確認のうえ同意してください。')));
+  cd.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',background:'var(--border-l)',borderRadius:'8px',padding:'8px 12px',marginBottom:'14px'}},
+    (u.org_name||u.org||'')+'　'+(u.name||'')+(u.role==='admin'?'（管理者）':u.role==='staff'?'（スタッフ）':'')+'　／　誓約書バージョン '+CONSENT_VERSIONS.nda+'　施行日 '+CONSENT_EFFECTIVE));
+  const box=h('div',{style:{maxHeight:'46vh',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'10px',padding:'14px 16px',fontSize:'12.5px',lineHeight:'1.85',background:'#fff'}});
+  CONSENT_DOCS.forEach(d=>{
+    box.appendChild(h('div',{style:{fontWeight:'800',marginTop:'10px',marginBottom:'4px',color:'var(--ink)'}},d.title+'　'+d.ver));
+    const ul=h('ul',{style:{margin:'0 0 6px 18px',padding:'0'}});
+    d.body.forEach(line=>ul.appendChild(h('li',{style:{marginBottom:'4px'}},line)));
+    box.appendChild(ul);
+  });
+  cd.appendChild(box);
+  let checked=false;
+  const agreeBtn=h('button',{className:'btn btn-pri btn-full',style:{marginTop:'16px',opacity:'.5',pointerEvents:'none'},onClick:async()=>{
+    agreeBtn.textContent='記録中...';agreeBtn.style.pointerEvents='none';
+    await recordConsent();
+    S.scr='app';S.page='patients';toast('同意を記録しました');rr();
+  }},'上記すべてに同意して利用を開始する');
+  const chkRow=h('label',{style:{display:'flex',alignItems:'flex-start',gap:'10px',marginTop:'16px',cursor:'pointer',fontSize:'13px',fontWeight:'600'}},
+    h('input',{type:'checkbox',style:{marginTop:'3px',width:'18px',height:'18px',flexShrink:'0'},onChange:e=>{checked=e.target.checked;agreeBtn.style.opacity=checked?'1':'.5';agreeBtn.style.pointerEvents=checked?'auto':'none';}}),
+    h('span',{},'上記の利用規約・個人情報保護・秘密保持・不正利用防止の内容を確認し、同意します。'));
+  cd.appendChild(chkRow);
+  cd.appendChild(agreeBtn);
+  cd.appendChild(h('a',{href:'#',style:{display:'block',textAlign:'center',marginTop:'14px',fontSize:'12px',color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();stopNotifPolling();S.token=null;S.user=null;S.moduleAccess=null;localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-autologin');S.scr='login';rr();}},'同意せずログアウト'));
+  w.appendChild(cd);
+  return w;
+}
+function showConsentLogModal(){
+  const logs=(D.consentLog||[]).slice().reverse();
+  const m=h('div',{className:'modal',style:{maxWidth:'720px'}});
+  m.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
+    h('h3',{style:{fontSize:'18px',fontWeight:'800',margin:0}},'同意ログ'),
+    h('span',{style:{fontSize:'12px',color:'var(--ink-m)'}},logs.length+'件')));
+  m.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginBottom:'12px',lineHeight:'1.6'}},'スタッフごとの誓約・秘密保持・不正利用防止への同意記録です。同意文面のハッシュ値により、どの版に同意したかを後から検証できます。'));
+  if(!logs.length){
+    m.appendChild(h('div',{style:{padding:'24px',textAlign:'center',color:'var(--ink-m)',fontSize:'13px'}},'まだ同意ログはありません。'));
+  }else{
+    const box=h('div',{style:{maxHeight:'56vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:'8px'}});
+    logs.forEach(r=>{
+      const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',lineHeight:'1.7'}});
+      card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}},
+        h('span',{style:{fontWeight:'700'}},(r.name||'（無名）')+'　'+(r.staffId||'')),
+        h('span',{style:{color:'var(--ink-m)'}},(r.at||'').replace('T',' ').slice(0,16))));
+      card.appendChild(h('div',{style:{color:'var(--ink-m)'}},(r.org_name||r.org||'')+(r.role?'／'+({admin:'管理者',staff:'スタッフ'}[r.role]||r.role):'')));
+      card.appendChild(h('div',{style:{color:'var(--ink-m)'}},'誓約書ver: '+Object.entries(r.versions||{}).map(([k,v])=>k+':'+v).join(' / ')+'　施行: '+(r.effective||'')));
+      card.appendChild(h('div',{style:{fontFamily:'monospace',fontSize:'10px',color:'var(--ink-l)',wordBreak:'break-all'}},'hash: '+(r.hash||'')));
+      box.appendChild(card);
+    });
+    m.appendChild(box);
+  }
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'14px'}},
+    btn('CSV書き出し','btn-out btn-sm',()=>{
+      const head=['at','staffId','name','org_name','role','terms','privacy','nda','fairuse','effective','hash'];
+      const rows=(D.consentLog||[]).map(r=>[r.at,r.staffId,r.name,r.org_name||r.org,r.role,(r.versions||{}).terms,(r.versions||{}).privacy,(r.versions||{}).nda,(r.versions||{}).fairuse,r.effective,r.hash].map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(','));
+      const csv=[head.join(',')].concat(rows).join('\n');
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='consent_log.csv';a.click();
+    }),
+    btn('閉じる','btn-sec btn-sm',()=>{S.modal=null;rr()})));
+  S.modal=m;rr();
+}
 // --- ROUTER ---
-function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='app')app.appendChild(appShell());if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
+function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='app'){if(S.user&&needsConsent()){app.appendChild(consentGateScr())}else{app.appendChild(appShell())}};if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
 // --- INIT ---
 ld();
 // Token-based auto-login
