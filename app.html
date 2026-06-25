@@ -557,6 +557,14 @@ async function loadFromCloud(){
         if(data.conferences&&data.conferences.length)D.conferences=data.conferences;
         if(data.monitors&&data.monitors.length)D.monitors=data.monitors;
         if(data.assessments&&data.assessments.length)D.assessments=data.assessments;
+        // B1: 組織レベルの監査・設定・災害データをクラウドから取り込む（サーバが返した場合のみ上書き）
+        if(Array.isArray(data.consentLog))D.consentLog=data.consentLog;
+        if(Array.isArray(data.opLog))D.opLog=data.opLog;
+        if(Array.isArray(data.medLinks))D.medLinks=data.medLinks;
+        if(Array.isArray(data.emergencyContacts))D.emergencyContacts=data.emergencyContacts;
+        if(data.disaster&&typeof data.disaster==='object')D.disaster=data.disaster;
+        if(Array.isArray(data.broadcasts))D.broadcasts=data.broadcasts;
+        if(Array.isArray(data.safetyReports))D.safetyReports=data.safetyReports;
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
         // v4.20: ローカルにデータがあってクラウドが空の場合、初回ログイン or D1リセット後と判断して
