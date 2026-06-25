@@ -105,159 +105,89 @@ body {
 
 /* ─── Hero ─── */
 /* ─── Hero (v4.9 写真背景型) ─── */
+/* ─── Hero (v5.6 写真レス・タイポ／グラデーション型) ─── */
 .hero {
   position: relative; overflow: hidden;
-  padding: 0;
-  display: block;
+  padding: 0; display: flex; align-items: center;
   isolation: isolate;
-  min-height: 720px;
-}
-/* チーム写真背景（全面・トリミングなし）v5.0.6: 画像比率16:9を維持して両端切れ防止 */
-.hero::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0;
-  /* 画像比率(1600×900=16:9)を保持。画面幅100%で表示し、高さは自動算出 */
-  aspect-ratio: 16 / 9;
-  background-image: url('assets/img/generated/v2/team_yaruze_hero_20260622b.jpg');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  filter: saturate(0.75) brightness(1.05);
-  z-index: -2;
-}
-/* 全面薄白オーバーレイ（写真透けOK・下半分はテキストの可読性のため濃く） v5.0.6 */
-.hero::after {
-  content: ''; position: absolute;
-  inset: 0;
+  min-height: 92vh;
   background:
-    linear-gradient(180deg,
-      rgba(255,255,255,.22) 0%,
-      rgba(255,255,255,.22) 40%,
-      rgba(255,255,255,.60) 58%,
-      rgba(248,250,252,.92) 78%,
-      rgba(248,250,252,1.0) 100%
-    );
-  z-index: -1;
+    radial-gradient(1200px 600px at 18% -10%, rgba(8,145,178,.20), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(34,211,238,.18), transparent 55%),
+    linear-gradient(160deg, #06222e 0%, #0a3344 42%, #0c4a6e 100%);
 }
-.hero-inner {
-  position: relative;
-  z-index: 1;
-  padding: 0;
+/* 細いグリッド + ドットの幾何テクスチャ */
+.hero::before {
+  content: ''; position: absolute; inset: 0; z-index: -2;
+  background-image:
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px),
+    radial-gradient(rgba(255,255,255,.10) 1px, transparent 1px);
+  background-size: 56px 56px, 56px 56px, 28px 28px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 55%, transparent 100%);
 }
-/* テキストカード: 半透明白ガラス、HEROの下半分（脚エリア）に配置して顔バンドと完全分離 */
+/* 上下のフェード（次セクションへ自然に繋ぐ） */
+.hero::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, transparent 60%, rgba(248,250,252,.0) 80%, #f8fafc 100%);
+}
+.hero-inner { position: relative; z-index: 1; padding: 0; width: 100%; }
 .hero-text-block {
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 32px 40px 40px;
-  background: rgba(255,255,255,.94);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid rgba(255,255,255,.7);
-  border-radius: 20px;
-  box-shadow: 0 16px 48px rgba(15,23,42,.18), 0 4px 12px rgba(15,23,42,.08);
-  color: var(--ink);
-  text-align: left;
-  /* v5.0.6: 画像高さ(画面幅×9/16=56.25vw)の約70%地点(=脚部分)からテキスト開始 */
-  /* 大画面では絶対値の上限で抑える(超大画面でも下がりすぎない) */
-  margin-top: min(calc(56.25vw * 0.72), 720px);
-  margin-bottom: 70px;
+  max-width: 940px; margin: 0 auto; padding: 0 32px; text-align: center; color: #fff;
 }
-/* v5.0.6: 大画面では .hero 自体の高さも画像高さに追随させる */
-@media (min-width: 981px) {
-  .hero { min-height: calc(56.25vw + 100px); }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .72rem; font-weight: 800; letter-spacing: .28em; text-transform: uppercase;
+  color: #67e8f9; padding: 7px 16px; margin-bottom: 26px;
+  border: 1px solid rgba(103,232,249,.35); border-radius: 100px;
+  background: rgba(8,145,178,.12); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
+.hero-eyebrow::before { content:''; width:7px; height:7px; border-radius:50%; background:#22d3ee; box-shadow:0 0 10px #22d3ee; }
 .hero-title {
-  font-size: clamp(2.6rem, 6.4vw, 4.8rem);
-  font-weight: 900; line-height: 1.05;
-  color: var(--ink); margin-bottom: 12px;
-  text-shadow: none;
-  letter-spacing: -.02em;
-  white-space: nowrap;
+  font-size: clamp(2.8rem, 8vw, 6rem);
+  font-weight: 900; line-height: 1.02; letter-spacing: -.03em;
+  margin-bottom: 18px; color: #fff;
 }
 .hero-title .highlight {
-  color: var(--blue);
-  text-shadow: none;
-  background: none; -webkit-background-clip: initial; -webkit-text-fill-color: initial; background-clip: initial;
+  background: linear-gradient(120deg, #22d3ee 0%, #38bdf8 50%, #a5f3fc 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
 }
 .hero-subtitle {
-  font-size: clamp(.85rem, 1.3vw, 1rem);
-  font-weight: 700;
-  color: var(--blue-d);
-  letter-spacing: .12em;
-  margin-bottom: 24px;
-  text-shadow: none;
+  font-size: clamp(.9rem, 1.4vw, 1.05rem); font-weight: 700;
+  color: #7dd3fc; letter-spacing: .14em; margin-bottom: 28px;
 }
-.hero-subtitle-red {
-  color: #dc2626 !important;
-}
+.hero-subtitle-red { color: #fca5a5 !important; }
 .hero-desc {
-  font-size: .82rem; line-height: 1.95;
-  color: var(--ink-l);
-  margin-bottom: 26px;
-  text-shadow: none;
-  word-break: keep-all;
+  font-size: .9rem; line-height: 2.05; color: rgba(255,255,255,.72);
+  max-width: 760px; margin: 0 auto 34px; word-break: keep-all;
 }
-.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .hero-actions .btn-primary {
-  background: var(--grad);
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
-  box-shadow: 0 8px 24px rgba(8,145,178,.30);
-  font-weight: 800;
+  background: linear-gradient(120deg, #06b6d4, #22d3ee);
+  color: #042f3a !important; -webkit-text-fill-color: #042f3a !important;
+  box-shadow: 0 10px 30px rgba(34,211,238,.35); font-weight: 900;
+  border: 1px solid rgba(255,255,255,.25);
 }
 .hero-actions .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(8,145,178,.40);
+  box-shadow: 0 16px 40px rgba(34,211,238,.5);
 }
-
-/* ─────────────────────────────────────────────
-   モバイル（980px以下）: 写真を「全員見える」アスペクト比固定表示に切り替え
-   写真は16:9（1600×900）。画面幅いっぱいに横並べ → 高さ = 幅 / 1.778
-   v4.26: 写真の上端を nav (position:fixed, height 64px) の真下に揃える。
-          こうしないと写真上部（万歳ポーズの手・建物）がナビバーに覆われて見えない。
-   ───────────────────────────────────────────── */
 @media (max-width:980px) {
-  .hero { min-height: 0; padding-top: 64px; /* nav の高さ分の余白 */ }
-  .hero::before {
-    /* 写真は nav 直下から幅100%・高さは16:9で固定。残りは下側オーバーレイで埋める */
-    inset: 64px 0 0 0;
-    background-size: 100% auto;
-    background-position: top center;
-    background-repeat: no-repeat;
-    background-color: #f8fafc;
-    filter: saturate(0.75) brightness(1.05); /* v5.0.6: 彩度を落として透け感 */
-  }
-  .hero::after {
-    /* nav の真下から始める。写真領域(56.25vw)の下端から白くフェード */
-    inset: 64px 0 0 0;
-    background:
-      linear-gradient(180deg,
-        rgba(255,255,255,0) 0%,
-        rgba(255,255,255,0) calc(56.25vw - 60px),
-        rgba(248,250,252,.85) calc(56.25vw - 10px),
-        rgba(248,250,252,1) calc(56.25vw + 20px),
-        rgba(248,250,252,1) 100%
-      );
-  }
-  .hero-text-block {
-    max-width: 100%;
-    margin-top: calc(56.25vw - 30px); /* 写真の下端から少しだけ重なる位置に配置 */
-    margin-bottom: 56px;
-    padding: 26px 24px 30px;
-  }
-  .hero-title { font-size: clamp(2.2rem, 8vw, 3.6rem); line-height: 1.1; white-space: nowrap; }
-  .hero-subtitle { font-size: .78rem; margin-bottom: 20px; }
+  .hero { min-height: 0; padding: 120px 0 80px; }
+  .hero-title { font-size: clamp(2.4rem, 11vw, 4rem); }
+  .hero-desc { font-size: .84rem; line-height: 1.95; }
 }
 @media (max-width:600px) {
-  .hero-text-block { margin-top: calc(56.25vw - 24px); margin-bottom: 48px; padding: 22px 20px 26px; border-radius: 16px; }
-  .hero-title { font-size: clamp(1.7rem, 9vw, 2.4rem); line-height: 1.1; white-space: nowrap; }
-  .hero-subtitle { font-size: .72rem; margin-bottom: 16px; letter-spacing: .1em; }
-  .hero-desc { font-size: .76rem; line-height: 1.9; margin-bottom: 20px; }
-  .hero-actions .btn-primary { padding: 13px 24px; font-size: .88rem; }
-}
-@media (max-width:400px) {
-  .hero-text-block { margin-top: calc(56.25vw - 20px); }
-  .hero-title { font-size: clamp(1.55rem, 9vw, 2.1rem); }
+  .hero { padding: 104px 0 64px; }
+  .hero-text-block { padding: 0 20px; }
+  .hero-title { font-size: clamp(2rem, 12vw, 3rem); }
+  .hero-subtitle { font-size: .78rem; letter-spacing: .1em; margin-bottom: 22px; }
+  .hero-desc { font-size: .78rem; line-height: 1.9; margin-bottom: 26px; }
+  .hero-eyebrow { font-size: .64rem; letter-spacing: .2em; margin-bottom: 20px; }
+  .hero-actions .btn-primary { padding: 13px 26px; font-size: .9rem; }
 }
 
 .btn-primary {
@@ -640,11 +570,12 @@ body {
   <div class="container">
     <div class="hero-inner">
       <div class="hero-text-block">
-        <h1 class="hero-title anim-up">
+        <span class="hero-eyebrow anim-up">医療 × 介護　連携プラットフォーム</span>
+        <h1 class="hero-title anim-up anim-up-d1">
           <span class="highlight">ぜんぶ&nbsp;ｍやるゼ！</span>
         </h1>
-        <p class="hero-subtitle hero-subtitle-red anim-up anim-up-d1">医療介護連携OS</p>
-        <p class="hero-desc anim-up anim-up-d2">
+        <p class="hero-subtitle hero-subtitle-red anim-up anim-up-d2">医療介護連携OS</p>
+        <p class="hero-desc anim-up anim-up-d3">
           ＃日程調整　＃アセスメント　＃サービス担当者会議　＃退院時共同指導　＃居宅療養管理指導　＃診療情報提供書　＃歯科診療情報提供書　＃NDA　＃同意書　＃モニタリング　＃退院通知　＃訪問マッサージ（鍼灸含む）連携　＃多職種カンファレンス　＃電子署名＋タイムスタンプ　＃ハッシュチェーン　＃記録生成支援
         </p>
         <div class="hero-actions anim-up anim-up-d3">
