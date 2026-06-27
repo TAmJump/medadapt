@@ -3873,12 +3873,12 @@ function consentNewPage(){
       drWrap.querySelectorAll('.cf-mod-'+cb.dataset.idx+':checked').forEach(m=>mods.push(m.value));
       derived.push(mods.length ? name+'（'+mods.join('・')+'）' : name);
     });
-    // 既存テキストのうち、チェック由来でない手入力行を保持
-    const manual=(dInp.value||'').split('\n').map(s=>s.trim()).filter(Boolean).filter(line=>{
+    // 既存テキストのうち、チェック由来でない手入力分を保持（、/改行 両対応）
+    const manual=(dInp.value||'').split(/[、\n]/).map(s=>s.trim()).filter(Boolean).filter(line=>{
       const base=line.replace(/（.*?）\s*$/,'').trim();
       return !reasonNames.includes(base);
     });
-    dInp.value=[...derived, ...manual].join('\n');
+    dInp.value=[...derived, ...manual].join('、');
   }
 
   // 前回スナップショットをフォームへ反映（患者・同意日は引用しない）
@@ -3910,11 +3910,16 @@ function consentNewPage(){
     // 手入力（チェック由来でない）行も引き継ぐ
     if(snap.diseasesText){
       const rnames=REASON_CFG.map(x=>x.name);
-      const cur=(dInp.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
-      const manual=snap.diseasesText.split('\n').map(s=>s.trim()).filter(Boolean).filter(line=>{
+      const cur=(dInp.value||'').split(/[、\n]/).map(s=>s.trim()).filter(Boolean);
+      const manual=(snap.diseasesText||'').split(/[、\n]/).map(s=>s.trim()).filter(Boolean).filter(line=>{
         const base=line.replace(/（.*?）\s*$/,'').trim();return !rnames.includes(base);
       });
-      dInp.value=[...cur, ...manual.filter(l=>!cur.includes(l))].join('\n');
+      dInp.value=[...cur, ...manual.filter(l=>!cur.includes(l))].join('、');
+    }
+    // 通院困難事由の反映
+    if(snap.difficulty){
+      drWrap2&&drWrap2.querySelectorAll('.cf-difficulty').forEach(cb=>{cb.checked=!!snap.difficulty[cb.value]});
+      if(diffNote)diffNote.value=snap.difficultyNote||'';
     }
   }
 
@@ -3942,7 +3947,21 @@ function consentNewPage(){
   });
   form.appendChild(drWrap);
 
-  // 算定設定
+  // 通院困難事由（往療を必要とする理由）— 傷病名とは別。公式様式の往療理由に相当。
+  const DIFF_OPTS=['歩行が困難','自力での外出・通院が困難','認知症等により単独通院が困難','疾病・障害により通院が困難','寝たきりの状態','その他'];
+  const drWrap2=h('div',{style:{padding:'12px',background:'#fff7ed',borderRadius:'4px',border:'1px solid #fed7aa'}});
+  drWrap2.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'8px',color:'#9a3412'}},'通院困難事由（往療を必要とする理由）'));
+  const diffRow=h('div',{style:{display:'flex',flexWrap:'wrap',gap:'10px 16px'}});
+  DIFF_OPTS.forEach(opt=>{
+    const lbl=h('label',{style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',cursor:'pointer'}});
+    lbl.appendChild(h('input',{type:'checkbox',className:'cf-difficulty',value:opt}));
+    lbl.appendChild(document.createTextNode(opt));
+    diffRow.appendChild(lbl);
+  });
+  drWrap2.appendChild(diffRow);
+  const diffNote=h('input',{type:'text',id:'cf-diff-note',placeholder:'補足（例：要介護3・自宅で静養中 等）',style:{width:'100%',marginTop:'8px',padding:'7px',borderRadius:'4px',border:'1px solid #d1d5db',fontSize:'12px'}});
+  drWrap2.appendChild(diffNote);
+  form.appendChild(drWrap2);
   const claimWrap=h('div',{style:{padding:'12px',background:'#fef3c7',borderRadius:'4px',border:'1px solid #fbbf24'}});
   claimWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'保険算定（療養費同意書交付料 B013）'));
   const claimCb=h('input',{type:'checkbox',id:'cf-claim',checked:true,style:{marginRight:'6px'}});
@@ -3953,19 +3972,25 @@ function consentNewPage(){
   form.appendChild(claimWrap);
 
   // 発行ボタン
+  const markErr=(el,on)=>{if(el)el.style.border=on?'2px solid #dc2626':'';};
   const submitBtn=btn('発行する（医師署名へ進む）','btn-pri',async ()=>{
-    const pt=document.getElementById('cf-patient').value;
-    if(!pt){toast('患者を選択してください');return;}
+    const ptEl=document.getElementById('cf-patient');
+    const dEl=document.getElementById('cf-diseases');
+    const pt=ptEl.value;
     const ctype=document.getElementById('cf-type').value;
-    const dRaw=document.getElementById('cf-diseases').value.trim();
-    // v5.0.5: request_form（訪問診療同意書/依頼書）の場合は傷病名を任意に
-    if(ctype!=='request_form' && !dRaw){toast('傷病名を1つ以上入力してください');return;}
-    const diseases= dRaw ? dRaw.split('\n').filter(l=>l.trim()).map(l=>{
-      return {name:l.trim(), onset_date:null};
-    }) : [];
-    const reasonChecks=document.querySelectorAll('.cf-reason:checked');
+    const dRaw=(dEl.value||'').trim();
+    // 入力チェック：不足は赤表示し、入力済みデータは消さない
+    markErr(ptEl,false);markErr(dEl,false);
+    const errs=[];
+    if(!pt){markErr(ptEl,true);errs.push('患者');}
+    if(ctype!=='request_form' && !dRaw){markErr(dEl,true);errs.push('傷病名');}
+    if(errs.length){toast('未入力：'+errs.join('・')+'（赤枠をご確認ください。入力内容は保持されています）');if(!pt)ptEl.focus();else dEl.focus();return;}
+    // 傷病名：「、」「／」改行のいずれでも区切って配列化
+    const diseases= dRaw ? dRaw.split(/[、／\n]/).map(s=>s.trim()).filter(Boolean).map(name=>({name, onset_date:null})) : [];
+    // 通院困難事由（往療理由）
     const drJson={};
-    reasonChecks.forEach(cb=>{drJson[cb.value]=true});
+    document.querySelectorAll('.cf-difficulty:checked').forEach(cb=>{drJson[cb.value]=true});
+    const diffNoteVal=(document.getElementById('cf-diff-note')||{}).value||'';
     const body={
       patient_id:pt,
       consent_type:ctype,
@@ -3980,16 +4005,14 @@ function consentNewPage(){
           if(s && e){
             const sd=new Date(s),ed=new Date(e);
             if(ed>=sd){
-              // 月数換算（小数点切り上げ・ハッシュ整合のため整数化）
               const months=(ed.getFullYear()-sd.getFullYear())*12+(ed.getMonth()-sd.getMonth())+(ed.getDate()>=sd.getDate()?0:0);
               return Math.max(1, months || 1);
             }
           }
-          return 6; // fallback
+          return 6;
         }
         return Number(document.getElementById('cf-months').value)||6;
       })(),
-      // カスタム期間時のみ、開始日・終了日を補足情報として送付（Worker は未使用でもOK）
       valid_from:(function(){
         const preset=document.getElementById('cf-period-preset');
         if(preset && preset.value==='custom') return document.getElementById('cf-period-start').value||null;
@@ -4001,6 +4024,7 @@ function consentNewPage(){
         return null;
       })(),
       difficulty_reasons:drJson,
+      difficulty_note:diffNoteVal,
       treatment_plan:{
         visit_frequency:'biannual',
         evaluation_frequency:'monthly',
@@ -4035,11 +4059,12 @@ function consentNewPage(){
           const mods=[];drWrap.querySelectorAll('.cf-mod-'+cb.dataset.idx+':checked').forEach(m=>mods.push(m.value));
           structuredReasons.push({name:cb.value,mods});
         });
-        const snap={id:'cd_'+uid(),at:now(),patientId:pt,patientName:((D.patients||[]).find(p=>p.id===pt)||{}).name||'',consent_type:ctype,validity_months:body.validity_months,valid_from:body.valid_from,valid_until:body.valid_until,diseasesText:dRaw,reasons:structuredReasons,claim:document.getElementById('cf-claim').checked};
+        const snap={id:'cd_'+uid(),at:now(),patientId:pt,patientName:((D.patients||[]).find(p=>p.id===pt)||{}).name||'',consent_type:ctype,validity_months:body.validity_months,valid_from:body.valid_from,valid_until:body.valid_until,diseasesText:dRaw,reasons:structuredReasons,difficulty:drJson,difficultyNote:diffNoteVal,claim:document.getElementById('cf-claim').checked};
         if(!Array.isArray(D.consentDrafts))D.consentDrafts=[];
         D.consentDrafts.unshift(snap);if(D.consentDrafts.length>100)D.consentDrafts=D.consentDrafts.slice(0,100);
         if(typeof logOp==='function')logOp('同意書を発行',(snap.patientName||'')+'／'+ctype);
         sv();
+        try{localStorage.removeItem('medadapt-consent-wip')}catch(e){}
       }catch(e){console.warn('consent snapshot failed',e);}
       S.consentList=null;
       S.consentId=cfId;
@@ -4051,7 +4076,49 @@ function consentNewPage(){
       submitBtn.textContent='発行する（医師署名へ進む）';
     }
   });
-  form.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'8px'}},submitBtn,btn('キャンセル','btn-out',()=>{S.page='consent';rr()})));
+  // 一時保存（入力途中で離席しても消えないよう localStorage に保持）
+  function serializeWip(){
+    const reasons=[];
+    drWrap.querySelectorAll('.cf-reason:checked').forEach(cb=>{
+      const mods=[];drWrap.querySelectorAll('.cf-mod-'+cb.dataset.idx+':checked').forEach(m=>mods.push(m.value));
+      reasons.push({name:cb.value,mods});
+    });
+    const diff={};drWrap2.querySelectorAll('.cf-difficulty:checked').forEach(cb=>{diff[cb.value]=true});
+    return {
+      at:now(),
+      patientId:(document.getElementById('cf-patient')||{}).value||'',
+      consent_type:(document.getElementById('cf-type')||{}).value||'massage',
+      consent_date:(document.getElementById('cf-date')||{}).value||'',
+      validity_months:Number((document.getElementById('cf-months')||{}).value)||6,
+      valid_from:(document.getElementById('cf-period-preset')||{}).value==='custom'?(document.getElementById('cf-period-start')||{}).value||null:null,
+      valid_until:(document.getElementById('cf-period-preset')||{}).value==='custom'?(document.getElementById('cf-period-end')||{}).value||null:null,
+      diseasesText:(document.getElementById('cf-diseases')||{}).value||'',
+      reasons, difficulty:diff, difficultyNote:(document.getElementById('cf-diff-note')||{}).value||'',
+      claim:(document.getElementById('cf-claim')||{checked:true}).checked
+    };
+  }
+  function applyWip(wip){
+    if(!wip)return;
+    const ptEl=document.getElementById('cf-patient');if(ptEl&&wip.patientId)ptEl.value=wip.patientId;
+    const dtEl=document.getElementById('cf-date');if(dtEl&&wip.consent_date)dtEl.value=wip.consent_date;
+    applyConsentSnapshot(wip); // 施術種別/期間/傷病/症状/通院困難/算定を反映
+  }
+  const saveWipBtn=btn('一時保存','btn-out',()=>{
+    try{localStorage.setItem('medadapt-consent-wip',JSON.stringify(serializeWip()));toast('一時保存しました（この端末に保存。離席後も復元できます）');}
+    catch(e){toast('一時保存に失敗しました');}
+  });
+  form.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'8px',flexWrap:'wrap'}},submitBtn,saveWipBtn,btn('キャンセル','btn-out',()=>{S.page='consent';rr()})));
+  // 下書き復元バナー
+  (function(){
+    let wip=null;try{const s=localStorage.getItem('medadapt-consent-wip');if(s)wip=JSON.parse(s);}catch(e){}
+    if(wip){
+      const banner=h('div',{style:{padding:'10px 14px',background:'#fefce8',border:'1px solid #fde047',borderRadius:'8px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}});
+      banner.appendChild(h('span',{style:{fontSize:'12px',color:'#854d0e',flex:'1',minWidth:'180px'}},'入力途中の下書きがあります（'+(wip.at||'').replace('T',' ').slice(0,16)+'）。復元しますか？'));
+      banner.appendChild(btn('復元する','btn-sm btn-pri',()=>{applyWip(wip);banner.remove();toast('下書きを復元しました');}));
+      banner.appendChild(btn('破棄','btn-sm btn-out',()=>{try{localStorage.removeItem('medadapt-consent-wip')}catch(e){}banner.remove();}));
+      form.insertBefore(banner,form.firstChild);
+    }
+  })();
   w.appendChild(form);
   return w;
 }
