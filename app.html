@@ -3799,23 +3799,78 @@ function consentNewPage(){
 
   form.appendChild(periodWrap);
 
-  // 傷病名（JSON テキストエリア・簡易版）
+  // 傷病名（通院困難理由のチェックから自動反映。手入力での追記も可）
   const dWrap=h('div');
-  dWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'傷病名（1行1疾病・「疾病名:発症日YYYY-MM-DD」形式）*'));
-  const dInp=h('textarea',{id:'cf-diseases',rows:4,placeholder:'変形性膝関節症（両）:2023-04-01\n腰痛症:2024-06-15',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',fontSize:'13px'}});
+  let dInp;
+  dWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'傷病名 *'));
+  dInp=h('textarea',{id:'cf-diseases',rows:4,placeholder:'下の「症状・傷病（チェック）」を選ぶと自動で入ります。1行1傷病。手入力での追記も可能です。',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',fontSize:'13px'}});
   dWrap.appendChild(dInp);
+  dWrap.appendChild(h('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'4px'}},'※ 発症年月日の入力は不要です。'));
   form.appendChild(dWrap);
+  void dInp;
 
-  // 通院困難理由（簡易チェックボックス）
+  // 症状・傷病（チェック）→ 傷病名へ自動反映。各傷病に正式な修飾欄（部位/椎間/左右）を付与。
+  // 修飾の種類: lat=□両/右/左、lumbar=□L1〜L4、site=□躯幹/右上肢/左上肢/右下肢/左下肢（あマ指 公式 施術部位）
+  const REASON_CFG=[
+    {name:'肩関節周囲炎', mod:'lat'},
+    {name:'変形性膝関節症', mod:'lat'},
+    {name:'腰痛症', mod:'lumbar'},
+    {name:'変形性腰椎症', mod:'lumbar'},
+    {name:'脊柱管狭窄症', mod:'lumbar'},
+    {name:'関節リウマチ', mod:null},
+    {name:'頸肩腕症候群', mod:null},
+    {name:'頸椎捻挫後遺症', mod:null},
+    {name:'五十肩', mod:'lat'},
+    {name:'脳梗塞・脳梗塞後遺症', mod:null},
+    {name:'脳出血・脳出血後遺症', mod:null},
+    {name:'麻痺', mod:'site'},
+    {name:'神経痛', mod:'site'},
+    {name:'関節拘縮', mod:'site'},
+    {name:'筋麻痺', mod:'site'},
+    {name:'パーキンソン', mod:null},
+    {name:'その他', mod:null}
+  ];
+  const MOD_OPTS={lat:['両','右','左'], lumbar:['L1','L2','L3','L4'], site:['躯幹','右上肢','左上肢','右下肢','左下肢']};
+  const reasonNames=REASON_CFG.map(r=>r.name);
+
+  // チェック内容から傷病名テキストを再構築（手入力の追記行は保持）
+  function rebuildDiseases(){
+    const derived=[];
+    drWrap.querySelectorAll('.cf-reason:checked').forEach(cb=>{
+      const name=cb.value;
+      const mods=[];
+      drWrap.querySelectorAll('.cf-mod-'+cb.dataset.idx+':checked').forEach(m=>mods.push(m.value));
+      derived.push(mods.length ? name+'（'+mods.join('・')+'）' : name);
+    });
+    // 既存テキストのうち、チェック由来でない手入力行を保持
+    const manual=(dInp.value||'').split('\n').map(s=>s.trim()).filter(Boolean).filter(line=>{
+      const base=line.replace(/（.*?）\s*$/,'').trim();
+      return !reasonNames.includes(base);
+    });
+    dInp.value=[...derived, ...manual].join('\n');
+  }
+
   const drWrap=h('div',{style:{padding:'12px',background:'#f9fafb',borderRadius:'4px',border:'1px solid #e5e7eb'}});
-  drWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'8px'}},'通院困難理由（チェック）'));
-  const reasons=['肩関節周囲炎','変形性膝関節症','腰痛症','変形性腰椎症','脊柱管狭窄症','関節リウマチ','脳梗塞・脳梗塞後遺症','脳出血・脳出血後遺症','麻痺','神経痛','パーキンソン','その他'];
-  reasons.forEach((r,i)=>{
-    const lbl=h('label',{style:{display:'inline-block',marginRight:'12px',marginBottom:'4px',fontSize:'13px',cursor:'pointer'}});
-    const cb=h('input',{type:'checkbox',className:'cf-reason',value:r,style:{marginRight:'4px'}});
-    lbl.appendChild(cb);
-    lbl.appendChild(document.createTextNode(r));
-    drWrap.appendChild(lbl);
+  drWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'8px'}},'症状・傷病（チェック）→ 傷病名へ自動反映'));
+  REASON_CFG.forEach((cfg,i)=>{
+    const row=h('div',{style:{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap',padding:'4px 0'}});
+    const lbl=h('label',{style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',cursor:'pointer',minWidth:'180px'}});
+    const cb=h('input',{type:'checkbox',className:'cf-reason',value:cfg.name,style:{marginRight:'2px'},onChange:()=>{modWrap.style.display=cb.checked&&cfg.mod?'inline-flex':'none';rebuildDiseases();}});
+    cb.dataset.idx=String(i);
+    lbl.appendChild(cb);lbl.appendChild(document.createTextNode(cfg.name));
+    row.appendChild(lbl);
+    const modWrap=h('span',{style:{display:'none',alignItems:'center',gap:'8px',flexWrap:'wrap'}});
+    if(cfg.mod){
+      modWrap.appendChild(h('span',{style:{fontSize:'11px',color:'#94a3b8'}},cfg.mod==='lat'?'左右:':cfg.mod==='lumbar'?'椎間:':'部位:'));
+      MOD_OPTS[cfg.mod].forEach(opt=>{
+        const ml=h('label',{style:{display:'inline-flex',alignItems:'center',gap:'2px',fontSize:'12px',cursor:'pointer'}});
+        const mcb=h('input',{type:'checkbox',className:'cf-mod-'+i,value:opt,onChange:rebuildDiseases});
+        ml.appendChild(mcb);ml.appendChild(document.createTextNode(opt));
+        modWrap.appendChild(ml);
+      });
+    }
+    row.appendChild(modWrap);
+    drWrap.appendChild(row);
   });
   form.appendChild(drWrap);
 
@@ -3838,8 +3893,7 @@ function consentNewPage(){
     // v5.0.5: request_form（訪問診療同意書/依頼書）の場合は傷病名を任意に
     if(ctype!=='request_form' && !dRaw){toast('傷病名を1つ以上入力してください');return;}
     const diseases= dRaw ? dRaw.split('\n').filter(l=>l.trim()).map(l=>{
-      const m=l.split(':');
-      return {name:(m[0]||'').trim(),onset_date:(m[1]||'').trim()||null};
+      return {name:l.trim(), onset_date:null};
     }) : [];
     const reasonChecks=document.querySelectorAll('.cf-reason:checked');
     const drJson={};
