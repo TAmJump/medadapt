@@ -4453,14 +4453,20 @@ function acuMassagePage(){
 
   // 参考情報セクション
   const infoBox=h('div',{style:{padding:'16px 18px',background:'#f8fafc',border:'1px solid #e5e7eb',borderRadius:'10px',fontSize:'12px',color:'#475569',lineHeight:'1.85'}});
-  infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0f172a',marginBottom:'6px',fontSize:'13px'}},'医療保険適用の仕組み'));
-  infoBox.appendChild(h('div',null,'・訪問マッサージ（鍼灸）は ',h('strong',null,'医療保険の療養費'),'（介護保険ではない）'));
+  infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0f172a',marginBottom:'6px',fontSize:'13px'}},'この画面で扱う書類'));
+  infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0e7490',marginTop:'4px'}},'■ 訪問診療同意書（依頼書）（メイン）'));
+  infoBox.appendChild(h('div',null,'・訪問診療（在宅医療）の依頼・同意に用いるコンパス様式の書類。'));
+  infoBox.appendChild(h('div',null,'・施術種別で「訪問診療同意書（依頼書）」を選択。傷病名・症状チェックの入力は不要。'));
+  infoBox.appendChild(h('div',null,'・発行時に ',h('strong',null,'SHA-256 ハッシュチェーン'),' へ登録し、QRコードで第三者が真正性を検証できます。'));
+  infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0e7490',marginTop:'10px'}},'■ はり・きゅう／あマ指 療養費同意書'));
+  infoBox.appendChild(h('div',null,'・はり・きゅう・あマ指（あん摩・マッサージ・指圧）は ',h('strong',null,'医療保険の療養費'),'（介護保険ではない）。'));
   infoBox.appendChild(h('div',null,'・はり・きゅうの対象6疾患：神経痛 / リウマチ / 頸腕症候群 / 五十肩 / 腰痛症 / 頸椎捻挫後遺症 ＋ その他'));
   infoBox.appendChild(h('div',null,'・あマ指（あん摩・マッサージ・指圧）の対象：筋麻痺 / 筋萎縮 / 関節拘縮（症状ベース）'));
   infoBox.appendChild(h('div',null,'・訪問条件：歩行困難または通院困難'));
   infoBox.appendChild(h('div',null,'・同意書有効期間：6か月（変形徒手矯正術は 1か月）'));
   infoBox.appendChild(h('div',null,'・再同意は ',h('strong',null,'対面診察必須'),'（電話再同意は不可）'));
-  infoBox.appendChild(h('div',{style:{marginTop:'8px',paddingTop:'8px',borderTop:'1px dashed #cbd5e1'}},'参考: ',h('a',{href:'https://www.mhlw.go.jp/bunya/iryouhoken/iryouhoken13/01.html',target:'_blank',rel:'noopener',style:{color:'#0891b2',textDecoration:'none'}},'厚労省 療養費の改定等について')));
+  infoBox.appendChild(h('div',{style:{marginTop:'10px',paddingTop:'8px',borderTop:'1px dashed #cbd5e1'}},'共通：保険医療機関名は ',h('strong',null,'「医療法人コンパス」'),' で発行。'));
+  infoBox.appendChild(h('div',null,'参考: ',h('a',{href:'https://www.mhlw.go.jp/bunya/iryouhoken/iryouhoken13/01.html',target:'_blank',rel:'noopener',style:{color:'#0891b2',textDecoration:'none'}},'厚労省 療養費の改定等について')));
   w.appendChild(infoBox);
 
   return w;
