@@ -152,7 +152,7 @@ const APP_CONFIG = {
 };
 const WHEREBY_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmFwcGVhci5pbiIsImF1ZCI6Imh0dHBzOi8vYXBpLmFwcGVhci5pbi92MSIsImV4cCI6OTAwNzE5OTI1NDc0MDk5MSwiaWF0IjoxNzc2MTM4NTA4LCJvcmdhbml6YXRpb25JZCI6MzM4NTAyLCJqdGkiOiI5NWExNjQ1ZC00YjkzLTQ0ZjQtYTE0Ni0xZTBiZDMxN2EzMjkifQ.Zj3MJ92mLCp-wpY6Jw00ul0Ka6HLy4tpcVHTlyOPXIo';
 
-let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[],medLinks:[],disaster:{active:false},emergencyContacts:[],safetyReports:[],broadcasts:[],opLog:[]};
+let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[],medLinks:[],disaster:{active:false},emergencyContacts:[],safetyReports:[],broadcasts:[],opLog:[],consentDrafts:[]};
 let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,notifList:null,noticeId:null,noticeData:null,ndaList:null,dischargeList:null,
   ptId:null,hubTab:'overview',caseId:null,caseTab:'schedule',confId:null,confTab:'info',monId:null,monTab:'status',assId:null,
   modal:null,signed:false,np:{n:'',r:''},shareStep:1,ptFilter:'all',token:null,pendingShares:[]};
@@ -565,6 +565,7 @@ async function loadFromCloud(){
         if(data.disaster&&typeof data.disaster==='object')D.disaster=data.disaster;
         if(Array.isArray(data.broadcasts))D.broadcasts=data.broadcasts;
         if(Array.isArray(data.safetyReports))D.safetyReports=data.safetyReports;
+        if(Array.isArray(data.consentDrafts))D.consentDrafts=data.consentDrafts;
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
         // v4.20: ローカルにデータがあってクラウドが空の場合、初回ログイン or D1リセット後と判断して
@@ -3696,6 +3697,36 @@ function consentNewPage(){
     h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0'}},'同意書を発行する')
   ));
   const form=h('div',{style:{display:'flex',flexDirection:'column',gap:'14px',background:'#fff',padding:'20px',borderRadius:'8px',border:'1px solid #e5e7eb'}});
+
+  // 前回の書類から引用（コピペ）— 同患者を優先、他患者からも引用可。差分だけ直して発行できる。
+  const quoteWrap=h('div',{style:{padding:'12px',background:'#ecfeff',border:'1px solid rgba(8,145,178,.3)',borderRadius:'8px'}});
+  quoteWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'800',marginBottom:'6px',color:'#0e7490'}},'前回の書類から引用（チェック内容ごとコピー → 差分だけ修正）'));
+  const drafts=(D.consentDrafts||[]).slice().sort((a,b)=>(a.at<b.at?1:-1));
+  if(!drafts.length){
+    quoteWrap.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b'}},'引用できる過去の書類はまだありません。1件発行すると、次回から内容をコピーできます。'));
+  }else{
+    const qRow=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}});
+    const qSel=h('select',{id:'cf-quote',style:{flex:'1',minWidth:'240px',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',fontSize:'13px'}});
+    qSel.appendChild(h('option',{value:''},'過去の書類を選択…'));
+    const typeL={acupuncture:'はり・きゅう',massage:'あマ指',both:'はり・きゅう＋あマ指',request_form:'訪問診療同意書'};
+    const sameG=h('optgroup',{label:'この患者の書類'});
+    const otherG=h('optgroup',{label:'他の患者の書類'});
+    drafts.forEach((d,i)=>{
+      const lbl=(d.patientName||d.patientId||'')+'／'+(typeL[d.consent_type]||d.consent_type)+'／'+(d.at||'').slice(0,10)+'　'+((d.diseasesText||'').split('\n')[0]||'');
+      const opt=h('option',{value:String(i)},lbl.slice(0,70));
+      (ptId&&d.patientId===ptId?sameG:otherG).appendChild(opt);
+    });
+    if(sameG.children.length)qSel.appendChild(sameG);
+    if(otherG.children.length)qSel.appendChild(otherG);
+    qRow.appendChild(qSel);
+    qRow.appendChild(btn('引用する','btn-sm btn-pri',()=>{
+      const idx=qSel.value;if(idx===''){toast('引用元を選択してください');return;}
+      applyConsentSnapshot(drafts[Number(idx)]);toast('前回の内容を引用しました。差分だけ修正してください');
+    }));
+    quoteWrap.appendChild(qRow);
+    quoteWrap.appendChild(h('div',{style:{fontSize:'11px',color:'#64748b',marginTop:'6px'}},'※ 患者・同意日は引用しません（取り違え防止）。施術種別・有効期間・傷病名・症状チェック・算定を引き継ぎます。'));
+  }
+  form.appendChild(quoteWrap);
   // 患者選択
   const ptWrap=h('div');
   ptWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'患者 *'));
@@ -3850,6 +3881,43 @@ function consentNewPage(){
     dInp.value=[...derived, ...manual].join('\n');
   }
 
+  // 前回スナップショットをフォームへ反映（患者・同意日は引用しない）
+  function applyConsentSnapshot(snap){
+    if(!snap)return;
+    if(typeSel)typeSel.value=snap.consent_type||'massage';
+    if(snap.valid_from&&snap.valid_until){
+      presetSel.value='custom';customRow.style.display='flex';monthsHidden.value='custom';
+      startInp.value=snap.valid_from;endInp.value=snap.valid_until;
+    }else{
+      const m=String(snap.validity_months||6);
+      presetSel.value=(m==='1'||m==='6')?m:'6';customRow.style.display='none';monthsHidden.value=presetSel.value;
+    }
+    if(claimCb)claimCb.checked=snap.claim!==false;
+    // リセット
+    drWrap.querySelectorAll('.cf-reason').forEach(cb=>{cb.checked=false;cb.dispatchEvent(new Event('change'));});
+    drWrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{if(cb.className&&cb.className.indexOf('cf-mod-')===0)cb.checked=false;});
+    // 反映
+    (snap.reasons||[]).forEach(r=>{
+      const idx=REASON_CFG.findIndex(x=>x.name===r.name);if(idx<0)return;
+      const cb=Array.from(drWrap.querySelectorAll('.cf-reason')).find(x=>x.value===r.name);
+      if(cb){cb.checked=true;cb.dispatchEvent(new Event('change'));}
+      (r.mods||[]).forEach(mv=>{
+        const mcb=Array.from(drWrap.querySelectorAll('.cf-mod-'+idx)).find(x=>x.value===mv);
+        if(mcb)mcb.checked=true;
+      });
+    });
+    rebuildDiseases();
+    // 手入力（チェック由来でない）行も引き継ぐ
+    if(snap.diseasesText){
+      const rnames=REASON_CFG.map(x=>x.name);
+      const cur=(dInp.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+      const manual=snap.diseasesText.split('\n').map(s=>s.trim()).filter(Boolean).filter(line=>{
+        const base=line.replace(/（.*?）\s*$/,'').trim();return !rnames.includes(base);
+      });
+      dInp.value=[...cur, ...manual.filter(l=>!cur.includes(l))].join('\n');
+    }
+  }
+
   const drWrap=h('div',{style:{padding:'12px',background:'#f9fafb',borderRadius:'4px',border:'1px solid #e5e7eb'}});
   drWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'8px'}},'症状・傷病（チェック）→ 傷病名へ自動反映'));
   REASON_CFG.forEach((cfg,i)=>{
@@ -3960,6 +4028,19 @@ function consentNewPage(){
         // ここでは consent_form_id を保持して詳細画面へ遷移
       }
       toast('同意書を発行しました');
+      // 次回の引用用にスナップショットを保存（チェック内容ごと）
+      try{
+        const structuredReasons=[];
+        drWrap.querySelectorAll('.cf-reason:checked').forEach(cb=>{
+          const mods=[];drWrap.querySelectorAll('.cf-mod-'+cb.dataset.idx+':checked').forEach(m=>mods.push(m.value));
+          structuredReasons.push({name:cb.value,mods});
+        });
+        const snap={id:'cd_'+uid(),at:now(),patientId:pt,patientName:((D.patients||[]).find(p=>p.id===pt)||{}).name||'',consent_type:ctype,validity_months:body.validity_months,valid_from:body.valid_from,valid_until:body.valid_until,diseasesText:dRaw,reasons:structuredReasons,claim:document.getElementById('cf-claim').checked};
+        if(!Array.isArray(D.consentDrafts))D.consentDrafts=[];
+        D.consentDrafts.unshift(snap);if(D.consentDrafts.length>100)D.consentDrafts=D.consentDrafts.slice(0,100);
+        if(typeof logOp==='function')logOp('同意書を発行',(snap.patientName||'')+'／'+ctype);
+        sv();
+      }catch(e){console.warn('consent snapshot failed',e);}
       S.consentList=null;
       S.consentId=cfId;
       S.page='consent_detail';
