@@ -615,6 +615,15 @@ async function handleRequest(request, env, json, err) {
   if (!currentUser) return err('ユーザーが見つかりません', 401);
   const currentEmail = currentUser.email;
 
+  // ── 特権アカウント：全機能を無料で解放（plan を pro 強制） ──
+  // 監修医師など。login_id または email で指定。ここに追記すれば全機能無料になる。
+  const PRIVILEGED_LOGIN_IDS = ['ADM-4D3R62']; // 監修医師（後藤 基温先生）
+  const PRIVILEGED_EMAILS = [];
+  if ((currentUser.login_id && PRIVILEGED_LOGIN_IDS.includes(currentUser.login_id)) ||
+      (currentUser.email && PRIVILEGED_EMAILS.includes(currentUser.email))) {
+    currentUser.plan = 'pro';
+  }
+
   // ── GET /auth/me ─────────────────────────────────────────
   // 現在のユーザー情報を返す（鍼灸師ポータル等のクライアントが使用）
   if (path === '/auth/me' && method === 'GET') {
