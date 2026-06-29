@@ -613,10 +613,19 @@ async function handleRequest(request, env, json, err) {
   const userId = session.email;
   const currentUser = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(userId).first();
   if (!currentUser) return err('ユーザーが見つかりません', 401);
+  // ── アクティブ法人（切換え）：membershipで検証して currentUser を上書き ──
+  // これにより以降の org スコープ（currentUser.org_id 由来）が全てアクティブ法人に向く
+  if (session.active_org_id && currentUser.login_id && session.active_org_id !== (currentUser.org_id || currentUser.id)) {
+    try {
+      const mb = await env.DB.prepare("SELECT * FROM memberships WHERE login_id=? AND org_id=? AND status='active'")
+        .bind(currentUser.login_id, session.active_org_id).first();
+      if (mb) { currentUser.org_id = session.active_org_id; currentUser.role = mb.role || currentUser.role; }
+    } catch (e) {}
+  }
   // データ所有者は org の admin に統一（スタッフ/サブアカウントでも同じ org の患者・帳票を参照・保存できる）
   // ※ /sync の保存側 ownerEmail と同じ計算にすることで「患者が見つかりません」404を防ぐ
   const _orgId = currentUser.org_id || currentUser.id;
-  const _orgAdmin = currentUser.role === 'admin' ? currentUser :
+  const _orgAdmin = (_orgId === currentUser.id && currentUser.role === 'admin') ? currentUser :
     await env.DB.prepare('SELECT * FROM users WHERE id=? AND role=?').bind(_orgId, 'admin').first();
   const currentEmail = _orgAdmin ? _orgAdmin.email : currentUser.email;
 
@@ -627,6 +636,54 @@ async function handleRequest(request, env, json, err) {
   if ((currentUser.login_id && PRIVILEGED_LOGIN_IDS.includes(currentUser.login_id)) ||
       (currentUser.email && PRIVILEGED_EMAILS.includes(currentUser.email))) {
     currentUser.plan = 'pro';
+  }
+
+  // ── GET /me/memberships（自分の所属法人・施設の一覧） ──
+  if (path === '/me/memberships' && method === 'GET') {
+    await ensureOrgMemberships(env.DB);
+    let rows = { results: [] };
+    try {
+      rows = await env.DB.prepare(
+        "SELECT m.org_id, m.role, COALESCE(o.name, u.org, '') AS org_name, COALESCE(o.kind,'medical') AS kind FROM memberships m LEFT JOIN orgs o ON o.id=m.org_id LEFT JOIN users u ON u.id=m.org_id WHERE m.login_id=? AND m.status='active' ORDER BY m.created"
+      ).bind(currentUser.login_id).all();
+    } catch (e) {}
+    const activeOrg = session.active_org_id || (currentUser.org_id || currentUser.id);
+    return json({
+      active_org_id: activeOrg,
+      memberships: (rows.results || []).map(r => ({
+        org_id: r.org_id, org_name: r.org_name, kind: r.kind, role: r.role, active: r.org_id === activeOrg
+      }))
+    });
+  }
+
+  // ── POST /auth/switch-org（アクティブ法人を切り替え） ──
+  if (path === '/auth/switch-org' && method === 'POST') {
+    const { org_id } = await request.json().catch(() => ({}));
+    if (!org_id) return err('org_id が必要です');
+    const mb = await env.DB.prepare("SELECT * FROM memberships WHERE login_id=? AND org_id=? AND status='active'")
+      .bind(currentUser.login_id, org_id).first();
+    if (!mb) return err('この法人へのアクセス権がありません');
+    await env.DB.prepare("UPDATE sessions SET active_org_id=? WHERE token=?").bind(org_id, token).run();
+    return json({ ok: true, active_org_id: org_id, role: mb.role });
+  }
+
+  // ── POST /membership/link-account（自分の別アカウントを同一IDに連携） ──
+  if (path === '/membership/link-account' && method === 'POST') {
+    const { login_id, password } = await request.json().catch(() => ({}));
+    if (!login_id || !password) return err('連携する法人のログインIDとパスワードを入力してください');
+    const target = await env.DB.prepare('SELECT * FROM users WHERE login_id=?').bind(String(login_id).toUpperCase()).first();
+    if (!target) return err('該当するアカウントが見つかりません');
+    const ok = await verifyPassword(password, target.pw_hash || target.pw);
+    if (!ok) return err('パスワードが違います');
+    const targetOrg = target.org_id || target.id;
+    if (targetOrg === (currentUser.org_id || currentUser.id)) return err('現在の法人と同じアカウントです');
+    await ensureOrgMemberships(env.DB);
+    const nowIso = new Date().toISOString();
+    await env.DB.prepare("INSERT OR IGNORE INTO orgs (id,name,kind,owner_login_id,created) VALUES (?,?,?,?,?)")
+      .bind(targetOrg, target.org || '', 'medical', target.login_id, nowIso).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO memberships (id,login_id,org_id,role,status,created) VALUES (?,?,?,?,?,?)")
+      .bind('mb_' + currentUser.login_id + '_' + targetOrg, currentUser.login_id, targetOrg, (target.role === 'admin' ? 'admin' : 'staff'), 'active', nowIso).run();
+    return json({ ok: true, org_id: targetOrg, org_name: target.org || '' });
   }
 
   // ── GET /auth/me ─────────────────────────────────────────
@@ -3442,6 +3499,10 @@ async function initDB(db) {
     `ALTER TABLE hash_chain RENAME COLUMN id TO chain_index`,
     // ── 組織レベル設定（あて先・発行元マスタ等。org_id × skey → JSON value） ──
     `CREATE TABLE IF NOT EXISTS org_settings (org_id TEXT, skey TEXT, value TEXT, updated TEXT, PRIMARY KEY (org_id, skey))`,
+    // ── マルチ法人・施設（org）＋ 所属（membership：人×org×役割） ──
+    `CREATE TABLE IF NOT EXISTS orgs (id TEXT PRIMARY KEY, name TEXT DEFAULT '', kind TEXT DEFAULT 'medical', address TEXT DEFAULT '', tel TEXT DEFAULT '', fax TEXT DEFAULT '', owner_login_id TEXT, created TEXT)`,
+    `CREATE TABLE IF NOT EXISTS memberships (id TEXT PRIMARY KEY, login_id TEXT NOT NULL, org_id TEXT NOT NULL, role TEXT DEFAULT 'staff', status TEXT DEFAULT 'active', created TEXT, UNIQUE(login_id, org_id))`,
+    `ALTER TABLE sessions ADD COLUMN active_org_id TEXT`,
     // ── 同意書 アプリ内配信（署名依頼）用カラム（既存テーブルにも自動追加） ──
     `ALTER TABLE consent_forms ADD COLUMN requested_doctor_user_id TEXT`,
     `ALTER TABLE consent_forms ADD COLUMN sent_at TEXT`,
@@ -3452,6 +3513,25 @@ async function initDB(db) {
       if (!e.message?.includes('already exists')) console.error('initDB error:', e.message);
     }
   }
+}
+
+// 既存 users から orgs / memberships を一度だけバックフィル（冪等・非破壊）
+async function ensureOrgMemberships(db) {
+  try {
+    const mk = await db.prepare("SELECT value FROM org_settings WHERE org_id='__system__' AND skey='migrated_orgs_v1'").first();
+    if (mk && mk.value === '1') return;
+    // admin ユーザー → org 行
+    await db.prepare(
+      "INSERT OR IGNORE INTO orgs (id,name,kind,owner_login_id,created) SELECT id, COALESCE(org,''), 'medical', login_id, COALESCE(created,'') FROM users WHERE role='admin'"
+    ).run();
+    // 全ユーザー → membership（今の所属を1件ずつ）
+    await db.prepare(
+      "INSERT OR IGNORE INTO memberships (id,login_id,org_id,role,status,created) SELECT 'mb_'||COALESCE(login_id,id)||'_'||COALESCE(org_id,id), COALESCE(login_id,id), COALESCE(org_id,id), COALESCE(role,'staff'), 'active', COALESCE(created,'') FROM users WHERE COALESCE(login_id,id) IS NOT NULL"
+    ).run();
+    await db.prepare(
+      "INSERT OR REPLACE INTO org_settings (org_id,skey,value,updated) VALUES ('__system__','migrated_orgs_v1','1',?)"
+    ).bind(new Date().toISOString()).run();
+  } catch (e) { console.error('ensureOrgMemberships:', e.message); }
 }
 
 // ── パスワードハッシュ ────────────────────────────────────
