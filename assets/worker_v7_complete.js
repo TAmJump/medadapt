@@ -3344,6 +3344,11 @@ async function initDB(db) {
     `CREATE TABLE IF NOT EXISTS schedule_slots (id TEXT PRIMARY KEY, poll_id TEXT NOT NULL, slot_datetime TEXT NOT NULL, label TEXT DEFAULT '')`,
     `CREATE TABLE IF NOT EXISTS schedule_votes (id TEXT PRIMARY KEY, slot_id TEXT NOT NULL, voter_org_id TEXT NOT NULL, voter_type TEXT DEFAULT '', answer TEXT NOT NULL, voted_at TEXT NOT NULL, UNIQUE(slot_id, voter_org_id))`,
     `CREATE TABLE IF NOT EXISTS match_selections (id TEXT PRIMARY KEY, notice_id TEXT NOT NULL, patient_id TEXT NOT NULL, selected_org_id TEXT NOT NULL, selected_at TEXT NOT NULL, note TEXT DEFAULT '')`,
+    // ── 同意書（consent）系テーブル（マイグレーション漏れ修正） ──
+    `CREATE TABLE IF NOT EXISTS consent_forms (id TEXT PRIMARY KEY, org_id TEXT, patient_id TEXT, doctor_user_id TEXT, consent_type TEXT, disease_names TEXT, notes TEXT, consent_date TEXT, validity_months INTEGER, expires_at TEXT, visit_plan TEXT, difficulty_reasons TEXT, clinic_name TEXT, clinic_address TEXT, clinic_tel TEXT, clinic_fax TEXT, doctor_name TEXT, patient_name TEXT, patient_address TEXT, patient_birth TEXT, form_payload TEXT, status TEXT DEFAULT 'draft', renewed_from TEXT, created_at TEXT, updated_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS treatment_plans (id TEXT PRIMARY KEY, consent_form_id TEXT, org_id TEXT, patient_id TEXT, doctor_user_id TEXT, visit_frequency TEXT, evaluation_frequency TEXT, goals TEXT, treatment_method TEXT, created_at TEXT, updated_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS signature_events (id TEXT PRIMARY KEY, consent_form_id TEXT, signer_user_id TEXT, signer_role TEXT, signature_method TEXT, signature_data TEXT, signed_at TEXT, signed_ip TEXT, signed_user_agent TEXT, event_hash TEXT, prev_event_hash TEXT, created_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS hash_chain (id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT, entity_id TEXT, entity_hash TEXT, prev_chain_hash TEXT, chain_hash TEXT, created_at TEXT)`,
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {
