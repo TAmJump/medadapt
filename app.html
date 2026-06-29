@@ -152,7 +152,7 @@ const APP_CONFIG = {
 };
 const WHEREBY_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmFwcGVhci5pbiIsImF1ZCI6Imh0dHBzOi8vYXBpLmFwcGVhci5pbi92MSIsImV4cCI6OTAwNzE5OTI1NDc0MDk5MSwiaWF0IjoxNzc2MTM4NTA4LCJvcmdhbml6YXRpb25JZCI6MzM4NTAyLCJqdGkiOiI5NWExNjQ1ZC00YjkzLTQ0ZjQtYTE0Ni0xZTBiZDMxN2EzMjkifQ.Zj3MJ92mLCp-wpY6Jw00ul0Ka6HLy4tpcVHTlyOPXIo';
 
-let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[],medLinks:[],disaster:{active:false},emergencyContacts:[],safetyReports:[],broadcasts:[],opLog:[],consentDrafts:[]};
+let D={users:[],patients:[],cases:[],conferences:[],monitors:[],assessments:[],consentLog:[],medLinks:[],disaster:{active:false},emergencyContacts:[],safetyReports:[],broadcasts:[],opLog:[],consentDrafts:[],consentMasters:null};
 let S={user:null,scr:'login',page:'patients',toast:null,tt:null,loginErr:'',signupStep:1,signupPlan:'free',signupData:{},unreadCount:0,moduleAccess:null,notifList:null,noticeId:null,noticeData:null,ndaList:null,dischargeList:null,
   ptId:null,hubTab:'overview',caseId:null,caseTab:'schedule',confId:null,confTab:'info',monId:null,monTab:'status',assId:null,
   modal:null,signed:false,np:{n:'',r:''},shareStep:1,ptFilter:'all',token:null,pendingShares:[]};
@@ -566,6 +566,18 @@ async function loadFromCloud(){
         if(Array.isArray(data.broadcasts))D.broadcasts=data.broadcasts;
         if(Array.isArray(data.safetyReports))D.safetyReports=data.safetyReports;
         if(Array.isArray(data.consentDrafts))D.consentDrafts=data.consentDrafts;
+        // あて先・発行元マスタ（org_settings 同期）：クラウドに有ればそれを採用。
+        // 無ければ旧localStorageのマスタを移行pushして他端末/スタッフへ共有する。
+        if(data.consentMasters&&typeof data.consentMasters==='object'&&((Array.isArray(data.consentMasters.addressees)&&data.consentMasters.addressees.length)||(Array.isArray(data.consentMasters.clinics)&&data.consentMasters.clinics.length))){
+          D.consentMasters=data.consentMasters;
+        }else{
+          try{const lm=JSON.parse(localStorage.getItem('medadapt-consent-masters')||'null');
+            if(lm&&Array.isArray(lm.addressees)&&Array.isArray(lm.clinics)&&(lm.addressees.length||lm.clinics.length)){
+              D.consentMasters=lm;
+              fetch(API+'/sync',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},body:JSON.stringify(D)}).catch(()=>{});
+            }
+          }catch(e){}
+        }
         if(data.user)S.user={...S.user,...data.user};
         try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}
         // v4.20: ローカルにデータがあってクラウドが空の場合、初回ログイン or D1リセット後と判断して
@@ -3691,13 +3703,21 @@ function consentPage(){
 
 // あて先・発行元マスタ（登録 → 選択。localStorageに蓄積）
 function getConsentMasters(){
+  // 1) クラウド同期済み（D.consentMasters）を最優先
+  try{const m=D.consentMasters;if(m&&Array.isArray(m.addressees)&&Array.isArray(m.clinics)&&m.addressees.length&&m.clinics.length)return m;}catch(e){}
+  // 2) 旧localStorage（オフライン・移行前）
   try{const m=JSON.parse(localStorage.getItem('medadapt-consent-masters')||'null');if(m&&Array.isArray(m.addressees)&&Array.isArray(m.clinics)&&m.addressees.length&&m.clinics.length)return m;}catch(e){}
+  // 3) 既定値
   return {
     addressees:[{id:'default',name:'医療法人コンパス'}],
     clinics:[{id:'default',name:'医療法人コンパス',address:'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',tel:'048-783-2713',fax:'03-6369-4732'}]
   };
 }
-function saveConsentMasters(m){try{localStorage.setItem('medadapt-consent-masters',JSON.stringify(m))}catch(e){}}
+function saveConsentMasters(m){
+  try{D.consentMasters=m;}catch(e){}
+  try{localStorage.setItem('medadapt-consent-masters',JSON.stringify(m))}catch(e){}
+  try{sv();}catch(e){}/* /sync POST でクラウド(org_settings)へ＝他端末/スタッフ共有 */
+}
 
 function consentNewPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'760px'}});
