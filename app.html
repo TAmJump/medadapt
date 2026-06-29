@@ -3813,7 +3813,10 @@ function consentNewPage(){
     if(addrSel.value==='__new__'){
       const name=prompt('新しい宛先（医療機関名）を入力');
       if(name&&name.trim()){
-        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim()});saveConsentMasters(m);
+        const address=prompt('宛先の住所（任意・空欄可）')||'';
+        const tel=prompt('宛先のTEL（任意・空欄可）')||'';
+        const fax=prompt('宛先のFAX（任意・空欄可）')||'';
+        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim(),address,tel,fax});saveConsentMasters(m);
         addrSel.insertBefore(h('option',{value:name.trim()},name.trim()),addrSel.lastChild);
         addrSel.value=name.trim();
       }else{addrSel.value=_masters.addressees[0]?.name||'医療法人コンパス';}
@@ -4038,10 +4041,9 @@ function consentNewPage(){
   form.appendChild(drWrap2);
   // 施術種別が訪問診療同意書（依頼書）のときは、療養費用の症状チェック・往療理由を隠す
   function applyTypeVisibility(){
-    const t=(document.getElementById('cf-type')||{}).value;
-    const isReq=t==='request_form';
-    if(typeof drWrap!=='undefined'&&drWrap)drWrap.style.display=isReq?'none':'';
-    if(typeof drWrap2!=='undefined'&&drWrap2)drWrap2.style.display=isReq?'none':'';
+    // 訪問診療同意書（request_form）も傷病名・往療理由を要するため、症状チェックと通院困難事由は常時表示する
+    if(typeof drWrap!=='undefined'&&drWrap)drWrap.style.display='';
+    if(typeof drWrap2!=='undefined'&&drWrap2)drWrap2.style.display='';
   }
   applyTypeVisibility();
   const claimWrap=h('div',{style:{padding:'12px',background:'#fef3c7',borderRadius:'4px',border:'1px solid #fbbf24'}});
@@ -4065,7 +4067,7 @@ function consentNewPage(){
     markErr(ptEl,false);markErr(dEl,false);
     const errs=[];
     if(!pt){markErr(ptEl,true);errs.push('患者');}
-    if(ctype!=='request_form' && !dRaw){markErr(dEl,true);errs.push('傷病名');}
+    if(!dRaw){markErr(dEl,true);errs.push('傷病名');}
     if(errs.length){toast('未入力：'+errs.join('・')+'（赤枠をご確認ください。入力内容は保持されています）');if(!pt)ptEl.focus();else dEl.focus();return;}
     // 傷病名：「、」「／」改行のいずれでも区切って配列化
     const diseases= dRaw ? dRaw.split(/[、／\n]/).map(s=>s.trim()).filter(Boolean).map(name=>({name, onset_date:null})) : [];
@@ -4076,6 +4078,8 @@ function consentNewPage(){
     const _csId=(document.getElementById('cf-clinic-sel')||{}).value;
     const _cms=getConsentMasters();
     const _selClinic=_cms.clinics.find(c=>c.id===_csId)||_cms.clinics[0]||{name:'医療法人コンパス',address:'',tel:'',fax:''};
+    const _addrName=(document.getElementById('cf-addressee-sel')||{}).value||'医療法人コンパス';
+    const _selAddr=(_cms.addressees||[]).find(a=>a.name===_addrName);
     const body={
       patient_id:pt,
       consent_type:ctype,
@@ -4120,7 +4124,11 @@ function consentNewPage(){
       clinic_address:_selClinic.address||'',
       clinic_tel:_selClinic.tel||'',
       clinic_fax:_selClinic.fax||'',
-      form_payload:{addressee:(document.getElementById('cf-addressee-sel')||{}).value||'医療法人コンパス'}
+      form_payload:{
+        addressee:_addrName,
+        addressee_detail:(_selAddr&&(_selAddr.address||_selAddr.tel||_selAddr.fax))?{address:_selAddr.address||'',tel:_selAddr.tel||'',fax:_selAddr.fax||''}:undefined,
+        difficulty_note:diffNoteVal
+      }
     };
     submitBtn.disabled=true;
     submitBtn.textContent='発行中...';
@@ -4423,32 +4431,51 @@ async function previewConsentPDF(cfId){
       }
     }catch(e){}
   }
+  // 傷病名：disease_names（JSON文字列 or 配列 or 読点区切り文字列）を名称配列へ正規化
+  let diseasesArr=[];
+  try{
+    const dn=typeof cf.disease_names==='string'?(cf.disease_names.trim().startsWith('[')?JSON.parse(cf.disease_names):cf.disease_names):cf.disease_names;
+    if(Array.isArray(dn))diseasesArr=dn.map(x=>typeof x==='string'?x:(x&&x.name?x.name:'')).filter(Boolean);
+    else if(typeof dn==='string'&&dn)diseasesArr=dn.split(/[、,／\/\n]/).map(s=>s.trim()).filter(Boolean);
+  }catch(e){if(typeof cf.disease_names==='string')diseasesArr=cf.disease_names.split(/[、,／\/\n]/).map(s=>s.trim()).filter(Boolean);}
+  // 表題・本文（種別で出し分け）
+  let docTitle,bodyText;
+  if(cf.consent_type==='both'){
+    docTitle='はり・きゅう／あん摩マッサージ指圧　同意書作成の依頼書<br>兼　訪問診療同意書及び計画書';
+    bodyText='内容：通院困難のため在宅にて上記計画により施術の同意書作成を依頼する。また、定期的に効果判定の診察を受け、継続の要否を決定することに同意します。';
+  }else{
+    docTitle='訪問診療同意書　兼　計画書';
+    bodyText='内容：通院困難のため在宅にて訪問診療を行うことに同意し、上記計画に基づく定期的な診察を受け、継続の要否を決定することに同意します。';
+  }
   const data={
     sd_id:sd?.id||(doctorSig?('SE-'+(doctorSig.id||'').slice(0,8)):'未確定'),
     content_hash:sd?.content_hash||doctorSig?.event_hash||cf.content_hash||'',
     chain_index:sd?.chain_index||cf.chain_index||(doctorSig?'—':0),
     qr_image_base64:'',  // QR は別途生成
     verify_url:sd?.qr_payload||'',
+    doc_title:docTitle,
+    body_text:bodyText,
     addressee:fp.addressee||cf.clinic_name||'医療法人コンパス',
+    addressee_detail:fp.addressee_detail||undefined,
     visit_plan:cf.visit_plan||'年２回（６か月に１回）',
     difficulty_reasons:dr,
+    difficulty_note:fp.difficulty_note||cf.difficulty_note||'',
     consent_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     consent_date_jp:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     exam_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     patient:patientInfo,
     clinic:clinicCommon,
     doctor:{name:cf.doctor_name||'後藤 基温',has_seal:!!sd||!!doctorSig},
-    signature:doctorSig?{signed_at:doctorSig.signed_at,signer_label:(cf.doctor_name||'後藤 基温')+'　医師（医療法人コンパス）'}:(sd?{signed_at:sd.created_at}:null),
+    signature:doctorSig?{signed_at:doctorSig.signed_at,signer_label:(cf.doctor_name||'後藤 基温')+'　医師（医療法人コンパス）'}:(sd?{signed_at:sd.signed_at||sd.created_at}:null),
     notes:cf.notes||'',
     // 厚労省様式 V2 用：form_payload から症状・施術部位等を展開
     symptoms:fp.symptoms,
     treatments:fp.treatments,
     visit:fp.visit,
-    disease_name:fp.disease_name||cf.disease_names,
-    diseases:fp.diseases,
+    disease_name:diseasesArr.join('、'),
+    diseases:diseasesArr,
     onset:fp.onset,
     consent_type:cf.consent_type==='acupuncture'||cf.consent_type==='massage' ? (fp.consent_type||'new') : undefined,
-    signature: sd ? {signed_at:sd.signed_at||sd.created_at||(new Date().toISOString())} : undefined,
     timestamp: sd?.tsa_payload ? (typeof sd.tsa_payload==='string'?JSON.parse(sd.tsa_payload):sd.tsa_payload) : undefined,
     tsa: sd?.tsa_authority ? {authority:sd.tsa_authority,acquired_at:sd.tsa_acquired_at} : undefined
   };

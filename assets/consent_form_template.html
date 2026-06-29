@@ -305,30 +305,32 @@
   <div class="seal-mark">（<span id="copy-mark">正</span>・控）</div>
 
   <!-- タイトル -->
-  <div class="title">
-    鍼灸・マッサージ　同意書作成の依頼書<br>
-    兼　訪問診療同意書及び計画書
+  <div class="title" id="doc-title">
+    訪問診療同意書　兼　計画書
   </div>
 
   <!-- 宛先（医療機関名） -->
   <div class="addressee" id="addressee-name">
     医療法人コンパス　宛
   </div>
+  <div class="addressee-detail" id="addressee-detail" style="display:none;font-size:12px;color:#555;margin:-6px 0 10px 0;line-height:1.6;"></div>
 
   <!-- 計画 -->
   <div class="plan-block">
     <span class="label">計画：</span><span id="visit-plan">年２回（６か月に１回）</span>
   </div>
 
-  <!-- 本文（厚労省様式準拠の定型文） -->
-  <div class="body-text">
-    内容：通院困難のため在宅にて上記回数により同意書を作成することを依頼する。<br>
-    また、６か月に１回（変形徒手は１か月に１回）鍼灸・マッサージ の効果判定の<br>
-    定期診察を受け継続の要否を決定することに同意する。
+  <!-- 本文（定型文・種別により差し替え可能） -->
+  <div class="body-text" id="body-text">
+    内容：通院困難のため在宅にて訪問診療を行うことに同意し、上記計画に基づく定期的な診察を受け、継続の要否を決定することに同意します。
   </div>
 
-  <!-- 通院困難理由 -->
-  <div class="difficulty-title">【通院困難理由】</div>
+  <!-- 傷病名 -->
+  <div class="difficulty-title">【傷病名】</div>
+  <div class="disease-block" id="disease-block" style="margin:4px 0 14px 0;font-size:14px;line-height:1.9;"></div>
+
+  <!-- 通院困難理由（往療を必要とする理由） -->
+  <div class="difficulty-title">【通院困難理由（往療を必要とする理由）】</div>
   <div class="difficulty-grid" id="difficulty-grid">
     <!-- 動的生成（下記 JS で挿入） -->
   </div>
@@ -472,18 +474,50 @@
 window.consentTemplateRender = function(data) {
   // 正・控
   document.getElementById('copy-mark').textContent = data.copy_kind === 'copy' ? '控' : '正';
+  // 表題（種別により差し替え）
+  if (data.doc_title) {
+    document.getElementById('doc-title').innerHTML = data.doc_title;
+  }
+  // 本文（種別により差し替え）
+  if (data.body_text) {
+    document.getElementById('body-text').innerHTML = data.body_text;
+  }
   // 宛先
   if (data.addressee) {
     document.getElementById('addressee-name').textContent = data.addressee.endsWith('宛')
       ? data.addressee
       : (data.addressee + '　宛');
   }
+  // 宛先 住所・連絡先（宛先マスタに登録があれば表示）
+  if (data.addressee_detail) {
+    const ad = document.getElementById('addressee-detail');
+    const adr = data.addressee_detail.address || '';
+    const tel = data.addressee_detail.tel ? 'TEL：' + data.addressee_detail.tel : '';
+    const fax = data.addressee_detail.fax ? 'FAX：' + data.addressee_detail.fax : '';
+    const line2 = [tel, fax].filter(Boolean).join('　　');
+    const html = (adr ? `<div>${escapeHtml(adr)}</div>` : '') + (line2 ? `<div>${escapeHtml(line2)}</div>` : '');
+    if (html) { ad.innerHTML = html; ad.style.display = ''; } else { ad.style.display = 'none'; }
+  }
+  // 傷病名
+  (function(){
+    const dblock = document.getElementById('disease-block');
+    if (!dblock) return;
+    let names = [];
+    if (Array.isArray(data.diseases)) {
+      names = data.diseases.map(d => typeof d === 'string' ? d : (d && d.name ? d.name : '')).filter(Boolean);
+    } else if (typeof data.disease_name === 'string' && data.disease_name) {
+      names = data.disease_name.split(/[、,／\/\n]/).map(s => s.trim()).filter(Boolean);
+    }
+    dblock.innerHTML = names.length
+      ? names.map(n => `・${escapeHtml(n)}`).join('<br>')
+      : '<span style="color:#94a3b8;">（傷病名の入力がありません）</span>';
+  })();
   // 計画
   if (data.visit_plan) {
     document.getElementById('visit-plan').textContent = data.visit_plan;
   }
-  // 通院困難理由のレンダリング
-  renderDifficultyReasons(data.difficulty_reasons || {});
+  // 通院困難理由（往療を必要とする理由）のレンダリング
+  renderDifficultyReasons(data.difficulty_reasons || {}, data.difficulty_note || '');
   // 日付
   if (data.consent_date_jp) {
     document.getElementById('reiwa-year').textContent = data.consent_date_jp.year;
@@ -603,66 +637,23 @@ function formatTsUTC(iso) {
 }
 
 
-function renderDifficultyReasons(dr) {
+function renderDifficultyReasons(dr, note) {
   const grid = document.getElementById('difficulty-grid');
   grid.innerHTML = '';
-
-  // 部位選択型（両・左・右）
-  const lateralItems = [
-    { key: '肩関節周囲炎', label: '肩関節周囲炎' },
-    { key: '変形性膝関節症', label: '変形性膝関節症' },
-  ];
-  // 単純チェック型
-  const simpleItems = [
-    { key: '腰痛症', label: '腰痛症' },
-    { key: '変形性腰椎症', label: '変形性腰椎症' },
-    { key: '脊柱管狭窄症', label: '脊柱管狭窄症' },
-    { key: '関節リウマチ', label: '関節リウマチ' },
-    { key: 'パーキンソン', label: 'パーキンソン' },
-  ];
-  // 時期付き
-  const withPeriodItems = [
-    { key: '脳梗塞', label: '脳梗塞、脳梗塞後遺症' },
-    { key: '脳出血', label: '脳出血、脳出血後遺症' },
-  ];
-  // 部位付き（フリーテキスト）
-  const withLocationItems = [
-    { key: '麻痺', label: '麻痺' },
-    { key: '神経痛', label: '神経痛' },
-  ];
-
-  lateralItems.forEach(item => {
-    const sel = dr[item.key]; // 'both' | 'left' | 'right' | null
-    const checked = sel === 'both' || sel === 'left' || sel === 'right';
-    const opts = ['両', '左', '右'];
-    const selKey = sel === 'both' ? '両' : sel === 'left' ? '左' : sel === 'right' ? '右' : null;
-    const optsHtml = opts.map(o => o === selKey ? `<span class="selected-option">${o}</span>` : o).join('・');
-    grid.appendChild(createCheckItem(checked, `${item.label}（${optsHtml}）`));
-  });
-
-  simpleItems.forEach(item => {
-    grid.appendChild(createCheckItem(!!dr[item.key], item.label));
-  });
-
-  withPeriodItems.forEach(item => {
-    const v = dr[item.key];
-    const checked = v && v.checked;
-    const period = checked && v.period ? v.period : '　　　　　　　　　　';
-    grid.appendChild(createCheckItem(checked, `${item.label}（時期：${period}）`));
-  });
-
-  withLocationItems.forEach(item => {
-    const v = dr[item.key];
-    const checked = v && v.checked;
-    const location = checked && v.location ? v.location : '　　　　　　　　';
-    grid.appendChild(createCheckItem(checked, `${item.label}（部位：${location}）`));
-  });
-
-  // その他（フリーテキスト）
-  const other = dr['その他'];
-  const otherChecked = other && other.checked;
-  const otherText = otherChecked && other.text ? other.text : '　　　　　　　　　　　　　　　　';
-  grid.appendChild(createCheckItem(otherChecked, `その他（${otherText}）`));
+  // dr は { 往療理由ラベル: true } 形式（フォームの cf-difficulty と一致）。
+  const keys = Object.keys(dr || {}).filter(k => dr[k]);
+  if (keys.length === 0) {
+    grid.appendChild(createCheckItem(false, '（往療理由の選択がありません）'));
+  } else {
+    keys.forEach(k => grid.appendChild(createCheckItem(true, escapeHtml(k))));
+  }
+  if (note) {
+    const n = document.createElement('div');
+    n.className = 'difficulty-note';
+    n.style.cssText = 'grid-column:1 / -1;margin-top:6px;font-size:13px;color:#374151;';
+    n.textContent = '補足：' + note;
+    grid.appendChild(n);
+  }
 }
 
 function createCheckItem(checked, htmlText) {
@@ -689,20 +680,24 @@ if (window.location.search.includes('demo=1')) {
     content_hash: 'a3b8e7d2f1c5b4a9e8d7c6b5a4938271a3b8e7d2f1c5b4a9e8d7c6b5a4938271',
     chain_index: 1,
     qr_image_base64: '',
-    addressee: '医療法人コンパス',
+    doc_title: '訪問診療同意書　兼　計画書',
+    addressee: '医療法人タムジ',
+    addressee_detail: { address: '東京都中央区東日本橋3-3-17', tel: '03-0000-0000' },
+    diseases: ['変形性膝関節症（右）', '腰痛症', '脳梗塞後遺症'],
     visit_plan: '年２回（６か月に１回）',
     difficulty_reasons: {
-      変形性膝関節症: 'both',
-      腰痛症: true,
-      脳梗塞: { checked: true, period: '令和6年4月' }
+      '歩行が困難': true,
+      '自力での外出・通院が困難': true,
+      '寝たきりの状態': true
     },
+    difficulty_note: '要介護3・自宅で静養中',
     consent_date_jp: { year: 8, month: 5, day: 24 },
     patient: {
       address: '埼玉県さいたま市大宮区桜木町4-1-1',
       name: '田中 タムジ',
       phone: '048-000-0000'
     },
-    signature: { signed_at: '2026-05-24T10:00:00+09:00' },
+    signature: { signed_at: '2026-05-24T10:00:00+09:00', signer_label: '後藤 基温　医師（医療法人コンパス）' },
     timestamp: {
       authority_name: 'セイコータイムスタンプサービス',
       authority: 'seiko',
