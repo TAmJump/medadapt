@@ -350,7 +350,7 @@
     </div>
     <div class="field-inline">
       <div>
-        <span class="field-label">自署氏名：</span>
+        <span class="field-label" id="self-sign-label">自署氏名：</span>
         <span class="field-value" id="patient-name"></span>
         <img id="patient-sign-img" alt="自署" style="display:none;height:12mm;vertical-align:bottom;margin-left:2mm;">
       </div>
@@ -537,6 +537,18 @@ window.consentTemplateRender = function(data) {
     document.getElementById('patient-name').textContent = data.patient.name || '';
     document.getElementById('patient-phone').textContent = data.patient.phone || '';
   }
+  // 自署区分（本人 / 代理署名）に応じて自署欄ラベルを切替える
+  (function(){
+    const lbl = document.getElementById('self-sign-label');
+    if (!lbl) return;
+    if (data.signer && data.signer.mode === 'proxy') {
+      lbl.textContent = '代理署名（' + (data.signer.relation || '家族') + '）：';
+      const nm = document.getElementById('patient-name');
+      if (nm && data.signer.name) nm.textContent = data.signer.name;
+    } else {
+      lbl.textContent = '自署氏名：';
+    }
+  })();
   // 医療機関（コンパス固定値を上書き可能）
   if (data.clinic) {
     const cb = document.getElementById('clinic-block');
