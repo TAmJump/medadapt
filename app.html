@@ -550,7 +550,7 @@ function ld(){try{const s=localStorage.getItem(K);if(s){const p=JSON.parse(s);Ob
 // 既存患者に住所・連絡先・代理人（サンプル）を一度だけ補完（空欄のみ・既存値は上書きしない）
 function seedPatientContacts(){
   try{
-    if(localStorage.getItem('medadapt-pt-contact-seeded-v2')==='1')return;
+    if(localStorage.getItem('medadapt-pt-contact-seeded-v3')==='1')return;
     if(!Array.isArray(D.patients)||!D.patients.length)return;
     const addrs=['埼玉県さいたま市大宮区桜木町1-2-3','埼玉県さいたま市浦和区高砂4-5-6','東京都中央区東日本橋3-3-17','埼玉県川口市本町2-1-8','埼玉県さいたま市中央区下落合5-6-7','東京都台東区浅草2-3-4','埼玉県越谷市南越谷1-9-2','埼玉県草加市高砂3-4-5'];
     const rels=['妻','長男','次女','夫','長女','次男','子'];
@@ -563,19 +563,20 @@ function seedPatientContacts(){
       if(!p.phone){p.phone='048-'+String(500+(i%400)).padStart(3,'0')+'-'+String(1000+(i*37)%9000).padStart(4,'0');edited=true;}
       if(!p.selfSign){
         const needProxy=(Number(p.age)>=80)||/要介護[45]/.test(p.cl||'')||(i%2===0);
-        if(needProxy){
-          p.selfSign='proxy';
-          const rel=rels[i%rels.length];
-          const surname=(p.name||'　').trim().split(/[ 　]/)[0]||'';
-          const given=(rel==='妻'||rel==='長女'||rel==='次女')?givenF[i%givenF.length]:givenM[i%givenM.length];
-          p.proxyRelation=rel;p.proxyName=surname+' '+given;
-        }else{p.selfSign='self';}
-        edited=true;
+        p.selfSign=needProxy?'proxy':'self';edited=true;
+      }
+      // 代理人氏名・続柄は自署区分に関わらず全員へ補完（空欄のみ）
+      if(!p.proxyRelation){p.proxyRelation=rels[i%rels.length];edited=true;}
+      if(!p.proxyName){
+        const rel=p.proxyRelation;
+        const surname=(p.name||'　').trim().split(/[ 　]/)[0]||'';
+        const given=(rel==='妻'||rel==='長女'||rel==='次女')?givenF[i%givenF.length]:givenM[i%givenM.length];
+        p.proxyName=surname+' '+given;edited=true;
       }
       if(edited)changed=true;
     });
     if(changed)sv();
-    localStorage.setItem('medadapt-pt-contact-seeded-v2','1');
+    localStorage.setItem('medadapt-pt-contact-seeded-v3','1');
   }catch(e){}
 }
 async function loadFromCloud(){
