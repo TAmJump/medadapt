@@ -369,12 +369,12 @@
   <div class="e-cert-banner" id="e-cert-banner" style="display:none;">
     <div class="e-cert-icon">✓</div>
     <div class="e-cert-body">
-      <div class="e-cert-title">電子署名＋タイムスタンプ済</div>
-      <div>本書面は <strong>e-文書法・電子署名法</strong> に準拠した電子署名と、第三者機関のタイムスタンプを付与した上で、<strong>SHA-256 ハッシュチェーン</strong> に登録された原本性保証付き文書です。</div>
+      <div class="e-cert-title" id="e-cert-title">電子署名済</div>
+      <div id="e-cert-desc">本書面は <strong>電子署名法</strong> に準拠した電子署名を行い、<strong>SHA-256 ハッシュチェーン</strong> に登録済みです。</div>
       <div class="e-cert-row">
         <span>署名者: <strong id="cert-signer">—</strong></span>
-        <span>タイムスタンプ: <strong id="cert-timestamp">—</strong></span>
-        <span>認証局: <strong id="cert-tsa-authority">—</strong></span>
+        <span>署名日時: <strong id="cert-timestamp">—</strong></span>
+        <span>タイムスタンプ: <strong id="cert-tsa-authority">—</strong></span>
       </div>
     </div>
   </div>
@@ -566,8 +566,15 @@ window.consentTemplateRender = function(data) {
       : '依頼者');
     document.getElementById('cert-signer').textContent = signerLabel;
     document.getElementById('cert-timestamp').textContent = formatSignedTimeStd(data.signature.signed_at);
-    document.getElementById('cert-tsa-authority').textContent =
-      (data.tsa && data.tsa.authority) ? data.tsa.authority.toUpperCase() : 'mYaruze TSA';
+    // 第三者タイムスタンプ（TSA）が確定済みか否かで表記を2段階に分ける（真正性の正確な表示）
+    const hasTSA = !!(data.timestamp && data.timestamp.acquired_at) || !!(data.tsa && data.tsa.authority);
+    document.getElementById('e-cert-title').textContent = hasTSA ? '電子署名＋タイムスタンプ済' : '電子署名済（医師署名・確定前）';
+    document.getElementById('e-cert-desc').innerHTML = hasTSA
+      ? '本書面は <strong>e-文書法・電子署名法</strong> に準拠した電子署名と、第三者機関のタイムスタンプを付与した上で、<strong>SHA-256 ハッシュチェーン</strong> に登録された原本性保証付き文書です。'
+      : '本書面は <strong>電子署名法</strong> に準拠した電子署名を行い、<strong>SHA-256 ハッシュチェーン</strong> に登録済みです。第三者機関のタイムスタンプは患者署名による確定時に付与されます。';
+    document.getElementById('cert-tsa-authority').textContent = hasTSA
+      ? ((data.tsa && data.tsa.authority) ? data.tsa.authority.toUpperCase() : (data.timestamp && (data.timestamp.authority_name || data.timestamp.authority)) || '付与済')
+      : '確定時に付与';
   } else {
     certBanner.style.display = 'none';
   }

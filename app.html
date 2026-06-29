@@ -1061,6 +1061,7 @@ else if(S.page==='nda'){main.appendChild(ndaPage())}
 else if(S.page==='consent'){main.appendChild(acuMassagePage())}
 else if(S.page==='consent_list'){main.appendChild(consentPage())}
 else if(S.page==='consent_new'){main.appendChild(consentNewPage())}
+else if(S.page==='consent_inbox'){main.appendChild(consentInboxPage())}
 else if(S.page==='consent_detail'&&S.consentId){main.appendChild(consentDetailPage())}
 else if(S.page==='acu_massage'){S.page='consent';main.appendChild(acuMassagePage())}
 else if(S.page==='kyotaku'){main.appendChild(kyotakuPage())}
@@ -3813,10 +3814,11 @@ function consentNewPage(){
     if(addrSel.value==='__new__'){
       const name=prompt('新しい宛先（医療機関名）を入力');
       if(name&&name.trim()){
+        const login_id=prompt('宛先医師のログインID（アプリ内で署名依頼を送る場合に入力・任意）\n例: ADM-XXXXXX / STF-XXXXXX')||'';
         const address=prompt('宛先の住所（任意・空欄可）')||'';
         const tel=prompt('宛先のTEL（任意・空欄可）')||'';
         const fax=prompt('宛先のFAX（任意・空欄可）')||'';
-        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim(),address,tel,fax});saveConsentMasters(m);
+        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim(),login_id:login_id.trim(),address,tel,fax});saveConsentMasters(m);
         addrSel.insertBefore(h('option',{value:name.trim()},name.trim()),addrSel.lastChild);
         addrSel.value=name.trim();
       }else{addrSel.value=_masters.addressees[0]?.name||'医療法人コンパス';}
@@ -4278,6 +4280,11 @@ function consentDetailPage(){
     h('div',{style:{marginBottom:'4px'}},'同意日: '+cf.consent_date+' / 有効期限: '+(cf.expires_at||'').slice(0,10)),
     h('div',{},'施術種別: '+cf.consent_type+' / 有効月数: '+cf.validity_months+'ヶ月')
   ));
+  // アプリ内 署名依頼の送信状況
+  if(cf.send_status==='sent'){
+    const sentTxt='署名依頼を宛先医師へ送信済み（'+(cf.sent_at||'').slice(0,16).replace('T',' ')+'）。宛先が署名すると通知が届きます。';
+    w.appendChild(h('div',{style:{padding:'10px 14px',background:'#eff6ff',border:'1px solid #93c5fd',borderRadius:'6px',marginBottom:'12px',fontSize:'12px',color:'#1e40af'}},sentTxt));
+  }
   // 改ざん検知情報
   if(cf.content_hash){
     w.appendChild(h('div',{style:{padding:'10px 14px',background:'#dcfce7',border:'1px solid #16a34a',borderRadius:'6px',marginBottom:'12px',fontSize:'12px',fontFamily:'monospace'}},
@@ -4294,6 +4301,21 @@ function consentDetailPage(){
       if(!name)return;
       const res=await api('/consent/'+cf.id+'/sign-doctor',{method:'POST',body:JSON.stringify({signature_method:'typed_name',signature_data:name})});
       if(res?.ok){toast('医師署名完了');S.consentDetail=null;rr()}else toast(res?.error||'エラー');
+    }));
+    actions.appendChild(btn('宛先へ送信（署名依頼）','btn-out btn-sm',async()=>{
+      // 宛先マスタから医師ログインIDを解決（未登録なら入力）
+      let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
+      const cms=getConsentMasters();
+      const addr=(cms.addressees||[]).find(a=>a.name===(fp.addressee||''));
+      let login_id=addr&&addr.login_id?addr.login_id:'';let email='';
+      if(!login_id){
+        const v=prompt('宛先医師のログインID または メールアドレスを入力\n（宛先マスタに登録しておくと次回から自動で送れます）');
+        if(!v)return;
+        if(v.includes('@'))email=v.trim();else login_id=v.trim();
+      }
+      const res=await api('/consent/'+cf.id+'/send',{method:'POST',body:JSON.stringify({doctor_login_id:login_id,doctor_email:email})});
+      if(res?.ok){toast('宛先（'+(res.doctor_name||'医師')+'）へ署名依頼を送信しました');S.consentDetail=null;rr();}
+      else toast(res?.error||'送信に失敗しました');
     }));
   }
   if(cf.status==='signed_by_doctor'){
@@ -4508,6 +4530,43 @@ async function previewConsentPDF(cfId){
 // 訪問マッサージ・訪問鍼灸の医療保険療養費に関する各機能をまとめて表示
 // 該当する保険医療機関名は「医療法人コンパス」（歯科併設の正式クリニック名ではなく法人名で統一）
 // ===========================================================
+function consentInboxPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}},
+    h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.page='consent';rr()}},'← 同意書')
+  ));
+  w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 8px'}},'受信した署名依頼'));
+  w.appendChild(h('div',{style:{fontSize:'13px',color:'#64748b',marginBottom:'16px',lineHeight:'1.7'}},'他の事業所から自分（医師）宛に届いた同意書です。内容を確認し、医師署名すると発行元へ通知が返ります。'));
+  if(!S.consentInbox){
+    api('/consent/inbox').then(res=>{S.consentInbox=res?.items||[];rr()}).catch(()=>{S.consentInbox=[];rr()});
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'#94a3b8'}},'読み込み中...'));
+    return w;
+  }
+  const items=S.consentInbox;
+  if(!items.length){
+    w.appendChild(h('div',{style:{padding:'32px',textAlign:'center',color:'#94a3b8',background:'#f8fafc',border:'1px solid #e5e7eb',borderRadius:'10px'}},'届いている署名依頼はありません。'));
+    return w;
+  }
+  const typeLabels={request_form:'訪問診療同意書（依頼書）',massage:'あマ指',acupuncture:'はり・きゅう',both:'はり・きゅう＋あマ指'};
+  const statusLabels={'draft':'署名待ち','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済'};
+  const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
+  items.forEach(it=>{
+    const pending=it.status==='draft';
+    const card=h('div',{
+      style:{padding:'14px 16px',background:'#fff',border:'1px solid '+(pending?'#fbbf24':'#e5e7eb'),borderRadius:'10px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',flexWrap:'wrap'},
+      onClick:()=>{S.consentId=it.id;S.consentDetail=null;S.page='consent_detail';rr()}
+    });
+    card.appendChild(h('div',null,
+      h('div',{style:{fontWeight:'700',fontSize:'14px',marginBottom:'2px'}},(it.patient_name||'（患者名なし）')+'　'+(typeLabels[it.consent_type]||it.consent_type)),
+      h('div',{style:{fontSize:'12px',color:'#64748b'}},'同意日 '+(it.consent_date||'—')+'　/　受信 '+((it.sent_at||'').slice(0,16).replace('T',' ')||'—'))
+    ));
+    card.appendChild(h('span',{style:{fontSize:'12px',fontWeight:'700',padding:'4px 10px',borderRadius:'999px',color:pending?'#92400e':'#0891b2',background:pending?'#fef3c7':'#e0f2fe'}},pending?'署名待ち':(statusLabels[it.status]||it.status)));
+    list.appendChild(card);
+  });
+  w.appendChild(list);
+  return w;
+}
+
 function acuMassagePage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
   w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 8px'}},'同意書'));
@@ -4563,6 +4622,15 @@ function acuMassagePage(){
   card3.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'B013 療養費同意書交付料（100点）の算定対象一覧を確認し、月次集計を取得します。'));
   card3.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'加算管理を開く →'));
   grid.appendChild(card3);
+  // カード4: 受信した署名依頼（自分宛に届いた同意書の署名依頼）
+  const card4=h('div',{
+    style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+    onClick:()=>{S.consentInbox=null;S.page='consent_inbox';rr()}
+  });
+  card4.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'④ 受信した署名依頼'));
+  card4.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'他の事業所から自分（医師）宛に届いた同意書の署名依頼を確認し、内容を見て医師署名します。'));
+  card4.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'受信箱を開く →'));
+  grid.appendChild(card4);
   w.appendChild(grid);
 
   // 参考情報セクション
@@ -4570,7 +4638,7 @@ function acuMassagePage(){
   infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0f172a',marginBottom:'6px',fontSize:'13px'}},'この画面で扱う書類'));
   infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0e7490',marginTop:'4px'}},'■ 訪問診療同意書（依頼書）（メイン）'));
   infoBox.appendChild(h('div',null,'・訪問診療（在宅医療）の依頼・同意に用いるコンパス様式の書類。'));
-  infoBox.appendChild(h('div',null,'・施術種別で「訪問診療同意書（依頼書）」を選択。傷病名・症状チェックの入力は不要。'));
+  infoBox.appendChild(h('div',null,'・施術種別で「訪問診療同意書（依頼書）」を選択。傷病名と通院困難事由（往療理由）を入力します。'));
   infoBox.appendChild(h('div',null,'・発行時に ',h('strong',null,'SHA-256 ハッシュチェーン'),' へ登録し、QRコードで第三者が真正性を検証できます。'));
   infoBox.appendChild(h('div',{style:{fontWeight:'800',color:'#0e7490',marginTop:'10px'}},'■ はり・きゅう／あマ指 療養費同意書'));
   infoBox.appendChild(h('div',null,'・はり・きゅう・あマ指（あん摩・マッサージ・指圧）は ',h('strong',null,'医療保険の療養費'),'（介護保険ではない）。'));
