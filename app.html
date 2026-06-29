@@ -3689,6 +3689,16 @@ function consentPage(){
   return w;
 }
 
+// あて先・発行元マスタ（登録 → 選択。localStorageに蓄積）
+function getConsentMasters(){
+  try{const m=JSON.parse(localStorage.getItem('medadapt-consent-masters')||'null');if(m&&Array.isArray(m.addressees)&&Array.isArray(m.clinics)&&m.addressees.length&&m.clinics.length)return m;}catch(e){}
+  return {
+    addressees:[{id:'default',name:'医療法人コンパス'}],
+    clinics:[{id:'default',name:'医療法人コンパス',address:'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',tel:'048-783-2713',fax:'03-6369-4732'}]
+  };
+}
+function saveConsentMasters(m){try{localStorage.setItem('medadapt-consent-masters',JSON.stringify(m))}catch(e){}}
+
 function consentNewPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'760px'}});
   // v4.16: 患者ハブから来た場合は戻り先を患者ハブにする
@@ -3772,20 +3782,43 @@ function consentNewPage(){
   typeWrap.appendChild(typeSel);
   form.appendChild(typeWrap);
 
-  // あて先・発行元（入力・選択可能）
+  // あて先・発行元（登録 → 選択。＋新規登録）
+  const _masters=getConsentMasters();
   const addrWrap=h('div');
-  addrWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'あて先（同意書の宛先医療機関）'));
-  addrWrap.appendChild(h('input',{id:'cf-addressee',value:'医療法人コンパス',placeholder:'例：医療法人コンパス',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}}));
+  addrWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'あて先（宛先医療機関）'));
+  const addrSel=h('select',{id:'cf-addressee-sel',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  _masters.addressees.forEach(a=>addrSel.appendChild(h('option',{value:a.name},a.name)));
+  addrSel.appendChild(h('option',{value:'__new__'},'＋ 新しい宛先を登録...'));
+  addrSel.addEventListener('change',()=>{
+    if(addrSel.value==='__new__'){
+      const name=prompt('新しい宛先（医療機関名）を入力');
+      if(name&&name.trim()){
+        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim()});saveConsentMasters(m);
+        addrSel.insertBefore(h('option',{value:name.trim()},name.trim()),addrSel.lastChild);
+        addrSel.value=name.trim();
+      }else{addrSel.value=_masters.addressees[0]?.name||'医療法人コンパス';}
+    }
+  });
+  addrWrap.appendChild(addrSel);
   form.appendChild(addrWrap);
 
-  const clinicWrap=h('div',{style:{padding:'12px',background:'#f8fafc',border:'1px solid #e5e7eb',borderRadius:'8px'}});
-  clinicWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'6px'}},'発行元（保険医療機関）'));
-  clinicWrap.appendChild(h('input',{id:'cf-clinic-name',value:'医療法人コンパス',placeholder:'医療機関名',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',marginBottom:'6px'}}));
-  clinicWrap.appendChild(h('input',{id:'cf-clinic-address',value:'〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室',placeholder:'住所',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',marginBottom:'6px',fontSize:'12px'}}));
-  const clinicTelFax=h('div',{style:{display:'flex',gap:'6px'}});
-  clinicTelFax.appendChild(h('input',{id:'cf-clinic-tel',value:'048-783-2713',placeholder:'TEL',style:{flex:'1',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}}));
-  clinicTelFax.appendChild(h('input',{id:'cf-clinic-fax',value:'03-6369-4732',placeholder:'FAX',style:{flex:'1',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}}));
-  clinicWrap.appendChild(clinicTelFax);
+  const clinicWrap=h('div');
+  clinicWrap.appendChild(h('label',{style:{display:'block',fontSize:'12px',fontWeight:'700',marginBottom:'4px'}},'発行元（保険医療機関）'));
+  const clinicSel=h('select',{id:'cf-clinic-sel',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db'}});
+  _masters.clinics.forEach(c=>clinicSel.appendChild(h('option',{value:c.id},c.name)));
+  clinicSel.appendChild(h('option',{value:'__new__'},'＋ 新しい発行元を登録...'));
+  clinicSel.addEventListener('change',()=>{
+    if(clinicSel.value==='__new__'){
+      const name=prompt('発行元（医療機関名）');
+      if(name&&name.trim()){
+        const address=prompt('住所')||'';const tel=prompt('TEL')||'';const fax=prompt('FAX')||'';
+        const id='cl_'+Date.now();const m=getConsentMasters();m.clinics.push({id,name:name.trim(),address,tel,fax});saveConsentMasters(m);
+        clinicSel.insertBefore(h('option',{value:id},name.trim()),clinicSel.lastChild);
+        clinicSel.value=id;
+      }else{clinicSel.value=_masters.clinics[0]?.id||'default';}
+    }
+  });
+  clinicWrap.appendChild(clinicSel);
   form.appendChild(clinicWrap);
 
   // 同意日
@@ -4020,6 +4053,9 @@ function consentNewPage(){
     const drJson={};
     document.querySelectorAll('.cf-difficulty:checked').forEach(cb=>{drJson[cb.value]=true});
     const diffNoteVal=(document.getElementById('cf-diff-note')||{}).value||'';
+    const _csId=(document.getElementById('cf-clinic-sel')||{}).value;
+    const _cms=getConsentMasters();
+    const _selClinic=_cms.clinics.find(c=>c.id===_csId)||_cms.clinics[0]||{name:'医療法人コンパス',address:'',tel:'',fax:''};
     const body={
       patient_id:pt,
       consent_type:ctype,
@@ -4060,11 +4096,11 @@ function consentNewPage(){
         goals:'',
         treatment_method:''
       },
-      clinic_name:(document.getElementById('cf-clinic-name')||{}).value||'医療法人コンパス',
-      clinic_address:(document.getElementById('cf-clinic-address')||{}).value||'',
-      clinic_tel:(document.getElementById('cf-clinic-tel')||{}).value||'',
-      clinic_fax:(document.getElementById('cf-clinic-fax')||{}).value||'',
-      form_payload:{addressee:(document.getElementById('cf-addressee')||{}).value||'医療法人コンパス'}
+      clinic_name:_selClinic.name||'医療法人コンパス',
+      clinic_address:_selClinic.address||'',
+      clinic_tel:_selClinic.tel||'',
+      clinic_fax:_selClinic.fax||'',
+      form_payload:{addressee:(document.getElementById('cf-addressee-sel')||{}).value||'医療法人コンパス'}
     };
     submitBtn.disabled=true;
     submitBtn.textContent='発行中...';
@@ -4124,11 +4160,8 @@ function consentNewPage(){
       at:now(),
       patientId:(document.getElementById('cf-patient')||{}).value||'',
       patientName:_ptName,
-      addressee:(document.getElementById('cf-addressee')||{}).value||'',
-      clinic_name:(document.getElementById('cf-clinic-name')||{}).value||'',
-      clinic_address:(document.getElementById('cf-clinic-address')||{}).value||'',
-      clinic_tel:(document.getElementById('cf-clinic-tel')||{}).value||'',
-      clinic_fax:(document.getElementById('cf-clinic-fax')||{}).value||'',
+      addressee:(document.getElementById('cf-addressee-sel')||{}).value||'',
+      clinicId:(document.getElementById('cf-clinic-sel')||{}).value||'',
       consent_type:(document.getElementById('cf-type')||{}).value||'request_form',
       consent_date:(document.getElementById('cf-date')||{}).value||'',
       validity_months:Number((document.getElementById('cf-months')||{}).value)||6,
@@ -4143,11 +4176,8 @@ function consentNewPage(){
     if(!wip)return;
     const ptEl=document.getElementById('cf-patient');if(ptEl&&wip.patientId)ptEl.value=wip.patientId;
     const dtEl=document.getElementById('cf-date');if(dtEl&&wip.consent_date)dtEl.value=wip.consent_date;
-    const aEl=document.getElementById('cf-addressee');if(aEl&&wip.addressee)aEl.value=wip.addressee;
-    const cnEl=document.getElementById('cf-clinic-name');if(cnEl&&wip.clinic_name)cnEl.value=wip.clinic_name;
-    const caEl=document.getElementById('cf-clinic-address');if(caEl&&wip.clinic_address)caEl.value=wip.clinic_address;
-    const ctEl=document.getElementById('cf-clinic-tel');if(ctEl&&wip.clinic_tel)ctEl.value=wip.clinic_tel;
-    const cxEl=document.getElementById('cf-clinic-fax');if(cxEl&&wip.clinic_fax)cxEl.value=wip.clinic_fax;
+    const aEl=document.getElementById('cf-addressee-sel');if(aEl&&wip.addressee){if(![...aEl.options].some(o=>o.value===wip.addressee)){aEl.insertBefore(h('option',{value:wip.addressee},wip.addressee),aEl.lastChild);}aEl.value=wip.addressee;}
+    const cEl=document.getElementById('cf-clinic-sel');if(cEl&&wip.clinicId)cEl.value=wip.clinicId;
     applyConsentSnapshot(wip); // 施術種別/期間/傷病/症状/通院困難/算定を反映
     try{applyTypeVisibility()}catch(e){}
   }
