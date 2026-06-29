@@ -1160,6 +1160,29 @@ const pts=myPatients().filter(p=>{
   return true;
 });if(!pts.length){w.appendChild(h('div',{className:'card',style:{textAlign:'center',padding:'48px'}},h('div',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px'}},S.ptSearch?('「'+S.ptSearch+'」に一致する患者がありません'):'患者が登録されていません'),S.ptSearch?btn('検索をクリア','btn-out',()=>{S.ptSearch='';rr()}):btn('+ 新規登録','btn-pri',()=>{if(!freeCheck('patients'))return;showPatientModal()})))}
 else{pts.forEach(p=>{const sb2=stBdg(p.status);const members=(p.members||[]).filter(m=>m.active!==false);const shared=(p.sharedWith||[]).filter(s=>s.status==='active').length;const card=h('div',{className:'card',style:{marginBottom:'12px',cursor:'pointer',padding:'16px',display:'flex',alignItems:'center',gap:'16px'},onClick:()=>{S.ptId=p.id;S.page='hub';S.hubTab='overview';rr()}});const info=h('div',{style:{flex:1}});info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},p.room?h('span',{style:{fontSize:'12px',fontWeight:'700',color:'var(--accent)',minWidth:'36px'}},p.room):null,h('span',{style:{fontSize:'16px',fontWeight:'700'}},p.name),bdg(sb2.l,sb2.c),p.cl?bdg(p.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(p.age?p.age+'歳 ':'')+(p.managerOrg?'管理：'+p.managerOrg:'')));const counts=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px',flexWrap:'wrap'}});const nc=ptCases(p.id).length,nco=ptConfs(p.id).length,nm=ptMons(p.id).length,na=ptAssess(p.id).length;if(nc)counts.appendChild(bdg('移行'+nc));if(na)counts.appendChild(bdg('アセス'+na));if(nco)counts.appendChild(bdg('担当者会議'+nco));if(nm)counts.appendChild(bdg('モニタ'+nm));if(members.length)counts.appendChild(bdg(members.length+'名関係者'));if(shared)counts.appendChild(bdg(shared+'名共有'));info.appendChild(counts);card.appendChild(info);card.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'20px'}},'→'));w.appendChild(card)})}return w}
+// --- 基本情報パネル（表示 → 中に編集ボタン） ---
+function showPatientInfo(pt){
+  const m=h('div',{className:'modal',style:{maxWidth:'560px'}});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'基本情報'));
+  m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'同意書を発行すると、住所・連絡先・代理人などがこの内容から自動で反映されます。'));
+  const row=(label,val)=>h('div',{style:{display:'flex',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'13px'}},h('div',{style:{minWidth:'120px',color:'var(--ink-m)',fontWeight:'700'}},label),h('div',{style:{flex:1}},val||'—'));
+  const sexL=pt.sex==='male'?'男性':pt.sex==='female'?'女性':'';
+  const signL=pt.selfSign==='proxy'?('代理署名（'+(pt.proxyRelation||'家族')+'　'+(pt.proxyName||'未登録')+'）'):'本人が自署';
+  m.appendChild(row('氏名',pt.name));
+  m.appendChild(row('部屋番号',pt.room));
+  m.appendChild(row('年齢・性別',((pt.age?pt.age+'歳':'')+(sexL?'　'+sexL:''))||''));
+  m.appendChild(row('介護認定',pt.cl));
+  m.appendChild(row('主傷病',pt.diagnosis));
+  m.appendChild(row('管理主体',pt.managerOrg));
+  m.appendChild(row('住所',pt.address));
+  m.appendChild(row('連絡先',pt.phone));
+  m.appendChild(row('自署区分',signL));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'18px'}},
+    btn('編集','btn-pri',()=>{S.modal=null;showPatientModal(pt)}),
+    btn('閉じる','btn-sec',()=>{S.modal=null;rr()})
+  ));
+  S.modal=m;rr();
+}
 // --- PATIENT MODAL (2-path: 入居前 vs 入居中) ---
 function showPatientModal(ex){const p=ex?{...ex,members:[...(ex.members||[]).map(m=>({...m}))]}:{id:'',name:'',age:'',sex:'',cl:'',diagnosis:'',dd:'',room:'',status:'pre_admission',startDate:'',address:'',phone:'',selfSign:'self',proxyName:'',proxyRelation:'',managerOrg:S.user?S.user.org:'',members:[],ownerEmail:getOwnerEmail(),sharedWith:[],audit:[],flags:{}};const isE=!!(ex&&ex.id);const m=h('div',{className:'modal'});m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'16px'}},isE?'患者情報の編集':'新規患者登録'));
 if(!isE){m.appendChild(h('div',{className:'section-label',style:{marginBottom:'8px'}},'開始状態を選択'));const sg=h('div',{style:{display:'flex',gap:'10px',marginBottom:'16px'}});[{v:'pre_admission',l:'入居前（退院調整あり）',d:'アセス→受入判断→入居決定'},{v:'active',l:'入居中・利用中（既存）',d:'今日からモニタリング/担当者会議開始'}].forEach(o=>{const cb=h('div',{style:{flex:1,padding:'14px',border:'2px solid '+(p.status===o.v?'var(--accent)':'var(--border)'),borderRadius:'12px',cursor:'pointer',background:p.status===o.v?'var(--accent-l)':'var(--surface)'},onClick:()=>{p.status=o.v;S.modal=null;showPatientModal(Object.assign({},p,{status:o.v}))}});cb.appendChild(h('div',{style:{fontWeight:'700',fontSize:'13px'}},o.l));cb.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},o.d));sg.appendChild(cb)});m.appendChild(sg)}
@@ -1184,7 +1207,7 @@ function showImportModal(){const m=h('div',{className:'modal'});m.appendChild(h(
 function patientHub(){const pt=D.patients.find(p=>p.id===S.ptId);if(!pt)return h('div',null,'患者が見つかりません');const w=h('div');
 w.appendChild(h('div',{style:{marginBottom:'12px'}},h('span',{style:{cursor:'pointer',fontSize:'13px',color:'var(--accent)',fontWeight:'600'},onClick:()=>{S.page='patients';S.ptId=null;rr()}},'← 患者一覧')));
 // --- Header: Name + Status + Manager + Primary Members + Next Tasks ---
-const hdr=h('div',{className:'pt-header'});const hdrTop=h('div',{className:'pt-hdr-top',style:{display:'flex',alignItems:'center',gap:'16px',marginBottom:'12px'}});const info=h('div',{style:{flex:1}});const sb2=stBdg(pt.status);info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},pt.room?h('span',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}},pt.room):null,h('span',{style:{fontSize:'20px',fontWeight:'800'}},pt.name),bdg(sb2.l,sb2.c),pt.cl?bdg(pt.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(pt.age?pt.age+'歳':'')+(pt.sex==='male'?' 男性':pt.sex==='female'?' 女性':'')+(pt.diagnosis?' '+pt.diagnosis:'')+(pt.dd?' 退院：'+pt.dd:'')));hdrTop.appendChild(info);hdrTop.appendChild(h('div',{style:{display:'flex',gap:'6px'}},btn('編集','btn-xs btn-out',()=>showPatientModal(pt)),
+const hdr=h('div',{className:'pt-header'});const hdrTop=h('div',{className:'pt-hdr-top',style:{display:'flex',alignItems:'center',gap:'16px',marginBottom:'12px'}});const info=h('div',{style:{flex:1}});const sb2=stBdg(pt.status);info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},pt.room?h('span',{style:{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}},pt.room):null,h('span',{style:{fontSize:'20px',fontWeight:'800'}},pt.name),bdg(sb2.l,sb2.c),pt.cl?bdg(pt.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(pt.age?pt.age+'歳':'')+(pt.sex==='male'?' 男性':pt.sex==='female'?' 女性':'')+(pt.diagnosis?' '+pt.diagnosis:'')+(pt.dd?' 退院：'+pt.dd:'')));hdrTop.appendChild(info);hdrTop.appendChild(h('div',{style:{display:'flex',gap:'6px'}},btn('基本情報','btn-xs btn-pri',()=>showPatientInfo(pt)),
     btn('薬剤情報を確認','btn-xs btn-out',()=>showMedLinkPicker(pt)),
     pt.status!=='closed'?btn('ステータス変更','btn-xs btn-out',()=>showStatusModal(pt)):null,
     !pt.archived?btn('非表示にする','btn-xs btn-out',()=>{
