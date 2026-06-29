@@ -604,6 +604,44 @@ async function handleRequest(request, env, json, err) {
     });
   }
 
+  // ── 公開：本人・家族のオンライン署名（ログイン不要・sign_token） ──
+  if (path.startsWith('/consent/sign/') && method === 'GET') {
+    const tok = path.replace('/consent/sign/', '');
+    if (!tok) return err('リンクが無効です', 404);
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE sign_token=?').bind(tok).first();
+    if (!cf) return err('リンクが無効か期限切れです', 404);
+    const sigs = await env.DB.prepare('SELECT signer_role, signature_method, signature_data, signed_at FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cf.id).all();
+    return json({ ok: true, consent_form: cf, signatures: sigs?.results || [], can_sign: cf.status === 'signed_by_doctor', call_url: cf.sign_call_url || '' });
+  }
+  if (path.startsWith('/consent/sign/') && method === 'POST') {
+    const tok = path.replace('/consent/sign/', '');
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE sign_token=?').bind(tok).first();
+    if (!cf) return err('リンクが無効か期限切れです', 404);
+    if (cf.status !== 'signed_by_doctor') return err('この同意書は署名できる状態ではありません（現状態: ' + cf.status + '）', 400);
+    const body = await request.json().catch(() => ({}));
+    const { signature_method, signature_data } = body;
+    if (!signature_method || !['electronic_seal', 'handwritten_image', 'typed_name'].includes(signature_method)) return err('署名方式が不正です');
+    const now = new Date().toISOString();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const ua = request.headers.get('User-Agent') || '';
+    const prevSig = await env.DB.prepare('SELECT event_hash FROM signature_events WHERE consent_form_id=? ORDER BY signed_at DESC LIMIT 1').bind(cf.id).first();
+    const prevEventHash = prevSig?.event_hash || '';
+    const seId = 'SE-' + genUuid();
+    const signerId = 'public:' + (cf.patient_id || '');
+    const eventHash = await sha256Hex(`${seId}|${cf.id}|${signerId}|patient|${signature_method}|${signature_data || ''}|${now}|${prevEventHash}`);
+    await env.DB.prepare(`INSERT INTO signature_events (id, consent_form_id, signer_user_id, signer_role, signature_method, signature_data, signed_at, signed_ip, signed_user_agent, event_hash, prev_event_hash, created_at) VALUES (?, ?, ?, 'patient', ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      seId, cf.id, signerId, signature_method, signature_data || null, now, ip, ua, eventHash, prevEventHash || null, now
+    ).run();
+    await appendHashChain(env, 'signature_event', seId, eventHash);
+    const allSigs = await env.DB.prepare('SELECT event_hash FROM signature_events WHERE consent_form_id=? ORDER BY signed_at ASC').bind(cf.id).all();
+    const sigConcat = (allSigs?.results || []).map(s => s.event_hash).join('|');
+    const contentHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
+    const chainRow = await appendHashChain(env, 'consent_form', cf.id, contentHash);
+    await env.DB.prepare("UPDATE consent_forms SET status='signed_by_patient', content_hash=?, prev_hash=?, chain_index=?, sign_token=NULL, updated_at=? WHERE id=?")
+      .bind(contentHash, chainRow.prev_chain_hash, chainRow.chain_index, now, cf.id).run();
+    return json({ ok: true });
+  }
+
   // ── Token認証 ─────────────────────────────────────────────
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();
@@ -2378,7 +2416,23 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true, signature_event_id: seId, content_hash: contentHash, chain_index: chainRow.chain_index });
   }
 
-  // ── POST /consent/:id/send（宛先医師へアプリ内で署名依頼を送信） ──
+  // ── POST /consent/:id/sign-link（本人・家族へオンライン署名リンクを発行） ──
+  const signLinkMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/sign-link$/);
+  if (signLinkMatch && method === 'POST') {
+    const cfId = signLinkMatch[1];
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (cf.org_id !== orgId && currentUser.role !== 'admin') return err('権限がありません', 403);
+    if (cf.status !== 'signed_by_doctor') return err('医師署名後に送信できます（現状態: ' + cf.status + '）', 400);
+    const body = await request.json().catch(() => ({}));
+    const tok = 'sg_' + genUuid().replace(/-/g, '');
+    const callUrl = (body.call_url || '').toString().slice(0, 500);
+    await env.DB.prepare("UPDATE consent_forms SET sign_token=?, sign_call_url=?, updated_at=? WHERE id=?")
+      .bind(tok, callUrl, new Date().toISOString(), cfId).run();
+    return json({ ok: true, sign_token: tok });
+  }
+
   const sendMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/send$/);
   if (sendMatch && method === 'POST') {
     const cfId = sendMatch[1];
@@ -3507,6 +3561,9 @@ async function initDB(db) {
     `ALTER TABLE consent_forms ADD COLUMN requested_doctor_user_id TEXT`,
     `ALTER TABLE consent_forms ADD COLUMN sent_at TEXT`,
     `ALTER TABLE consent_forms ADD COLUMN send_status TEXT`,
+    // ── 本人・家族のオンライン署名（ログイン不要の公開リンク） ──
+    `ALTER TABLE consent_forms ADD COLUMN sign_token TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN sign_call_url TEXT`,
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {

@@ -992,6 +992,89 @@ function showLinkAccountModal(){
   ov.addEventListener('click',e=>{if(e.target===ov)close()});
   setTimeout(()=>lid.focus(),50);
 }
+function signScr(){
+  if(S.signDone){
+    const w=h('div',{className:'auth-bg'});
+    const cd=h('div',{className:'card',style:{width:'100%',maxWidth:'460px',padding:'32px',textAlign:'center'}});
+    cd.appendChild(h('div',{style:{fontSize:'20px',fontWeight:'800',color:'#0891b2',marginBottom:'8px'}},'署名が完了しました'));
+    cd.appendChild(h('div',{style:{fontSize:'13px',color:'#64748b'}},'ご署名ありがとうございました。同意書は確定されました。この画面は閉じて構いません。'));
+    w.appendChild(cd);return w;
+  }
+  const p=S.signPayload||{};const cf=p.consent_form||{};
+  let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
+  const sg=fp.signer||{};
+  const signerLabel=sg.mode==='proxy'?('代理署名（'+(sg.relation||'家族')+'）：'+(sg.name||'')):('本人（'+(cf.patient_name||'')+'）の自署');
+  const w=h('div',{className:'auth-bg',style:{padding:'16px',overflowY:'auto'}});
+  const cd=h('div',{className:'card',style:{width:'100%',maxWidth:'560px',padding:'24px',margin:'0 auto'}});
+  cd.appendChild(h('div',{style:{fontSize:'20px',fontWeight:'800',marginBottom:'4px'}},'同意書への署名'));
+  cd.appendChild(h('div',{style:{fontSize:'13px',color:'#475569',marginBottom:'12px'}},'下記の内容をご確認のうえ、ご署名ください。'));
+  const sum=h('div',{style:{padding:'12px 14px',background:'#f9fafb',borderRadius:'8px',marginBottom:'12px',fontSize:'13px',lineHeight:'1.9'}});
+  sum.appendChild(h('div',null,'発行元：'+(cf.clinic_name||'医療法人コンパス')));
+  if(fp.addressee)sum.appendChild(h('div',null,'宛先：'+fp.addressee));
+  sum.appendChild(h('div',null,'署名者：'+signerLabel));
+  sum.appendChild(h('div',null,'同意日：'+(cf.consent_date||'')+'　/　有効期限：'+(cf.expires_at||'').slice(0,10)));
+  cd.appendChild(sum);
+  cd.appendChild(btn('同意書の内容をPDFで確認','btn-out btn-sm',()=>previewConsentFromPayload(cf,p.signatures||[])));
+  if(p.call_url){
+    cd.appendChild(h('a',{href:p.call_url,target:'_blank',style:{display:'block',marginTop:'10px',padding:'10px',background:'#ecfeff',border:'1px solid #67e8f9',borderRadius:'8px',textAlign:'center',color:'#0e7490',fontWeight:'700',textDecoration:'none'}},'ビデオ通話に参加する'));
+  }
+  if(!p.can_sign){
+    cd.appendChild(h('div',{style:{marginTop:'14px',padding:'12px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:'8px',fontSize:'13px',color:'#991b1b'}},'この同意書は現在署名できる状態ではありません。発行元にご確認ください。'));
+    w.appendChild(cd);return w;
+  }
+  cd.appendChild(h('div',{style:{fontWeight:'700',fontSize:'14px',margin:'16px 0 6px'}},'こちらに署名（直筆）'));
+  const canvas=h('canvas',{width:'500',height:'180',style:{width:'100%',height:'180px',border:'1px solid #cbd5e1',borderRadius:'8px',background:'#fff',display:'block'}});
+  canvas.style.touchAction='none';
+  cd.appendChild(canvas);
+  const ctx=canvas.getContext('2d');ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#0f172a';
+  let drawing=false,has=false,lx=0,ly=0;
+  const pos=e=>{const r=canvas.getBoundingClientRect();const sx=canvas.width/r.width,sy=canvas.height/r.height;const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;return[(cx-r.left)*sx,(cy-r.top)*sy];};
+  canvas.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;[lx,ly]=pos(e);});
+  canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const[x,y]=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.stroke();[lx,ly]=[x,y];has=true;});
+  canvas.addEventListener('pointerup',()=>drawing=false);canvas.addEventListener('pointerleave',()=>drawing=false);
+  const row=h('div',{style:{display:'flex',gap:'8px',marginTop:'12px',alignItems:'center'}});
+  row.appendChild(btn('クリア','btn-out btn-sm',()=>{ctx.clearRect(0,0,canvas.width,canvas.height);has=false;}));
+  row.appendChild(h('div',{style:{flex:1}}));
+  row.appendChild(btn('署名して送信','btn-pri',async()=>{
+    if(!has){toast('署名を記入してください');return;}
+    const url=canvas.toDataURL('image/png');
+    const res=await api('/consent/sign/'+S.signToken,{method:'POST',body:JSON.stringify({signature_method:'handwritten_image',signature_data:url})});
+    if(res&&res.ok){S.signDone=true;rr();}else toast(res?.error||'送信に失敗しました');
+  }));
+  cd.appendChild(row);
+  w.appendChild(cd);return w;
+}
+function showSendSignLinkModal(cf){
+  const ov=h('div',{style:{position:'fixed',inset:'0',background:'rgba(15,23,42,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000',padding:'16px'}});
+  const close=()=>{try{document.body.removeChild(ov)}catch(e){}};
+  const card=h('div',{className:'card',style:{width:'100%',maxWidth:'480px',padding:'22px',maxHeight:'90vh',overflow:'auto'}});
+  card.appendChild(h('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'本人・家族へ署名リンクを送信'));
+  card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},'相手はログイン不要でリンクを開き、スマホやPCで直筆署名できます。必要ならビデオ通話URLを併記し、通話しながら署名してもらえます。'));
+  const callInp=h('input',{type:'text',placeholder:'ビデオ通話URL（任意・Zoom/Meet/LINEなど）',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',boxSizing:'border-box',marginBottom:'10px'}});
+  card.appendChild(callInp);
+  const result=h('div');card.appendChild(result);
+  const genBtn=btn('署名リンクを発行','btn-pri',async()=>{
+    const res=await api('/consent/'+cf.id+'/sign-link',{method:'POST',body:JSON.stringify({call_url:callInp.value.trim()})});
+    if(!res||!res.ok){toast(res?.error||'発行に失敗しました');return;}
+    const url=window.location.origin+window.location.pathname+'?sign='+res.sign_token;
+    const msg='【署名のお願い】同意書にオンラインで署名をお願いします。\n'+url+(callInp.value.trim()?('\nビデオ通話：'+callInp.value.trim()):'');
+    result.innerHTML='';
+    result.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',margin:'4px 0 6px',color:'#0e7490'}},'署名リンク（コピーして相手に送ってください）'));
+    const urlBox=h('input',{type:'text',value:url,readonly:true,style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #cbd5e1',fontSize:'12px',boxSizing:'border-box',marginBottom:'8px'}});
+    result.appendChild(urlBox);
+    const sh=h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}});
+    sh.appendChild(btn('リンクをコピー','btn-out btn-sm',()=>{try{navigator.clipboard.writeText(url);toast('コピーしました')}catch(e){urlBox.select()}}));
+    sh.appendChild(btn('LINEで送る','btn-out btn-sm',()=>window.open('https://line.me/R/msg/text/?'+encodeURIComponent(msg),'_blank')));
+    sh.appendChild(btn('メールで送る','btn-out btn-sm',()=>window.open('mailto:?subject='+encodeURIComponent('同意書への署名のお願い')+'&body='+encodeURIComponent(msg),'_blank')));
+    sh.appendChild(btn('SMSで送る','btn-out btn-sm',()=>window.open('sms:?body='+encodeURIComponent(msg),'_blank')));
+    result.appendChild(sh);
+    genBtn.style.display='none';
+  });
+  card.appendChild(genBtn);
+  card.appendChild(h('div',{style:{marginTop:'12px'}},btn('閉じる','btn-sec',()=>close())));
+  ov.appendChild(card);document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)close()});
+}
 function loginScr(){const w=h('div',{className:'auth-bg'});const cd=h('form',{className:'card',style:{width:'100%',maxWidth:'420px',padding:'32px'},onSubmit:e=>{e.preventDefault();document.querySelector('.btn-pri.btn-full').click()}});const lastEmail=(()=>{try{return localStorage.getItem('medadapt-last-email')||''}catch(e){return''}})();cd.appendChild(h('div',{style:{textAlign:'center',marginBottom:'24px'}},h('img',{src:'icon-192.png',alt:APP_CONFIG.name,style:{width:'72px',height:'72px',borderRadius:'14px',marginBottom:'12px',display:'inline-block'}}),h('div',{style:{fontSize:'24px',fontWeight:'800',color:'var(--accent)'}},APP_CONFIG.name),h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},APP_CONFIG.tagline),h('div',{style:{fontSize:'12px',color:S.loginErr?'var(--red)':'var(--ink-m)',marginTop:'12px'}},S.loginErr||'ログインIDとパスワードを入力してください')));if(S.loginUnverified){cd.appendChild(h('div',{style:{padding:'10px 14px',background:'#fff7ed',border:'1px solid #fb923c',borderRadius:'8px',marginBottom:'12px',fontSize:'12px'}},h('div',{style:{fontWeight:'700',color:'#c2410c',marginBottom:'4px'}},'メールアドレスが未確認です'),h('div',{style:{color:'#92400e',marginBottom:'8px'}},'登録時に送信した確認メールのリンクをクリックしてください。'),btn('確認メールを再送する','btn-sm btn-out',async()=>{const email=document.getElementById('l_email')?.value?.trim();if(!email){toast('メールアドレスを入力してください');return}const res=await api('/auth/resend-verify',{method:'POST',body:JSON.stringify({email})});if(res)toast('確認メールを再送しました');S.loginUnverified=false;rr()})));}cd.appendChild(h('div',{className:'field'},h('label',{for:'l_email'},'ログインID'),h('input',{id:'l_email',type:'text',name:'loginid',autocomplete:'username',placeholder:'ADM-XXXXXX または STF-XXXXXX',value:lastEmail||''})));cd.appendChild(h('div',{className:'field'},h('label',{for:'l_pw'},'パスワード'),h('div',{style:{position:'relative'}},h('input',{id:'l_pw',type:'password',name:'password',autocomplete:'current-password',placeholder:'',style:{paddingRight:'48px'}}),h('button',{type:'button',style:{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'var(--ink-m)',fontFamily:'inherit'},onClick:()=>{const inp=document.getElementById('l_pw');if(inp)inp.type=inp.type==='password'?'text':'password';}},'👁'))));if(lastEmail){setTimeout(()=>{const pw=document.getElementById('l_pw');if(pw)pw.focus()},100)}cd.appendChild(h('div',{style:{marginTop:'8px'}},h('button',{className:'btn btn-pri btn-full',type:'submit',onClick:async()=>{const email=document.getElementById('l_email')?.value?.trim(),pw=document.getElementById('l_pw')?.value?.trim();if(!email||!pw){S.loginErr='入力してください';rr();return}S.loginUnverified=false;try{const res=await api('/auth/login',{method:'POST',body:JSON.stringify({email,password:pw})});if(res&&res.token){saveToken(res.token);S.user=res.user;try{localStorage.setItem('medadapt-last-email',email);localStorage.setItem('medadapt-autologin',res.user.login_id||email)}catch(e){}if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}}await loadFromCloud();await checkModuleAccess();startNotifPolling();const _mem=await loadMemberships();S.loginErr='';if(_mem&&_mem.memberships&&_mem.memberships.length>1){const _last=(()=>{try{return localStorage.getItem('medadapt-last-org')}catch(e){return null}})();if(_last&&_mem.memberships.some(m=>m.org_id===_last)){await switchOrg(_last);return;}S.scr='org_picker';rr();return;}S.scr='app';S.page='patients';rr()}else if(res&&res.error&&res.error.includes('未確認')){S.loginErr='メールアドレスが未確認です';S.loginUnverified=true;rr()}else{const u=findUser(email);if(u&&u.pw===pw){S.user=u;seedDemoData(email);try{localStorage.setItem('medadapt-autologin',email)}catch(e){}loadFromCloud().then(()=>rr());if(window.PasswordCredential){try{const cred=new PasswordCredential({id:email,password:pw,name:email});navigator.credentials.store(cred)}catch(e){}}S.scr='app';S.page='patients';S.loginErr='';rr()}else{S.loginErr='ログインIDまたはパスワードが違います';rr()}}}catch(e){S.loginErr='通信エラー';rr()}}},'ログイン')));cd.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',margin:'18px 0 14px',color:'var(--ink-m)',fontSize:'12px'}},h('div',{style:{flex:1,height:'1px',background:'var(--border)'}}),h('span',{},'または'),h('div',{style:{flex:1,height:'1px',background:'var(--border)'}})));cd.appendChild(h('button',{type:'button',className:'btn btn-out btn-full',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'},onClick:()=>startQRScanLogin()},'QRコードでログイン'));cd.appendChild(h('div',{style:{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px',fontSize:'13px'}},h('a',{href:'#',style:{color:'var(--ink-m)',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='resetpw';rr()}},'パスワードを忘れた'),h('a',{href:'#',style:{color:'var(--accent)',fontWeight:'600',textDecoration:'none'},onClick:e=>{e.preventDefault();S.scr='signup';S.signupStep=1;rr()}},'新規法人登録')));cd.appendChild(h('a',{href:'index.html',style:{display:'block',textAlign:'center',marginTop:'12px',fontSize:'12px',color:'var(--accent)',textDecoration:'none',fontWeight:'600'}},'← ｍやるゼ！トップへ'));w.appendChild(cd);return w}
 
 function signupScr(){const w=h('div',{className:'auth-bg'});const cd=h('div',{className:'card',style:{width:'100%',maxWidth:S.signupStep===1?'700px':'500px',padding:'32px'}});
@@ -3854,6 +3937,7 @@ function consentPage(){
       h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
         h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700',background:statusColors[item.status]||'#94a3b8',color:'#fff'}},statusLabels[item.status]||item.status),
         (item.status==='draft'&&item.send_status!=='sent')?btn('宛先へ送信','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
+        (item.status==='signed_by_doctor')?btn('本人・家族へ送信','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
         item.send_status==='sent'?h('span',{style:{fontSize:'11px',color:'#1e40af',fontWeight:'700'}},'送信済'):null,
         btn('PDF','btn-sm btn-pri',e=>{if(e&&e.stopPropagation)e.stopPropagation();previewConsentPDF(item.id);})
       )
@@ -4598,7 +4682,8 @@ function consentDetailPage(){
     }));
   }
   if(cf.status==='signed_by_doctor'){
-    actions.appendChild(btn('本人・家族が署名する（自署）','btn-pri btn-sm',()=>{
+    actions.appendChild(btn('本人・家族へ署名リンクを送信','btn-pri btn-sm',()=>showSendSignLinkModal(cf)));
+    actions.appendChild(btn('本人・家族が署名する（自署）','btn-out btn-sm',()=>{
       let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
       const sg=fp.signer||{};
       const title=(sg.mode==='proxy')?('代理署名（'+(sg.relation||'家族')+'　'+(sg.name||'')+'）'):'患者本人の自署';
@@ -4610,6 +4695,20 @@ function consentDetailPage(){
           S.consentDetail=null;rr();
         }else toast(res?.error||'エラー');
       });
+    }));
+    actions.appendChild(btn('宛先へ送信','btn-out btn-sm',async()=>{
+      let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
+      const cms=getConsentMasters();
+      const addr=(cms.addressees||[]).find(a=>a.name===(fp.addressee||''));
+      let login_id=addr&&addr.login_id?addr.login_id:'';let email='';
+      if(!login_id){
+        const v=prompt('宛先医師のログインID または メールアドレスを入力');
+        if(!v)return;
+        if(v.includes('@'))email=v.trim();else login_id=v.trim();
+      }
+      const res=await api('/consent/'+cf.id+'/send',{method:'POST',body:JSON.stringify({doctor_login_id:login_id,doctor_email:email})});
+      if(res?.ok){toast('宛先（'+(res.doctor_name||'医師')+'）へ送信しました');S.consentDetail=null;rr();}
+      else toast(res?.error||'送信に失敗しました');
     }));
   }
   // PDFプレビューは下書き〜確定の全状態で確認用に表示（previewConsentPDF は未署名でも動作）
@@ -4678,10 +4777,14 @@ async function previewConsentPDF(cfId){
     api('/signed-docs/by-doc/consent_form/'+cfId,{silent404:true})
   ]);
   if(!detail?.consent_form){toast('データ取得失敗');return;}
-  const cf=detail.consent_form;
-  const sd=sdRes?.signed_document;
-  const doctorSig=(detail.signatures||[]).find(s=>s.signer_role==='doctor');
-  const patientSig=(detail.signatures||[]).find(s=>s.signer_role==='patient');
+  consentTemplateRenderInWindow(detail.consent_form, detail.signatures||[], sdRes?.signed_document||null);
+}
+function previewConsentFromPayload(cf, signatures){
+  consentTemplateRenderInWindow(cf, signatures||[], null);
+}
+function consentTemplateRenderInWindow(cf, signatures, sd){
+  const doctorSig=(signatures||[]).find(s=>s.signer_role==='doctor');
+  const patientSig=(signatures||[]).find(s=>s.signer_role==='patient');
   // テンプレ選択: 厚労省様式の医師交付同意書（はり・きゅう / マッサージ） or コンパス依頼書（既定）
   let tplPath='assets/consent_form_template.html';
   let renderFn='consentTemplateRender';
@@ -7859,7 +7962,7 @@ function disasterPage(){
   return w;
 }
 // --- ROUTER ---
-function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='org_picker')app.appendChild(orgPickerScr());else if(S.scr==='app'){if(S.user&&needsConsent()){app.appendChild(consentGateScr())}else{app.appendChild(appShell())}};if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
+function rr(){const _om=document.querySelector('.main');const _sy=_om?_om.scrollTop:(window.scrollY||0);const _pg=S.scr+':'+(S.page||'')+':'+(S.ptId||'')+':'+(S.hubTab||'');const _changed=_pg!==S._lastPg;S._lastPg=_pg;const app=document.getElementById('app');app.innerHTML='';if(S.scr==='login')app.appendChild(loginScr());else if(S.scr==='signup')app.appendChild(signupScr());else if(S.scr==='resetpw')app.appendChild(resetpwScr());else if(S.scr==='changepw')app.appendChild(changepwScr());else if(S.scr==='staffRegister')app.appendChild(staffRegisterScr());else if(S.scr==='org_picker')app.appendChild(orgPickerScr());else if(S.scr==='sign')app.appendChild(signScr());else if(S.scr==='app'){if(S.user&&needsConsent()){app.appendChild(consentGateScr())}else{app.appendChild(appShell())}};if(S.toast){const ex=document.querySelector('.toast');if(ex)ex.remove();document.body.appendChild(h('div',{className:'toast'},S.toast))}const _ty=_changed?0:_sy;const _restore=()=>{const nm=document.querySelector('.main');if(nm)nm.scrollTop=_ty;window.scrollTo(0,_ty)};_restore();requestAnimationFrame(()=>{_restore();requestAnimationFrame(_restore)});setTimeout(_restore,0);setTimeout(_restore,50)}
 // --- INIT ---
 ld();
 // Token-based auto-login
@@ -7872,6 +7975,14 @@ function tryLocalLogin(){
 // URLパラメータ処理（メール認証・パスワードリセット）
 (async()=>{
   const params=new URLSearchParams(window.location.search);
+  const signToken=params.get('sign');
+  if(signToken){
+    S.signToken=signToken;
+    const res=await api('/consent/sign/'+signToken,{silent404:true});
+    if(res&&res.ok){S.signPayload=res;S.scr='sign';rr();}
+    else{S.scr='login';S.loginErr='署名リンクが無効か期限切れです';rr();}
+    return;
+  }
   const verifyToken=params.get('verify');
   const resetToken=params.get('reset');
   const paramEmail=params.get('email');
