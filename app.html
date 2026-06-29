@@ -3823,7 +3823,68 @@ function saveConsentMasters(m){
   try{sv();}catch(e){}/* /sync POST でクラウド(org_settings)へ＝他端末/スタッフ共有 */
 }
 
+// 発行元（自社法人）/ 宛先（医療機関）の登録・編集モーダル（promptの置き換え）
+// オーバーレイをbodyへ直挿し＝発行画面の入力状態を保持（rr()しない）
+function showMasterModal(kind,existing,onSaved){
+  const isClinic=kind==='clinic';
+  const f={name:'',login_id:'',address:'',tel:'',fax:'',...(existing||{})};
+  const ov=h('div',{style:{position:'fixed',inset:'0',background:'rgba(15,23,42,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000',padding:'16px'}});
+  const close=()=>{try{document.body.removeChild(ov)}catch(e){}};
+  const card=h('div',{className:'card',style:{width:'100%',maxWidth:'480px',padding:'22px',maxHeight:'90vh',overflow:'auto'}});
+  card.appendChild(h('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},(existing?'編集：':'登録：')+(isClinic?'発行元（自社の保険医療機関）':'宛先（宛先医療機関）')));
+  card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},isClinic?'自社が複数の法人を持つ場合は、法人ごとにここへ登録します。発行する同意書の「保険医療機関名・住所・連絡先」に反映されます。':'医師が複数の医療機関に所属する場合は、所属先ごとにここへ登録します。医師のログインIDを入れると、その宛先へアプリ内で署名依頼を送れます。'));
+  // NDA締結済みの取引先から選ぶ（宛先のみ）
+  if(!isClinic && Array.isArray(S.ndaList)){
+    const opts=S.ndaList.filter(n=>n.status==='active'&&(n.partner_org||n.partner_login_id));
+    if(opts.length){
+      const pw=h('div',{className:'field'});
+      pw.appendChild(h('label',null,'NDA締結済みの取引先から選ぶ（任意）'));
+      const sel=h('select',{onInput:e=>{const o=opts.find(x=>(x.partner_org||x.partner_login_id)===e.target.value);if(o){const n=document.getElementById('mm_name'),l=document.getElementById('mm_login');if(n)n.value=o.partner_org||'';if(l)l.value=o.partner_login_id||'';f.name=o.partner_org||'';f.login_id=o.partner_login_id||'';}}});
+      sel.appendChild(h('option',{value:''},'選択しない（手入力）'));
+      opts.forEach(o=>sel.appendChild(h('option',{value:o.partner_org||o.partner_login_id},(o.partner_org||o.partner_login_id))));
+      pw.appendChild(sel);card.appendChild(pw);
+    }
+  }
+  card.appendChild(fld('医療機関名','mm_name',f.name,v=>{f.name=v},{req:true,ph:'医療法人○○'}));
+  if(!isClinic)card.appendChild(fld('宛先医師のログインID（任意）','mm_login',f.login_id,v=>{f.login_id=v},{ph:'ADM-XXXXXX / STF-XXXXXX'}));
+  card.appendChild(fld('住所','mm_addr',f.address,v=>{f.address=v},{ph:'東京都…'}));
+  const grid=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+  grid.appendChild(fld('TEL','mm_tel',f.tel,v=>{f.tel=v},{ph:'03-…'}));
+  grid.appendChild(fld('FAX','mm_fax',f.fax,v=>{f.fax=v},{ph:'03-…'}));
+  card.appendChild(grid);
+  card.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn(existing?'保存':'登録','btn-pri',()=>{
+      const name=(document.getElementById('mm_name')?.value||'').trim();
+      if(!name){toast('医療機関名を入力してください');return;}
+      const address=(document.getElementById('mm_addr')?.value||'').trim();
+      const tel=(document.getElementById('mm_tel')?.value||'').trim();
+      const fax=(document.getElementById('mm_fax')?.value||'').trim();
+      const login_id=isClinic?'':(document.getElementById('mm_login')?.value||'').trim();
+      const mm=getConsentMasters();
+      const list=isClinic?mm.clinics:mm.addressees;
+      let item;
+      if(existing&&existing.id){
+        item=list.find(x=>x.id===existing.id);
+        if(item){item.name=name;item.address=address;item.tel=tel;item.fax=fax;if(!isClinic)item.login_id=login_id;}
+      }else{
+        item={id:(isClinic?'cl_':'ad_')+Date.now(),name,address,tel,fax};
+        if(!isClinic)item.login_id=login_id;
+        list.push(item);
+      }
+      saveConsentMasters(mm);
+      close();
+      if(onSaved)onSaved(item);
+      toast(existing?'保存しました':'登録しました');
+    }),
+    btn('キャンセル','btn-sec',()=>close())
+  ));
+  ov.appendChild(card);document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)close()});
+  setTimeout(()=>{const n=document.getElementById('mm_name');if(n)n.focus()},50);
+}
+
 function consentNewPage(){
+  if(typeof S.ndaList==='undefined'){S.ndaList=[];try{api('/nda/list',{silent404:true}).then(res=>{S.ndaList=res?.ndas||[];}).catch(()=>{});}catch(e){}}
   const w=h('div',{style:{padding:'24px',maxWidth:'760px'}});
   // v4.16: 患者ハブから来た場合は戻り先を患者ハブにする
   const fromHub=!!S.preselectPatientId;
@@ -3946,16 +4007,11 @@ function consentNewPage(){
   addrSel.appendChild(h('option',{value:'__new__'},'＋ 新しい宛先を登録...'));
   addrSel.addEventListener('change',()=>{
     if(addrSel.value==='__new__'){
-      const name=prompt('新しい宛先（医療機関名）を入力');
-      if(name&&name.trim()){
-        const login_id=prompt('宛先医師のログインID（アプリ内で署名依頼を送る場合に入力・任意）\n例: ADM-XXXXXX / STF-XXXXXX')||'';
-        const address=prompt('宛先の住所（任意・空欄可）')||'';
-        const tel=prompt('宛先のTEL（任意・空欄可）')||'';
-        const fax=prompt('宛先のFAX（任意・空欄可）')||'';
-        const m=getConsentMasters();m.addressees.push({id:'ad_'+Date.now(),name:name.trim(),login_id:login_id.trim(),address,tel,fax});saveConsentMasters(m);
-        addrSel.insertBefore(h('option',{value:name.trim()},name.trim()),addrSel.lastChild);
-        addrSel.value=name.trim();
-      }else{addrSel.value=_masters.addressees[0]?.name||'医療法人コンパス';}
+      addrSel.value=_masters.addressees[0]?.name||'医療法人コンパス';
+      showMasterModal('addressee',null,(item)=>{
+        addrSel.insertBefore(h('option',{value:item.name},item.name),addrSel.lastChild);
+        addrSel.value=item.name;
+      });
     }
   });
   addrWrap.appendChild(addrSel);
@@ -3968,13 +4024,11 @@ function consentNewPage(){
   clinicSel.appendChild(h('option',{value:'__new__'},'＋ 新しい発行元を登録...'));
   clinicSel.addEventListener('change',()=>{
     if(clinicSel.value==='__new__'){
-      const name=prompt('発行元（医療機関名）');
-      if(name&&name.trim()){
-        const address=prompt('住所')||'';const tel=prompt('TEL')||'';const fax=prompt('FAX')||'';
-        const id='cl_'+Date.now();const m=getConsentMasters();m.clinics.push({id,name:name.trim(),address,tel,fax});saveConsentMasters(m);
-        clinicSel.insertBefore(h('option',{value:id},name.trim()),clinicSel.lastChild);
-        clinicSel.value=id;
-      }else{clinicSel.value=_masters.clinics[0]?.id||'default';}
+      clinicSel.value=_masters.clinics[0]?.id||'default';
+      showMasterModal('clinic',null,(item)=>{
+        clinicSel.insertBefore(h('option',{value:item.id},item.name),clinicSel.lastChild);
+        clinicSel.value=item.id;
+      });
     }
   });
   clinicWrap.appendChild(clinicSel);
@@ -4703,6 +4757,7 @@ async function previewConsentPDF(cfId){
 // 該当する保険医療機関名は「医療法人コンパス」（歯科併設の正式クリニック名ではなく法人名で統一）
 // ===========================================================
 function consentMastersPage(){
+  if(typeof S.ndaList==='undefined'){S.ndaList=[];try{api('/nda/list',{silent404:true}).then(res=>{S.ndaList=res?.ndas||[];}).catch(()=>{});}catch(e){}}
   const w=h('div',{style:{padding:'24px',maxWidth:'860px'}});
   w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}},
     h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.page='consent';rr()}},'← 同意書')));
@@ -4719,13 +4774,7 @@ function consentMastersPage(){
     card.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b'}},c.address||'住所未登録'));
     card.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b',marginBottom:'6px'}},'TEL：'+(c.tel||'—')+'　FAX：'+(c.fax||'—')));
     const row=h('div',{style:{display:'flex',gap:'6px'}});
-    row.appendChild(btn('編集','btn-xs btn-out',()=>{
-      const name=prompt('発行元 医療機関名',c.name);if(name===null)return;
-      const address=prompt('住所',c.address||'');if(address===null)return;
-      const tel=prompt('TEL',c.tel||'');if(tel===null)return;
-      const fax=prompt('FAX',c.fax||'');if(fax===null)return;
-      c.name=name.trim()||c.name;c.address=address;c.tel=tel;c.fax=fax;saveConsentMasters(m);toast('更新しました');rr();
-    }));
+    row.appendChild(btn('編集','btn-xs btn-out',()=>showMasterModal('clinic',c,()=>rr())));
     if(c.id!=='default')row.appendChild(btn('削除','btn-xs btn-danger',()=>{if(!confirm('この発行元を削除しますか？'))return;m.clinics=m.clinics.filter(x=>x!==c);saveConsentMasters(m);toast('削除しました');rr();}));
     card.appendChild(row);
     clinicSec.appendChild(card);
@@ -4751,14 +4800,7 @@ function consentMastersPage(){
     card.appendChild(h('div',{style:{fontSize:'12px',color:a.login_id?'#0891b2':'#94a3b8'}},a.login_id?('医師ログインID：'+a.login_id+'（アプリ内送信可）'):'医師ログインID未登録（アプリ内送信不可）'));
     if(a.address||a.tel||a.fax)card.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b'}},(a.address||'')+(a.tel?'　TEL：'+a.tel:'')+(a.fax?'　FAX：'+a.fax:'')));
     const row=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}});
-    row.appendChild(btn('編集','btn-xs btn-out',()=>{
-      const name=prompt('宛先 医療機関名',a.name);if(name===null)return;
-      const login_id=prompt('宛先医師のログインID（アプリ内送信用・任意）',a.login_id||'');if(login_id===null)return;
-      const address=prompt('住所',a.address||'');if(address===null)return;
-      const tel=prompt('TEL',a.tel||'');if(tel===null)return;
-      const fax=prompt('FAX',a.fax||'');if(fax===null)return;
-      a.name=name.trim()||a.name;a.login_id=login_id.trim();a.address=address;a.tel=tel;a.fax=fax;saveConsentMasters(m);toast('更新しました');rr();
-    }));
+    row.appendChild(btn('編集','btn-xs btn-out',()=>showMasterModal('addressee',a,()=>rr())));
     if(a.id!=='default')row.appendChild(btn('削除','btn-xs btn-danger',()=>{if(!confirm('この宛先を削除しますか？'))return;m.addressees=m.addressees.filter(x=>x!==a);saveConsentMasters(m);toast('削除しました');rr();}));
     card.appendChild(row);
     addrSec.appendChild(card);
