@@ -2431,7 +2431,8 @@ async function handleRequest(request, env, json, err) {
       allowedAsPatient = !!p;
     }
     const allowedAsProxy = (cf.org_id === orgId) && ['med_clinic', 'org_staff', 'org_admin', 'admin'].includes(currentUser.role);
-    if (!allowedAsPatient && !allowedAsProxy && !_isSharedTherapist) return err('患者署名の権限がありません', 403);
+    const _isAssignee = (cf.sign_assignee_user_id && cf.sign_assignee_user_id === currentUser.id);
+    if (!allowedAsPatient && !allowedAsProxy && !_isSharedTherapist && !_isAssignee) return err('患者署名の権限がありません', 403);
     const body = await request.json().catch(() => ({}));
     const { signature_method, signature_data } = body;
     if (!signature_method || !['electronic_seal', 'handwritten_image', 'typed_name'].includes(signature_method)) {
@@ -2457,7 +2458,7 @@ async function handleRequest(request, env, json, err) {
     const sigConcat = (allSigs?.results || []).map(s => s.event_hash).join('|');
     const contentHash = await sha256Hex(`${cf.id}|${cf.org_id}|${cf.patient_id}|${cf.doctor_user_id}|${cf.consent_type}|${cf.disease_names}|${cf.notes}|${cf.consent_date}|${cf.validity_months}|${cf.expires_at}|${cf.visit_plan}|${cf.difficulty_reasons}|${sigConcat}`);
     const chainRow = await appendHashChain(env, 'consent_form', cfId, contentHash);
-    await env.DB.prepare("UPDATE consent_forms SET status='signed_by_patient', content_hash=?, prev_hash=?, chain_index=?, updated_at=? WHERE id=?")
+    await env.DB.prepare("UPDATE consent_forms SET status='signed_by_patient', content_hash=?, prev_hash=?, chain_index=?, sign_assignee_user_id=NULL, updated_at=? WHERE id=?")
       .bind(contentHash, chainRow.prev_chain_hash, chainRow.chain_index, now, cfId).run();
     return json({ ok: true, signature_event_id: seId, content_hash: contentHash, chain_index: chainRow.chain_index });
   }
@@ -2484,6 +2485,63 @@ async function handleRequest(request, env, json, err) {
     await env.DB.prepare("UPDATE consent_forms SET sign_token=?, sign_call_url=?, updated_at=? WHERE id=?")
       .bind(tok, callUrl, new Date().toISOString(), cfId).run();
     return json({ ok: true, sign_token: tok });
+  }
+
+  // ── POST /consent/:id/assign-signer（登録済みの本人・家族IDへ署名を依頼） ──
+  // 本人・家族はログイン後、受信箱から内容を確認して自署する。ビデオ通話URLは説明が必要な場合のみ任意。
+  const assignSignerMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/assign-signer$/);
+  if (assignSignerMatch && method === 'POST') {
+    const cfId = assignSignerMatch[1];
+    if (!['med_clinic', 'org_staff', 'org_admin', 'admin', 'med_acupuncturist'].includes(currentUser.role)) {
+      return err('依頼する権限がありません', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    const isIssuer = cf.org_id === orgId;
+    const isTherapist = currentUser.role === 'med_acupuncturist' && cf.shared_to_user_id === currentUser.id;
+    if (!isIssuer && !isTherapist && currentUser.role !== 'admin') return err('権限がありません', 403);
+    // 署名可能な状態か（種別で分岐）
+    const _ryoA = (cf.consent_type === 'massage' || cf.consent_type === 'acupuncture');
+    const _okStatus = _ryoA ? (cf.status === 'shared_to_therapist') : (cf.status === 'signed_by_doctor');
+    if (!_okStatus) return err('本人・家族へ依頼できる状態ではありません（現状態: ' + cf.status + '）', 400);
+    const body = await request.json().catch(() => ({}));
+    const login = (body.login_id || '').toString().trim();
+    const email = (body.email || '').toString().trim().toLowerCase();
+    if (!login && !email) return err('本人・家族のログインID または メールアドレスが必要です');
+    let signer = null;
+    if (login) signer = await env.DB.prepare('SELECT id, name FROM users WHERE login_id=?').bind(login).first();
+    if (!signer && email) signer = await env.DB.prepare('SELECT id, name FROM users WHERE email=?').bind(email).first();
+    if (!signer) return err('本人・家族のアカウントが見つかりません（先にID登録が必要です）', 404);
+    const callUrl = (body.call_url || '').toString().slice(0, 500);
+    const now = new Date().toISOString();
+    await env.DB.prepare('UPDATE consent_forms SET sign_assignee_user_id=?, sign_call_url=?, updated_at=? WHERE id=?')
+      .bind(signer.id, callUrl, now, cfId).run();
+    // 本人・家族へ通知
+    try {
+      await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind('NT-' + genUuid(), signer.id, 'consent', 'consent_sign_request',
+          '署名のお願いが届きました', `患者「${cf.patient_name || ''}」の同意書（${cfId}）への署名をお願いします。${callUrl ? 'オンライン説明のビデオ通話URLが設定されています。' : ''}`,
+          '#page:consent_sign_requests', 0, now).run();
+    } catch (e) {}
+    return json({ ok: true, assignee_user_id: signer.id, assignee_name: signer.name || '', call_url: callUrl });
+  }
+
+  // ── GET /consent/sign-requests（本人・家族：自分宛に届いた署名のお願い一覧） ──
+  if (path === '/consent/sign-requests' && method === 'GET') {
+    let rows;
+    try {
+      rows = await env.DB.prepare('SELECT * FROM consent_forms WHERE sign_assignee_user_id=? ORDER BY updated_at DESC LIMIT 200').bind(currentUser.id).all();
+    } catch (e) { return json({ ok: true, items: [] }); }
+    const list = (rows?.results || []).filter(r => {
+      const ryo = (r.consent_type === 'massage' || r.consent_type === 'acupuncture');
+      return ryo ? (r.status === 'shared_to_therapist') : (r.status === 'signed_by_doctor');
+    }).map(r => ({
+      id: r.id, patient_id: r.patient_id, patient_name: r.patient_name,
+      consent_type: r.consent_type, consent_date: r.consent_date,
+      status: r.status, sign_call_url: r.sign_call_url || '', updated_at: r.updated_at
+    }));
+    return json({ ok: true, items: list });
   }
 
   const sendMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/send$/);
@@ -2580,7 +2638,7 @@ async function handleRequest(request, env, json, err) {
       await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
         .bind('NT-' + genUuid(), acId, 'consent', 'consent_shared',
           '同意書が共有されました', `患者「${cf.patient_name || ''}」の同意書（${cfId}）が共有されました。施術のもとで本人・家族の署名を取得してください。`,
-          'consent_detail', 0, now).run();
+          '#page:consent', 0, now).run();
     } catch (e) { /* 通知失敗は共有自体を妨げない */ }
     return json({ ok: true, shared_to_user_id: acId, shared_to_name: ac.name || '', shared_at: now, status: newStatus });
   }
@@ -2637,7 +2695,7 @@ async function handleRequest(request, env, json, err) {
           await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
             .bind('NT-' + genUuid(), adminUser.id, 'consent', 'consent_delivered',
               '同意書が届きました', `${senderName || '取引先'}より患者「${cf.patient_name || ''}」の同意書が届きました。`,
-              'consent_deliveries_inbox', 0, now).run();
+              '#page:consent_deliveries_inbox', 0, now).run();
         }
       } catch (e) {}
     }
@@ -3683,6 +3741,10 @@ async function checkConsentAccess(env, cf, currentUser, currentEmail) {
   if (currentUser.role === 'med_acupuncturist' && cf.shared_to_user_id === currentUser.id) {
     return { allowed: true };
   }
+  // 署名を依頼された本人・家族（登録ID宛て）
+  if (cf.sign_assignee_user_id && cf.sign_assignee_user_id === currentUser.id) {
+    return { allowed: true };
+  }
   // アプリ内で署名依頼を受けた宛先医師（発行元と別組織でも可）
   if (cf.requested_doctor_user_id && cf.requested_doctor_user_id === currentUser.id
       && ['med_clinic', 'admin'].includes(currentUser.role)) {
@@ -3745,6 +3807,8 @@ async function initDB(db) {
     // ── 本人・家族のオンライン署名（ログイン不要の公開リンク） ──
     `ALTER TABLE consent_forms ADD COLUMN sign_token TEXT`,
     `ALTER TABLE consent_forms ADD COLUMN sign_call_url TEXT`,
+    // ── 登録済みの本人・家族IDへ署名を依頼（アプリ内・受信箱で署名） ──
+    `ALTER TABLE consent_forms ADD COLUMN sign_assignee_user_id TEXT`,
     // ── 確定同意書の 相手法人（宛先org）受信箱への配信（NDA締結済み取引先） ──
     `CREATE TABLE IF NOT EXISTS consent_deliveries (id TEXT PRIMARY KEY, consent_form_id TEXT, sender_org_id TEXT, sender_org_name TEXT, recipient_org_id TEXT, patient_name TEXT, consent_type TEXT, snapshot TEXT, message TEXT, status TEXT DEFAULT 'delivered', created_at TEXT, read_at TEXT)`,
     `CREATE INDEX IF NOT EXISTS idx_consent_deliveries_recipient ON consent_deliveries(recipient_org_id)`,
