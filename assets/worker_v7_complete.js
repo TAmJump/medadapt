@@ -3013,7 +3013,9 @@ async function handleRequest(request, env, json, err) {
     if (patientId) { sql += ' AND patient_id=?'; params.push(patientId); }
     if (claimKind) { sql += ' AND insurance_claim_kind=?'; params.push(claimKind); }
     sql += ' ORDER BY created_at DESC LIMIT 200';
-    const rows = await env.DB.prepare(sql).bind(...params).all();
+    let rows;
+    try { rows = await env.DB.prepare(sql).bind(...params).all(); }
+    catch (e) { console.error('signed-docs/list:', e.message); return json({ ok: true, items: [] }); }
     const list = (rows?.results || []).map(r => ({
       id: r.id, doc_kind: r.doc_kind, doc_id: r.doc_id, title: r.title,
       patient_id: r.patient_id, content_hash: r.content_hash, chain_index: r.chain_index,
@@ -3115,12 +3117,15 @@ async function handleRequest(request, env, json, err) {
   if (path === '/signed-docs/claim-summary' && method === 'GET') {
     const orgId = currentUser.org_id || currentUser.id;
     const month = url.searchParams.get('month') || new Date().toISOString().slice(0, 7);
-    const rows = await env.DB.prepare(`
+    let rows;
+    try {
+      rows = await env.DB.prepare(`
       SELECT claim_kind, claim_status, COUNT(*) as cnt, SUM(claim_points) as total_points
       FROM insurance_claim_log
       WHERE org_id=? AND claim_month=?
       GROUP BY claim_kind, claim_status
     `).bind(orgId, month).all();
+    } catch (e) { console.error('claim-summary:', e.message); return json({ ok: true, month, summary: [] }); }
     return json({ ok: true, month, summary: rows?.results || [] });
   }
 
@@ -3813,6 +3818,21 @@ async function initDB(db) {
     `CREATE TABLE IF NOT EXISTS consent_deliveries (id TEXT PRIMARY KEY, consent_form_id TEXT, sender_org_id TEXT, sender_org_name TEXT, recipient_org_id TEXT, patient_name TEXT, consent_type TEXT, snapshot TEXT, message TEXT, status TEXT DEFAULT 'delivered', created_at TEXT, read_at TEXT)`,
     `CREATE INDEX IF NOT EXISTS idx_consent_deliveries_recipient ON consent_deliveries(recipient_org_id)`,
     `CREATE INDEX IF NOT EXISTS idx_consent_deliveries_cf ON consent_deliveries(consent_form_id)`,
+    // ── 共通改ざん防止基盤（v13 / 加算管理）：手動SQL依存だったため initDB でも冪等作成（マイグレーション漏れ修正） ──
+    `CREATE TABLE IF NOT EXISTS signed_documents (id TEXT PRIMARY KEY, doc_kind TEXT NOT NULL, doc_id TEXT NOT NULL, org_id TEXT NOT NULL, patient_id TEXT, title TEXT NOT NULL, content_snapshot TEXT NOT NULL, content_hash TEXT NOT NULL, prev_hash TEXT, chain_index INTEGER, tsa_token TEXT, tsa_authority TEXT, tsa_acquired_at TEXT, tsa_status TEXT DEFAULT 'pending', verify_token TEXT NOT NULL, qr_payload TEXT, insurance_claim_kind TEXT, claim_points INTEGER, claim_unit TEXT, claim_status TEXT DEFAULT 'not_claimed', claim_recorded_at TEXT, claim_recorded_by TEXT, claim_notes TEXT DEFAULT '', created_at TEXT NOT NULL, finalized_at TEXT, created_by TEXT NOT NULL, UNIQUE(doc_kind, doc_id))`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_kind ON signed_documents(doc_kind)`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_org ON signed_documents(org_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_patient ON signed_documents(patient_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_claim ON signed_documents(insurance_claim_kind, claim_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_verify ON signed_documents(verify_token)`,
+    `CREATE INDEX IF NOT EXISTS idx_sd_chain ON signed_documents(chain_index)`,
+    `CREATE TABLE IF NOT EXISTS document_attestations (id TEXT PRIMARY KEY, signed_document_id TEXT NOT NULL, attester_user_id TEXT NOT NULL, attester_role TEXT NOT NULL, attester_org_id TEXT, attestation_method TEXT NOT NULL, attestation_data TEXT, attested_at TEXT NOT NULL, attested_ip TEXT, attested_user_agent TEXT, event_hash TEXT NOT NULL, prev_event_hash TEXT, tsa_token TEXT, tsa_authority TEXT, tsa_acquired_at TEXT, created_at TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_da_sd ON document_attestations(signed_document_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_da_user ON document_attestations(attester_user_id)`,
+    `CREATE TABLE IF NOT EXISTS insurance_claim_log (id TEXT PRIMARY KEY, signed_document_id TEXT NOT NULL, org_id TEXT NOT NULL, patient_id TEXT, claim_kind TEXT NOT NULL, claim_points INTEGER NOT NULL, claim_unit TEXT NOT NULL, claim_month TEXT NOT NULL, claim_status TEXT NOT NULL, receipt_number TEXT, insurer_code TEXT, notes TEXT DEFAULT '', recorded_by TEXT NOT NULL, recorded_at TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_cl_sd ON insurance_claim_log(signed_document_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_cl_org ON insurance_claim_log(org_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_cl_month ON insurance_claim_log(org_id, claim_month)`,
     // ── 医師プロフィール（医師認証・署名権限） ──
     `CREATE TABLE IF NOT EXISTS doctor_profiles (id TEXT PRIMARY KEY, user_id TEXT, doctor_name TEXT DEFAULT '', medical_license_number TEXT DEFAULT '', registration_date TEXT DEFAULT '', organization_name TEXT DEFAULT '', license_image_url TEXT DEFAULT '', license_verified_status TEXT DEFAULT 'pending', license_verified_at TEXT, organization_verified_status TEXT DEFAULT 'pending', hpki_enabled INTEGER DEFAULT 0, mfa_enabled INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)`,
     `ALTER TABLE doctor_profiles ADD COLUMN medical_license_number TEXT DEFAULT ''`,
