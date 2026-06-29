@@ -550,7 +550,7 @@ function ld(){try{const s=localStorage.getItem(K);if(s){const p=JSON.parse(s);Ob
 // 既存患者に住所・連絡先・代理人（サンプル）を一度だけ補完（空欄のみ・既存値は上書きしない）
 function seedPatientContacts(){
   try{
-    if(localStorage.getItem('medadapt-pt-contact-seeded')==='1')return;
+    if(localStorage.getItem('medadapt-pt-contact-seeded-v2')==='1')return;
     if(!Array.isArray(D.patients)||!D.patients.length)return;
     const addrs=['埼玉県さいたま市大宮区桜木町1-2-3','埼玉県さいたま市浦和区高砂4-5-6','東京都中央区東日本橋3-3-17','埼玉県川口市本町2-1-8','埼玉県さいたま市中央区下落合5-6-7','東京都台東区浅草2-3-4','埼玉県越谷市南越谷1-9-2','埼玉県草加市高砂3-4-5'];
     const rels=['妻','長男','次女','夫','長女','次男','子'];
@@ -575,7 +575,7 @@ function seedPatientContacts(){
       if(edited)changed=true;
     });
     if(changed)sv();
-    localStorage.setItem('medadapt-pt-contact-seeded','1');
+    localStorage.setItem('medadapt-pt-contact-seeded-v2','1');
   }catch(e){}
 }
 async function loadFromCloud(){
@@ -1162,21 +1162,30 @@ const pts=myPatients().filter(p=>{
 else{pts.forEach(p=>{const sb2=stBdg(p.status);const members=(p.members||[]).filter(m=>m.active!==false);const shared=(p.sharedWith||[]).filter(s=>s.status==='active').length;const card=h('div',{className:'card',style:{marginBottom:'12px',cursor:'pointer',padding:'16px',display:'flex',alignItems:'center',gap:'16px'},onClick:()=>{S.ptId=p.id;S.page='hub';S.hubTab='overview';rr()}});const info=h('div',{style:{flex:1}});info.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},p.room?h('span',{style:{fontSize:'12px',fontWeight:'700',color:'var(--accent)',minWidth:'36px'}},p.room):null,h('span',{style:{fontSize:'16px',fontWeight:'700'}},p.name),bdg(sb2.l,sb2.c),p.cl?bdg(p.cl):null));info.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginTop:'2px'}},(p.age?p.age+'歳 ':'')+(p.managerOrg?'管理：'+p.managerOrg:'')));const counts=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px',flexWrap:'wrap'}});const nc=ptCases(p.id).length,nco=ptConfs(p.id).length,nm=ptMons(p.id).length,na=ptAssess(p.id).length;if(nc)counts.appendChild(bdg('移行'+nc));if(na)counts.appendChild(bdg('アセス'+na));if(nco)counts.appendChild(bdg('担当者会議'+nco));if(nm)counts.appendChild(bdg('モニタ'+nm));if(members.length)counts.appendChild(bdg(members.length+'名関係者'));if(shared)counts.appendChild(bdg(shared+'名共有'));info.appendChild(counts);card.appendChild(info);card.appendChild(h('div',{style:{color:'var(--ink-m)',fontSize:'20px'}},'→'));w.appendChild(card)})}return w}
 // --- 基本情報パネル（表示 → 中に編集ボタン） ---
 function showPatientInfo(pt){
-  const m=h('div',{className:'modal',style:{maxWidth:'560px'}});
+  const m=h('div',{className:'modal',style:{maxWidth:'560px',maxHeight:'88vh',overflow:'auto'}});
   m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'基本情報'));
   m.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'16px'}},'同意書を発行すると、住所・連絡先・代理人などがこの内容から自動で反映されます。'));
-  const row=(label,val)=>h('div',{style:{display:'flex',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'13px'}},h('div',{style:{minWidth:'120px',color:'var(--ink-m)',fontWeight:'700'}},label),h('div',{style:{flex:1}},val||'—'));
+  const row=(label,val)=>h('div',{style:{display:'flex',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'13px'}},h('div',{style:{minWidth:'120px',color:'var(--ink-m)',fontWeight:'700'}},label),h('div',{style:{flex:1}},(val===0||val)?val:'—'));
   const sexL=pt.sex==='male'?'男性':pt.sex==='female'?'女性':'';
-  const signL=pt.selfSign==='proxy'?('代理署名（'+(pt.proxyRelation||'家族')+'　'+(pt.proxyName||'未登録')+'）'):'本人が自署';
+  const stL=(typeof stBdg==='function'?(stBdg(pt.status)||{}).l:null)||pt.status||'';
+  const flags=pt.flags?Object.keys(pt.flags).filter(k=>pt.flags[k]):[];
+  const members=(pt.members||[]).filter(mm=>mm.active!==false);
   m.appendChild(row('氏名',pt.name));
   m.appendChild(row('部屋番号',pt.room));
   m.appendChild(row('年齢・性別',((pt.age?pt.age+'歳':'')+(sexL?'　'+sexL:''))||''));
   m.appendChild(row('介護認定',pt.cl));
   m.appendChild(row('主傷病',pt.diagnosis));
+  m.appendChild(row('ステータス',stL));
+  m.appendChild(row('利用・入居開始日',pt.startDate));
+  if(pt.dd)m.appendChild(row('退院日',pt.dd));
   m.appendChild(row('管理主体',pt.managerOrg));
   m.appendChild(row('住所',pt.address));
-  m.appendChild(row('連絡先',pt.phone));
-  m.appendChild(row('自署区分',signL));
+  m.appendChild(row('連絡先（電話）',pt.phone));
+  m.appendChild(row('自署区分',pt.selfSign==='proxy'?'代理署名が必要':'本人が自署'));
+  m.appendChild(row('代理人氏名',pt.proxyName));
+  m.appendChild(row('続柄',pt.proxyRelation));
+  m.appendChild(row('重要フラグ',flags.length?flags.join('・'):''));
+  m.appendChild(row('家族・関係者',members.length?members.map(mm=>(typeof roleLabel==='function'?roleLabel(mm.role):mm.role||'')+' '+(mm.name||'')+(mm.isPrimary?'（主）':'')).join('／'):''));
   m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'18px'}},
     btn('編集','btn-pri',()=>{S.modal=null;showPatientModal(pt)}),
     btn('閉じる','btn-sec',()=>{S.modal=null;rr()})
