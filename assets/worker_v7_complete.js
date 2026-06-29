@@ -884,6 +884,13 @@ async function handleRequest(request, env, json, err) {
       env.DB.prepare('SELECT data FROM assessments WHERE owner_email=?').bind(ownerEmail).all(),
     ]);
 
+    // 組織レベル設定：あて先・発行元マスタ（org_settings）。失敗しても /sync 本体は壊さない
+    let consentMasters = null;
+    try {
+      const cmRow = await env.DB.prepare('SELECT value FROM org_settings WHERE org_id=? AND skey=?').bind(orgId, 'consentMasters').first();
+      if (cmRow && cmRow.value) consentMasters = safeJson(cmRow.value);
+    } catch (e) { /* org_settings 未作成等は無視 */ }
+
     // owner_email をレスポンスに含める
     let ownerEmailForClient = currentUser.email;
     if (currentUser.role === 'staff') ownerEmailForClient = ownerEmail;
@@ -900,6 +907,7 @@ async function handleRequest(request, env, json, err) {
       conferences: conferences.results.map(r => safeJson(r.data)),
       monitors: monitors.results.map(r => safeJson(r.data)),
       assessments: assessments.results.map(r => safeJson(r.data)),
+      consentMasters,
       user: userOut,
     });
   }
@@ -928,6 +936,19 @@ async function handleRequest(request, env, json, err) {
     if (Array.isArray(D.conferences)) for (const c of D.conferences) { if (c.id) stmts.push(upsert('conferences', c.id, { patient_id: c.patientId || '', created: c.created || now }, c)); }
     if (Array.isArray(D.monitors)) for (const m of D.monitors) { if (m.id) stmts.push(upsert('monitors', m.id, { patient_id: m.patientId || '', created: m.created || now }, m)); }
     if (Array.isArray(D.assessments)) for (const a of D.assessments) { if (a.id) stmts.push(upsert('assessments', a.id, { patient_id: a.patientId || '', created: a.created || now }, a)); }
+
+    // 組織レベル設定：あて先・発行元マスタ（org_settings）。
+    // 中身のある時のみ書込み＝マスタ未ロード端末がクラウドを空で上書きするのを防ぐ。
+    {
+      const cm = D.consentMasters;
+      const hasContent = cm && typeof cm === 'object' &&
+        ((Array.isArray(cm.addressees) && cm.addressees.length) || (Array.isArray(cm.clinics) && cm.clinics.length));
+      if (hasContent) {
+        stmts.push(env.DB.prepare(
+          'INSERT INTO org_settings (org_id, skey, value, updated) VALUES (?,?,?,?) ON CONFLICT(org_id, skey) DO UPDATE SET value=excluded.value, updated=excluded.updated'
+        ).bind(orgId, 'consentMasters', JSON.stringify(cm), now));
+      }
+    }
 
     for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
     return json({ success: true, saved: stmts.length });
@@ -3350,6 +3371,8 @@ async function initDB(db) {
     `CREATE TABLE IF NOT EXISTS signature_events (id TEXT PRIMARY KEY, consent_form_id TEXT, signer_user_id TEXT, signer_role TEXT, signature_method TEXT, signature_data TEXT, signed_at TEXT, signed_ip TEXT, signed_user_agent TEXT, event_hash TEXT, prev_event_hash TEXT, created_at TEXT)`,
     `CREATE TABLE IF NOT EXISTS hash_chain (chain_index INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT, entity_id TEXT, entity_hash TEXT, prev_chain_hash TEXT, chain_hash TEXT, created_at TEXT)`,
     `ALTER TABLE hash_chain RENAME COLUMN id TO chain_index`,
+    // ── 組織レベル設定（あて先・発行元マスタ等。org_id × skey → JSON value） ──
+    `CREATE TABLE IF NOT EXISTS org_settings (org_id TEXT, skey TEXT, value TEXT, updated TEXT, PRIMARY KEY (org_id, skey))`,
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {
