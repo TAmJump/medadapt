@@ -613,7 +613,12 @@ async function handleRequest(request, env, json, err) {
   const userId = session.email;
   const currentUser = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(userId).first();
   if (!currentUser) return err('ユーザーが見つかりません', 401);
-  const currentEmail = currentUser.email;
+  // データ所有者は org の admin に統一（スタッフ/サブアカウントでも同じ org の患者・帳票を参照・保存できる）
+  // ※ /sync の保存側 ownerEmail と同じ計算にすることで「患者が見つかりません」404を防ぐ
+  const _orgId = currentUser.org_id || currentUser.id;
+  const _orgAdmin = currentUser.role === 'admin' ? currentUser :
+    await env.DB.prepare('SELECT * FROM users WHERE id=? AND role=?').bind(_orgId, 'admin').first();
+  const currentEmail = _orgAdmin ? _orgAdmin.email : currentUser.email;
 
   // ── 特権アカウント：全機能を無料で解放（plan を pro 強制） ──
   // 監修医師など。login_id または email で指定。ここに追記すれば全機能無料になる。
@@ -2059,13 +2064,16 @@ async function handleRequest(request, env, json, err) {
     if (!['acupuncture', 'massage', 'both', 'request_form'].includes(consent_type)) {
       return err('consent_type は acupuncture / massage / both / request_form のいずれか');
     }
-    // 患者の存在 + 同医療機関配下確認
+    // 患者の存在 + 同医療機関配下確認（sync と同じ owner_email 基準で検索）
     const orgId = currentUser.org_id || currentUser.id;
-    const patient = await env.DB.prepare('SELECT * FROM patients WHERE id=? AND owner_email=?').bind(patient_id, currentEmail).first();
+    const adminUser = currentUser.role === 'admin' ? currentUser :
+      await env.DB.prepare('SELECT * FROM users WHERE id=? AND role=?').bind(orgId, 'admin').first();
+    const ownerEmail = adminUser ? adminUser.email : currentUser.email;
+    let patient = await env.DB.prepare('SELECT * FROM patients WHERE id=? AND owner_email=?').bind(patient_id, ownerEmail).first();
     if (!patient) {
-      // owner_email が一致しない場合でも同 org の登録患者なら許可
-      const altPatient = await env.DB.prepare('SELECT p.* FROM patients p JOIN users u ON u.id=p.owner_email WHERE p.id=? AND u.org_id=?').bind(patient_id, orgId).first();
-      if (!altPatient) return err('患者が見つかりません', 404);
+      // 後方互換：currentEmail 保存分や、同 org 配下（email 一致）も許可
+      patient = await env.DB.prepare('SELECT p.* FROM patients p JOIN users u ON u.email=p.owner_email WHERE p.id=? AND (p.owner_email=? OR u.org_id=?)').bind(patient_id, currentEmail, orgId).first();
+      if (!patient) return err('患者が見つかりません', 404);
     }
     const months = Number(validity_months) || 6;
     const expiresAt = computeExpiresAt(consent_date, months);
