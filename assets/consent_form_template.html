@@ -151,20 +151,25 @@
     font-size: 11pt;
     margin-bottom: 1.5mm;
   }
+  .doc-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 8mm;
+    padding-top: 3mm;
+    border-top: 1px dashed #94a3b8;
+    page-break-inside: avoid;
+  }
   .footer-hash {
-    position: absolute;
-    bottom: 10mm;
-    right: 15mm;
     font-size: 7pt;
     color: #444;
     font-family: 'Consolas', 'Menlo', monospace;
     text-align: right;
-    line-height: 1.4;
+    line-height: 1.5;
+    word-break: break-all;
+    max-width: 60%;
   }
   .footer-qr {
-    position: absolute;
-    bottom: 10mm;
-    left: 15mm;
     text-align: center;
     font-size: 7pt;
     color: #444;
@@ -176,13 +181,10 @@
     margin-bottom: 1mm;
   }
   .supervisor-credit {
-    position: absolute;
-    bottom: 5mm;
-    left: 50%;
-    transform: translateX(-50%);
+    text-align: center;
     font-size: 7pt;
     color: #555;
-    white-space: nowrap;
+    margin-top: 4mm;
   }
   /* 電子署名・タイムスタンプ認証バナー */
   .e-cert-banner {
@@ -350,6 +352,7 @@
       <div>
         <span class="field-label">自署氏名：</span>
         <span class="field-value" id="patient-name"></span>
+        <img id="patient-sign-img" alt="自署" style="display:none;height:12mm;vertical-align:bottom;margin-left:2mm;">
       </div>
       <div>
         <span class="field-label">連絡先：</span>
@@ -363,6 +366,10 @@
     <div class="clinic-name">医療法人コンパス</div>
     <div>〒330-0854　埼玉県さいたま市大宮区桜木町4-692-1　伊田グループビルⅢ405号室</div>
     <div>TEL：048-783-2713　　FAX：03-6369-4732</div>
+  </div>
+  <!-- 保険医署名（直筆） -->
+  <div class="doctor-sign-line" id="doctor-sign-line" style="display:none;margin-top:3mm;font-size:10pt;">
+    保険医署名：<img id="doctor-sign-img" alt="保険医署名" style="height:12mm;vertical-align:bottom;margin-left:2mm;">
   </div>
 
   <!-- 電子署名・タイムスタンプ認証バナー -->
@@ -409,18 +416,18 @@
     </div>
   </div>
 
-  <!-- フッタ QR（改ざん検証用） -->
-  <div class="footer-qr" id="footer-qr">
-    <img id="qr-image" src="" alt="検証QR">
-    <div>QRで真正性検証</div>
-  </div>
-
-  <!-- フッタ ハッシュ（改ざん検証用） -->
-  <div class="footer-hash" id="footer-hash">
-    <div>ID: <span id="sd-id">SD-XXXXXXXX</span></div>
-    <div>HASH: <span id="content-hash-short">XXXXXXXX...XXXXXXXX</span></div>
-    <div>CHAIN: #<span id="chain-index">XXXX</span></div>
-    <div id="tsa-line" style="display:none">TSA: <span id="tsa-authority"></span> <span id="tsa-acquired"></span></div>
+  <!-- フッタ（QR ＋ 改ざん検証ハッシュ） -->
+  <div class="doc-footer">
+    <div class="footer-qr" id="footer-qr">
+      <img id="qr-image" src="" alt="検証QR">
+      <div>QRで真正性検証</div>
+    </div>
+    <div class="footer-hash" id="footer-hash">
+      <div>ID: <span id="sd-id">SD-XXXXXXXX</span></div>
+      <div>HASH: <span id="content-hash-short">XXXXXXXX...XXXXXXXX</span></div>
+      <div>CHAIN: #<span id="chain-index">XXXX</span></div>
+      <div id="tsa-line" style="display:none">TSA: <span id="tsa-authority"></span> <span id="tsa-acquired"></span></div>
+    </div>
   </div>
 
   <!-- 医監修クレジット（v4.3 §48-2-3） -->
@@ -537,6 +544,17 @@ window.consentTemplateRender = function(data) {
       `<div class="clinic-name">${escapeHtml(data.clinic.name)}</div>` +
       `<div>${escapeHtml(data.clinic.address || '')}</div>` +
       `<div>TEL：${escapeHtml(data.clinic.tel || '')}　　FAX：${escapeHtml(data.clinic.fax || '')}</div>`;
+  }
+  // 患者自署（直筆画像があれば表示）
+  if (data.patient_signature_image && /^data:image\//.test(data.patient_signature_image)) {
+    const pimg = document.getElementById('patient-sign-img');
+    if (pimg) { pimg.src = data.patient_signature_image; pimg.style.display = 'inline-block'; }
+  }
+  // 保険医署名（直筆画像があれば表示）
+  if (data.doctor_signature_image && /^data:image\//.test(data.doctor_signature_image)) {
+    const dl = document.getElementById('doctor-sign-line');
+    const dimg = document.getElementById('doctor-sign-img');
+    if (dl && dimg) { dimg.src = data.doctor_signature_image; dl.style.display = ''; }
   }
   // フッタ
   document.getElementById('sd-id').textContent = data.sd_id || 'SD-XXXXXXXX';
