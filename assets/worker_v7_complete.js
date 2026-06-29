@@ -2168,7 +2168,9 @@ async function handleRequest(request, env, json, err) {
     const list = (rows?.results || []).map(r => ({
       id: r.id, patient_id: r.patient_id, consent_type: r.consent_type,
       consent_date: r.consent_date, expires_at: r.expires_at, status: r.status,
-      shared_to_user_id: r.shared_to_user_id, created_at: r.created_at, updated_at: r.updated_at
+      shared_to_user_id: r.shared_to_user_id,
+      requested_doctor_user_id: r.requested_doctor_user_id, send_status: r.send_status, sent_at: r.sent_at,
+      created_at: r.created_at, updated_at: r.updated_at
     }));
     return json({ ok: true, items: list });
   }
@@ -2257,6 +2259,19 @@ async function handleRequest(request, env, json, err) {
     ).run();
     await appendHashChain(env, 'signature_event', seId, eventHash);
     await env.DB.prepare("UPDATE consent_forms SET status='signed_by_doctor', updated_at=? WHERE id=?").bind(now, cfId).run();
+    // アプリ内で署名依頼を受けて署名した場合、発行元（org admin）へ完了通知を返す
+    if (cf.requested_doctor_user_id) {
+      try {
+        const issuerAdmin = await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='admin'").bind(cf.org_id).first()
+          || await env.DB.prepare("SELECT id FROM users WHERE org_id=? AND role='admin' ORDER BY created LIMIT 1").bind(cf.org_id).first();
+        if (issuerAdmin) {
+          await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+            .bind('NT-' + genUuid(), issuerAdmin.id, 'consent', 'consent_signed',
+              '医師署名が完了しました', `患者「${cf.patient_name || ''}」の同意書（${cfId}）に医師署名が行われました。`,
+              'consent_detail', 0, now).run();
+        }
+      } catch (e) { /* 通知失敗は署名自体を妨げない */ }
+    }
     return json({ ok: true, signature_event_id: seId, event_hash: eventHash });
   }
 
@@ -2304,6 +2319,55 @@ async function handleRequest(request, env, json, err) {
     await env.DB.prepare("UPDATE consent_forms SET status='signed_by_patient', content_hash=?, prev_hash=?, chain_index=?, updated_at=? WHERE id=?")
       .bind(contentHash, chainRow.prev_chain_hash, chainRow.chain_index, now, cfId).run();
     return json({ ok: true, signature_event_id: seId, content_hash: contentHash, chain_index: chainRow.chain_index });
+  }
+
+  // ── POST /consent/:id/send（宛先医師へアプリ内で署名依頼を送信） ──
+  const sendMatch = path.match(/^\/consent\/(CF-[A-Za-z0-9-]+)\/send$/);
+  if (sendMatch && method === 'POST') {
+    const cfId = sendMatch[1];
+    if (!['med_clinic', 'org_staff', 'org_admin', 'admin'].includes(currentUser.role)) {
+      return err('送信する権限がありません', 403);
+    }
+    const cf = await env.DB.prepare('SELECT * FROM consent_forms WHERE id=?').bind(cfId).first();
+    if (!cf) return err('同意書が見つかりません', 404);
+    const orgId = currentUser.org_id || currentUser.id;
+    if (currentUser.role !== 'admin' && cf.org_id !== orgId) return err('自院の同意書のみ送信できます', 403);
+    if (cf.status !== 'draft') return err('未署名（下書き）の同意書のみ送信できます（現状態: ' + cf.status + '）', 400);
+    const body = await request.json().catch(() => ({}));
+    const loginId = (body.doctor_login_id || '').trim();
+    const email = (body.doctor_email || '').trim().toLowerCase();
+    if (!loginId && !email) return err('宛先医師のログインID または メールアドレスが必要です');
+    // 宛先医師ユーザーを解決（med_clinic / admin のみ署名可能）
+    let doctor = null;
+    if (loginId) doctor = await env.DB.prepare('SELECT id, role, name FROM users WHERE login_id=?').bind(loginId).first();
+    if (!doctor && email) doctor = await env.DB.prepare('SELECT id, role, name FROM users WHERE email=?').bind(email).first();
+    if (!doctor) return err('宛先医師が見つかりません（先に医師アカウントの登録が必要です）', 404);
+    if (!['med_clinic', 'admin'].includes(doctor.role)) return err('宛先が医師（med_clinic）アカウントではありません', 400);
+    const now = new Date().toISOString();
+    await env.DB.prepare("UPDATE consent_forms SET requested_doctor_user_id=?, sent_at=?, send_status='sent', updated_at=? WHERE id=?")
+      .bind(doctor.id, now, now, cfId).run();
+    // 宛先医師へ通知
+    try {
+      await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind('NT-' + genUuid(), doctor.id, 'consent', 'consent_request',
+          '署名依頼が届きました', `患者「${cf.patient_name || ''}」の同意書（${cfId}）の医師署名をご依頼します。`,
+          'consent_inbox', 0, now).run();
+    } catch (e) { /* 通知テーブル未作成等は無視 */ }
+    return json({ ok: true, requested_doctor_user_id: doctor.id, doctor_name: doctor.name || '', sent_at: now });
+  }
+
+  // ── GET /consent/inbox（自分宛に届いた署名依頼の一覧） ──
+  if (path === '/consent/inbox' && method === 'GET') {
+    let rows;
+    try {
+      rows = await env.DB.prepare("SELECT * FROM consent_forms WHERE requested_doctor_user_id=? ORDER BY sent_at DESC LIMIT 200").bind(currentUser.id).all();
+    } catch (e) { return json({ ok: true, items: [] }); }
+    const list = (rows?.results || []).map(r => ({
+      id: r.id, patient_id: r.patient_id, patient_name: r.patient_name,
+      consent_type: r.consent_type, consent_date: r.consent_date,
+      status: r.status, sent_at: r.sent_at, send_status: r.send_status
+    }));
+    return json({ ok: true, items: list });
   }
 
   // ── POST /consent/:id/share ─────────────────────────────────
@@ -3327,6 +3391,11 @@ async function checkConsentAccess(env, cf, currentUser, currentEmail) {
   if (currentUser.role === 'med_acupuncturist' && cf.shared_to_user_id === currentUser.id) {
     return { allowed: true };
   }
+  // アプリ内で署名依頼を受けた宛先医師（発行元と別組織でも可）
+  if (cf.requested_doctor_user_id && cf.requested_doctor_user_id === currentUser.id
+      && ['med_clinic', 'admin'].includes(currentUser.role)) {
+    return { allowed: true };
+  }
   // 患者本人
   if (currentUser.role === 'patient') {
     const p = await env.DB.prepare('SELECT id FROM patients WHERE id=? AND owner_email=?').bind(cf.patient_id, currentEmail).first();
@@ -3373,6 +3442,10 @@ async function initDB(db) {
     `ALTER TABLE hash_chain RENAME COLUMN id TO chain_index`,
     // ── 組織レベル設定（あて先・発行元マスタ等。org_id × skey → JSON value） ──
     `CREATE TABLE IF NOT EXISTS org_settings (org_id TEXT, skey TEXT, value TEXT, updated TEXT, PRIMARY KEY (org_id, skey))`,
+    // ── 同意書 アプリ内配信（署名依頼）用カラム（既存テーブルにも自動追加） ──
+    `ALTER TABLE consent_forms ADD COLUMN requested_doctor_user_id TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN sent_at TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN send_status TEXT`,
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {
