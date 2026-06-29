@@ -919,7 +919,7 @@ async function handleRequest(request, env, json, err) {
       const cols = ['id', 'owner_email', ...keys, 'data', 'updated'];
       const vals = [id, ownerEmail, ...keys.map(k => extra[k]), JSON.stringify(data), now];
       const placeholders = vals.map(() => '?').join(',');
-      const onConflict = [...keys.map(k => `${k}=excluded.${k}`), 'data=excluded.data', 'updated=excluded.updated'].join(',');
+      const onConflict = ['owner_email=excluded.owner_email', ...keys.map(k => `${k}=excluded.${k}`), 'data=excluded.data', 'updated=excluded.updated'].join(',');
       return env.DB.prepare(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${placeholders}) ON CONFLICT(id) DO UPDATE SET ${onConflict}`).bind(...vals);
     };
 
