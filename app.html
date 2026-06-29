@@ -4682,6 +4682,9 @@ function consentDetailPage(){
     }));
   }
   if(cf.status==='signed_by_doctor'){
+    if(cf.consent_type==='massage'||cf.consent_type==='acupuncture'){
+      actions.appendChild(h('div',{style:{flexBasis:'100%',padding:'10px 12px',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:'8px',fontSize:'12px',color:'#92400e',lineHeight:'1.6'}},'あマ指・はり・きゅう（療養費）の流れ：医師署名 → 施術者へ共有 → 施術者のもとで本人・家族が施術同意に署名。訪問診療（医師署名 → 本人・家族）とは順序が異なります。'));
+    }
     actions.appendChild(btn('本人・家族へ署名リンクを送信','btn-pri btn-sm',()=>showSendSignLinkModal(cf)));
     actions.appendChild(btn('本人・家族が署名する（自署）','btn-out btn-sm',()=>{
       let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
