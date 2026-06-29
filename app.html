@@ -6911,11 +6911,15 @@ if(!u.doctor_profile)u.doctor_profile={
   organization_verified_status:'pending',mfa_enabled:false
 };
 const dp=u.doctor_profile;
+if(!S._dpLoaded){S._dpLoaded=true;api('/doctor/profile',{silent404:true}).then(res=>{if(res&&res.profile){const pr=res.profile;u.doctor_profile=Object.assign({},u.doctor_profile,{doctor_name:pr.doctor_name||u.doctor_profile.doctor_name,medical_license_number:pr.medical_license_number||'',registration_date:pr.registration_date||'',organization_name:pr.organization_name||u.doctor_profile.organization_name,license_verified_status:pr.license_verified_status||'pending',organization_verified_status:pr.organization_verified_status||'pending',hpki_enabled:!!pr.hpki_enabled,mfa_enabled:!!pr.mfa_enabled,license_verified_at:pr.license_verified_at||''});if(pr.license_verified_status==='verified')u.doctor_verified=true;rr();}}).catch(()=>{})}
 const dr1=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
 dr1.appendChild(fld('医師氏名','dr_n',dp.doctor_name,v=>{dp.doctor_name=v}));
-dr1.appendChild(fld('医籍登録番号','dr_lic',dp.medical_license_number,v=>{dp.medical_license_number=v},{ph:'例: 第123456号'}));
+dr1.appendChild(fld('医籍登録番号（医師免許番号）','dr_lic',dp.medical_license_number,v=>{dp.medical_license_number=v},{ph:'例: 第123456号'}));
 doc.appendChild(dr1);
-doc.appendChild(fld('所属医療機関','dr_org',dp.organization_name,v=>{dp.organization_name=v}));
+const dr2=h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}});
+dr2.appendChild(fld('所属医療機関','dr_org',dp.organization_name,v=>{dp.organization_name=v}));
+dr2.appendChild(fld('登録年月日','dr_regdate',dp.registration_date||'',v=>{dp.registration_date=v},{type:'date'}));
+doc.appendChild(dr2);
 // ステータス表示
 const stat={pending:{l:'確認待ち',c:'#92400e',bg:'#fef3c7'},verified:{l:'確認済み',c:'#15803d',bg:'#dcfce7'},rejected:{l:'差戻し',c:'#b91c1c',bg:'#fee2e2'}};
 const ls=stat[dp.license_verified_status]||stat.pending;
@@ -6928,13 +6932,13 @@ doc.appendChild(h('div',{style:{display:'flex',gap:'10px',marginTop:'12px',flexW
 ));
 // 操作ボタン
 doc.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'14px',flexWrap:'wrap'}},
-  btn('プロフィール保存','btn-out',()=>{dp.doctor_name=document.getElementById('dr_n')?.value||dp.doctor_name;dp.medical_license_number=document.getElementById('dr_lic')?.value||'';dp.organization_name=document.getElementById('dr_org')?.value||'';saveUser(u);toast('保存しました')}),
+  btn('プロフィール保存','btn-out',async()=>{dp.doctor_name=document.getElementById('dr_n')?.value||dp.doctor_name;dp.medical_license_number=document.getElementById('dr_lic')?.value||'';dp.registration_date=document.getElementById('dr_regdate')?.value||'';dp.organization_name=document.getElementById('dr_org')?.value||'';const res=await api('/doctor/profile',{method:'POST',body:JSON.stringify({doctor_name:dp.doctor_name,medical_license_number:dp.medical_license_number,registration_date:dp.registration_date,organization_name:dp.organization_name,hpki_enabled:dp.hpki_enabled,mfa_enabled:dp.mfa_enabled})});if(res&&res.ok){saveUser(u);toast('保存しました')}else toast(res?.error||'保存に失敗しました')}),
   btn('免許証画像アップロード','btn-out',()=>uploadLicenseImage(u,dp)),
-  btn(dp.mfa_enabled?'多要素認証 解除':'多要素認証 設定','btn-out',()=>{dp.mfa_enabled=!dp.mfa_enabled;saveUser(u);toast(dp.mfa_enabled?'多要素認証 ON':'多要素認証 OFF')}),
-  u.role==='admin'?btn(dp.license_verified_status==='verified'?'資格確認 取消':'資格確認済みにする','btn-out',()=>{
-    if(dp.license_verified_status==='verified'){dp.license_verified_status='pending';dp.license_verified_at=''}
-    else{dp.license_verified_status='verified';dp.license_verified_at=now();u.doctor_verified=true}
-    saveUser(u);toast('資格ステータス更新');rr();
+  btn(dp.mfa_enabled?'多要素認証 解除':'多要素認証 設定','btn-out',async()=>{dp.mfa_enabled=!dp.mfa_enabled;await api('/doctor/profile',{method:'POST',body:JSON.stringify({doctor_name:dp.doctor_name,medical_license_number:dp.medical_license_number,registration_date:dp.registration_date,organization_name:dp.organization_name,hpki_enabled:dp.hpki_enabled,mfa_enabled:dp.mfa_enabled})});saveUser(u);toast(dp.mfa_enabled?'多要素認証 ON':'多要素認証 OFF');rr()}),
+  u.role==='admin'?btn(dp.license_verified_status==='verified'?'資格確認 取消':'資格確認済みにする','btn-out',async()=>{
+    const willVerify=dp.license_verified_status!=='verified';
+    const res=await api('/doctor/profile/verify',{method:'POST',body:JSON.stringify({verified:willVerify})});
+    if(res&&res.ok){dp.license_verified_status=res.license_verified_status;dp.license_verified_at=willVerify?now():'';u.doctor_verified=willVerify;saveUser(u);toast('資格ステータス更新');rr();}else toast(res?.error||'更新に失敗しました');
   }):null
 ));
 doc.appendChild(h('div',{style:{padding:'10px 12px',background:'#f1f5f9',borderRadius:'8px',fontSize:'11px',color:'var(--ink-m)',marginTop:'12px',lineHeight:'1.7'}},

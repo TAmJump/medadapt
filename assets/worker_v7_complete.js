@@ -676,6 +676,39 @@ async function handleRequest(request, env, json, err) {
     currentUser.plan = 'pro';
   }
 
+  // ── GET /doctor/profile（医師プロフィール取得） ──
+  if (path === '/doctor/profile' && method === 'GET') {
+    let dp = null;
+    try { dp = await env.DB.prepare('SELECT * FROM doctor_profiles WHERE user_id=?').bind(currentUser.id).first(); } catch (e) {}
+    return json({ ok: true, profile: dp || null });
+  }
+  // ── POST /doctor/profile（医師プロフィール保存・upsert） ──
+  if (path === '/doctor/profile' && method === 'POST') {
+    const b = await request.json().catch(() => ({}));
+    const now = new Date().toISOString();
+    let dp = null;
+    try { dp = await env.DB.prepare('SELECT id FROM doctor_profiles WHERE user_id=?').bind(currentUser.id).first(); } catch (e) {}
+    if (dp) {
+      await env.DB.prepare(`UPDATE doctor_profiles SET doctor_name=?, medical_license_number=?, registration_date=?, organization_name=?, hpki_enabled=?, mfa_enabled=?, updated_at=? WHERE user_id=?`)
+        .bind(b.doctor_name || '', b.medical_license_number || '', b.registration_date || '', b.organization_name || '', b.hpki_enabled ? 1 : 0, b.mfa_enabled ? 1 : 0, now, currentUser.id).run();
+    } else {
+      await env.DB.prepare(`INSERT INTO doctor_profiles (id, user_id, doctor_name, medical_license_number, registration_date, organization_name, license_verified_status, organization_verified_status, hpki_enabled, mfa_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, ?, ?)`)
+        .bind('dp_' + genUuid(), currentUser.id, b.doctor_name || '', b.medical_license_number || '', b.registration_date || '', b.organization_name || '', b.hpki_enabled ? 1 : 0, b.mfa_enabled ? 1 : 0, now, now).run();
+    }
+    const out = await env.DB.prepare('SELECT * FROM doctor_profiles WHERE user_id=?').bind(currentUser.id).first();
+    return json({ ok: true, profile: out });
+  }
+  // ── POST /doctor/profile/verify（管理者：資格確認ステータス更新） ──
+  if (path === '/doctor/profile/verify' && method === 'POST') {
+    if (currentUser.role !== 'admin') return err('管理者のみ操作できます', 403);
+    const b = await request.json().catch(() => ({}));
+    const now = new Date().toISOString();
+    const status = b.verified ? 'verified' : 'pending';
+    await env.DB.prepare(`UPDATE doctor_profiles SET license_verified_status=?, license_verified_at=?, updated_at=? WHERE user_id=?`)
+      .bind(status, b.verified ? now : null, now, b.user_id || currentUser.id).run();
+    return json({ ok: true, license_verified_status: status });
+  }
+
   // ── GET /me/memberships（自分の所属法人・施設の一覧） ──
   if (path === '/me/memberships' && method === 'GET') {
     await ensureOrgMemberships(env.DB);
@@ -3564,6 +3597,16 @@ async function initDB(db) {
     // ── 本人・家族のオンライン署名（ログイン不要の公開リンク） ──
     `ALTER TABLE consent_forms ADD COLUMN sign_token TEXT`,
     `ALTER TABLE consent_forms ADD COLUMN sign_call_url TEXT`,
+    // ── 医師プロフィール（医師認証・署名権限） ──
+    `CREATE TABLE IF NOT EXISTS doctor_profiles (id TEXT PRIMARY KEY, user_id TEXT, doctor_name TEXT DEFAULT '', medical_license_number TEXT DEFAULT '', registration_date TEXT DEFAULT '', organization_name TEXT DEFAULT '', license_image_url TEXT DEFAULT '', license_verified_status TEXT DEFAULT 'pending', license_verified_at TEXT, organization_verified_status TEXT DEFAULT 'pending', hpki_enabled INTEGER DEFAULT 0, mfa_enabled INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)`,
+    `ALTER TABLE doctor_profiles ADD COLUMN medical_license_number TEXT DEFAULT ''`,
+    `ALTER TABLE doctor_profiles ADD COLUMN registration_date TEXT DEFAULT ''`,
+    `ALTER TABLE doctor_profiles ADD COLUMN organization_name TEXT DEFAULT ''`,
+    `ALTER TABLE doctor_profiles ADD COLUMN license_verified_at TEXT`,
+    `ALTER TABLE doctor_profiles ADD COLUMN organization_verified_status TEXT DEFAULT 'pending'`,
+    `ALTER TABLE doctor_profiles ADD COLUMN hpki_enabled INTEGER DEFAULT 0`,
+    `ALTER TABLE doctor_profiles ADD COLUMN mfa_enabled INTEGER DEFAULT 0`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_doctor_profiles_user ON doctor_profiles(user_id)`,
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {
