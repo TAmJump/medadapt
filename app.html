@@ -4217,8 +4217,9 @@ function consentDetailPage(){
       }else toast(res?.error||'エラー');
     }));
   }
+  // PDFプレビューは下書き〜確定の全状態で確認用に表示（previewConsentPDF は未署名でも動作）
+  actions.appendChild(btn('PDFをプレビュー','btn-out btn-sm',()=>previewConsentPDF(cf.id)));
   if(cf.status==='signed_by_patient'||cf.status==='shared'){
-    actions.appendChild(btn('PDFをプレビュー','btn-out btn-sm',()=>previewConsentPDF(cf.id)));
     actions.appendChild(btn('QR検証URLをコピー','btn-out btn-sm',async()=>{
       const sdRes=await api('/signed-docs/by-doc/consent_form/'+cf.id);
       if(sdRes?.signed_document?.qr_payload){
