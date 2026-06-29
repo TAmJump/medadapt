@@ -1242,6 +1242,7 @@ else if(S.page==='consent'){main.appendChild(acuMassagePage())}
 else if(S.page==='consent_list'){main.appendChild(consentPage())}
 else if(S.page==='consent_new'){main.appendChild(consentNewPage())}
 else if(S.page==='consent_inbox'){main.appendChild(consentInboxPage())}
+else if(S.page==='consent_deliveries_inbox'){main.appendChild(consentDeliveriesInboxPage())}
 else if(S.page==='consent_masters'){main.appendChild(consentMastersPage())}
 else if(S.page==='consent_detail'&&S.consentId){main.appendChild(consentDetailPage())}
 else if(S.page==='acu_massage'){S.page='consent';main.appendChild(acuMassagePage())}
@@ -2632,8 +2633,8 @@ function hubConsentTab(pt){
     ));
   }else{
     const typeLabels={'acupuncture':'はり・きゅう','massage':'あマ指（あん摩・マッサージ・指圧）','both':'はり・きゅう＋あマ指','request_form':'訪問診療同意書（依頼書）'};
-    const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
-    const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','revoked':'#dc2626','renewed':'#6b7280'};
+    const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','shared_to_therapist':'施術者へ共有済（署名待ち）','revoked':'取消し済','renewed':'再同意発行済'};
+    const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','shared_to_therapist':'#d97706','revoked':'#dc2626','renewed':'#6b7280'};
     list.forEach(item=>{
       const card=h('div',{style:{padding:'14px 16px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'8px',cursor:'pointer',marginBottom:'8px'},onClick:()=>{S.consentId=item.id;S.page='consent_detail';rr()}});
       card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}},
@@ -3918,8 +3919,8 @@ function consentPage(){
     (D.patients||[]).forEach(p=>{S._patientNameMap[p.id]=p.name||p.id;});
   }
   S.consentList.forEach(item=>{
-    const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
-    const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','revoked':'#dc2626','renewed':'#6b7280'};
+    const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','shared_to_therapist':'施術者へ共有済（署名待ち）','revoked':'取消し済','renewed':'再同意発行済'};
+    const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','shared_to_therapist':'#d97706','revoked':'#dc2626','renewed':'#6b7280'};
     const typeLabels={'acupuncture':'はり・きゅう','massage':'あマ指','both':'はり・きゅう＋あマ指','request_form':'訪問診療同意書（依頼書）'};
     const ptName=S._patientNameMap?.[item.patient_id]||'';
     const card=h('div',{
@@ -3937,7 +3938,8 @@ function consentPage(){
       h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
         h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700',background:statusColors[item.status]||'#94a3b8',color:'#fff'}},statusLabels[item.status]||item.status),
         (item.status==='draft'&&item.send_status!=='sent')?btn('宛先へ送信','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
-        (item.status==='signed_by_doctor')?btn('本人・家族へ送信','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
+        (item.status==='signed_by_doctor')?btn((item.consent_type==='massage'||item.consent_type==='acupuncture')?'施術者へ共有':'本人・家族へ送信','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
+        (item.status==='shared_to_therapist')?btn('本人・家族の署名へ','btn-sm btn-out',e=>{if(e&&e.stopPropagation)e.stopPropagation();S.consentId=item.id;S.page='consent_detail';rr();}):null,
         item.send_status==='sent'?h('span',{style:{fontSize:'11px',color:'#1e40af',fontWeight:'700'}},'送信済'):null,
         btn('PDF','btn-sm btn-pri',e=>{if(e&&e.stopPropagation)e.stopPropagation();previewConsentPDF(item.id);})
       )
@@ -4637,7 +4639,7 @@ function consentDetailPage(){
   const sigs=d.signatures||[];
   w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 12px'}},'同意書 '+cf.id));
   // ステータス
-  const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
+  const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','shared_to_therapist':'施術者へ共有済（署名待ち）','revoked':'取消し済','renewed':'再同意発行済'};
   w.appendChild(h('div',{style:{padding:'12px 14px',background:'#f9fafb',borderRadius:'6px',marginBottom:'12px',fontSize:'13px'}},
     h('div',{style:{marginBottom:'4px'}},'ステータス: ',h('span',{style:{fontWeight:'700'}},statusLabels[cf.status]||cf.status)),
     h('div',{style:{marginBottom:'4px'}},'同意日: '+cf.consent_date+' / 有効期限: '+(cf.expires_at||'').slice(0,10)),
@@ -4681,10 +4683,8 @@ function consentDetailPage(){
       else toast(res?.error||'送信に失敗しました');
     }));
   }
-  if(cf.status==='signed_by_doctor'){
-    if(cf.consent_type==='massage'||cf.consent_type==='acupuncture'){
-      actions.appendChild(h('div',{style:{flexBasis:'100%',padding:'10px 12px',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:'8px',fontSize:'12px',color:'#92400e',lineHeight:'1.6'}},'あマ指・はり・きゅう（療養費）の流れ：医師署名 → 施術者へ共有 → 施術者のもとで本人・家族が施術同意に署名。訪問診療（医師署名 → 本人・家族）とは順序が異なります。'));
-    }
+  // 本人・家族署名の共通ボタン（訪問診療の signed_by_doctor／療養費の shared_to_therapist で共用）
+  const addPatientSignButtons=()=>{
     actions.appendChild(btn('本人・家族へ署名リンクを送信','btn-pri btn-sm',()=>showSendSignLinkModal(cf)));
     actions.appendChild(btn('本人・家族が署名する（自署）','btn-out btn-sm',()=>{
       let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
@@ -4699,24 +4699,43 @@ function consentDetailPage(){
         }else toast(res?.error||'エラー');
       });
     }));
-    actions.appendChild(btn('宛先へ送信','btn-out btn-sm',async()=>{
-      let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
-      const cms=getConsentMasters();
-      const addr=(cms.addressees||[]).find(a=>a.name===(fp.addressee||''));
-      let login_id=addr&&addr.login_id?addr.login_id:'';let email='';
-      if(!login_id){
-        const v=prompt('宛先医師のログインID または メールアドレスを入力');
-        if(!v)return;
-        if(v.includes('@'))email=v.trim();else login_id=v.trim();
-      }
-      const res=await api('/consent/'+cf.id+'/send',{method:'POST',body:JSON.stringify({doctor_login_id:login_id,doctor_email:email})});
-      if(res?.ok){toast('宛先（'+(res.doctor_name||'医師')+'）へ送信しました');S.consentDetail=null;rr();}
-      else toast(res?.error||'送信に失敗しました');
-    }));
+  };
+  if(cf.status==='signed_by_doctor'){
+    if(cf.consent_type==='massage'||cf.consent_type==='acupuncture'){
+      // 療養費：医師署名 → 施術者へ共有（本人署名は施術者のもとで取得）
+      actions.appendChild(h('div',{style:{flexBasis:'100%',padding:'10px 12px',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:'8px',fontSize:'12px',color:'#92400e',lineHeight:'1.6'}},'あマ指・はり・きゅう（療養費）の流れ：医師署名 → 施術者へ共有 → 施術者のもとで本人・家族が施術同意に署名 → 確定。まず施術者へ共有してください。'));
+      actions.appendChild(btn('施術者へ共有','btn-pri btn-sm',()=>showShareToTherapistModal(cf)));
+    }else{
+      // 訪問診療：医師署名 → 本人・家族が署名
+      addPatientSignButtons();
+      actions.appendChild(btn('宛先へ送信','btn-out btn-sm',async()=>{
+        let fp={};try{fp=typeof cf.form_payload==='string'?JSON.parse(cf.form_payload):cf.form_payload||{}}catch(e){}
+        const cms=getConsentMasters();
+        const addr=(cms.addressees||[]).find(a=>a.name===(fp.addressee||''));
+        let login_id=addr&&addr.login_id?addr.login_id:'';let email='';
+        if(!login_id){
+          const v=prompt('宛先医師のログインID または メールアドレスを入力');
+          if(!v)return;
+          if(v.includes('@'))email=v.trim();else login_id=v.trim();
+        }
+        const res=await api('/consent/'+cf.id+'/send',{method:'POST',body:JSON.stringify({doctor_login_id:login_id,doctor_email:email})});
+        if(res?.ok){toast('宛先（'+(res.doctor_name||'医師')+'）へ送信しました');S.consentDetail=null;rr();}
+        else toast(res?.error||'送信に失敗しました');
+      }));
+    }
+  }
+  if(cf.status==='shared_to_therapist'){
+    // 療養費：施術者へ共有済 → 施術者のもとで本人・家族署名
+    actions.appendChild(h('div',{style:{flexBasis:'100%',padding:'10px 12px',background:'#ecfeff',border:'1px solid #67e8f9',borderRadius:'8px',fontSize:'12px',color:'#0e7490',lineHeight:'1.6'}},'施術者へ共有済み。施術者のもとで本人・家族の施術同意署名を取得してください。署名が完了すると確定します。'+(cf.shared_to_user_id?'（共有先施術者ID: '+cf.shared_to_user_id+'）':'')));
+    addPatientSignButtons();
+    if(S.user&&S.user.role!=='med_acupuncturist'){
+      actions.appendChild(btn('別の施術者へ共有し直す','btn-out btn-sm',()=>showShareToTherapistModal(cf)));
+    }
   }
   // PDFプレビューは下書き〜確定の全状態で確認用に表示（previewConsentPDF は未署名でも動作）
   actions.appendChild(btn('PDFをプレビュー','btn-out btn-sm',()=>previewConsentPDF(cf.id)));
   if(cf.status==='signed_by_patient'||cf.status==='shared'){
+    actions.appendChild(btn('相手法人（宛先）へ送付','btn-pri btn-sm',()=>showDeliverConsentModal(cf)));
     actions.appendChild(btn('QR検証URLをコピー','btn-out btn-sm',async()=>{
       const sdRes=await api('/signed-docs/by-doc/consent_form/'+cf.id);
       if(sdRes?.signed_document?.qr_payload){
@@ -4734,6 +4753,25 @@ function consentDetailPage(){
     }));
   }
   w.appendChild(actions);
+  // 相手法人への送付状況（確定/共有済のみ）
+  if(cf.status==='signed_by_patient'||cf.status==='shared'){
+    const delivBox=h('div',{style:{marginBottom:'16px'}});
+    w.appendChild(delivBox);
+    api('/consent/'+cf.id+'/deliveries',{silent404:true}).then(res=>{
+      const items=res?.items||[];
+      if(!items.length)return;
+      delivBox.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',margin:'4px 0 6px'}},'相手法人への送付状況'));
+      const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}});
+      items.forEach(it=>{
+        const read=!!it.read_at;
+        list.appendChild(h('div',{style:{padding:'8px 12px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',fontSize:'12px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('span',{style:{fontWeight:'700'}},it.recipient_org_name||it.recipient_login_id||it.recipient_org_id),
+          h('span',{style:{padding:'2px 10px',borderRadius:'999px',fontSize:'11px',fontWeight:'700',color:read?'#166534':'#92400e',background:read?'#dcfce7':'#fef3c7'}},read?('開封済 '+(it.read_at||'').replace('T',' ').slice(0,16)):'未開封')
+        ));
+      });
+      delivBox.appendChild(list);
+    }).catch(()=>{});
+  }
   // 署名履歴
   if(sigs.length){
     w.appendChild(h('h3',{style:{fontSize:'14px',fontWeight:'700',margin:'12px 0 6px'}},'署名履歴（改ざん不可）'));
@@ -4751,6 +4789,122 @@ function consentDetailPage(){
     w.appendChild(sigList);
   }
   return w;
+}
+
+// ── 施術者へ共有モーダル（療養費：医師署名済→施術者へ共有） ──
+function showShareToTherapistModal(cf){
+  const ov=h('div',{style:{position:'fixed',inset:'0',background:'rgba(15,23,42,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000',padding:'16px'}});
+  const close=()=>{try{document.body.removeChild(ov)}catch(e){}};
+  const card=h('div',{className:'card',style:{width:'100%',maxWidth:'460px',padding:'22px',maxHeight:'90vh',overflow:'auto'}});
+  card.appendChild(h('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'施術者へ共有'));
+  card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},'はり師・きゅう師／あん摩マッサージ指圧師（施術者）のアカウントへこの同意書を共有します。共有後、施術者のもとで本人・家族が施術同意に署名すると確定します。'));
+  const inp=h('input',{type:'text',placeholder:'施術者のログインID または メールアドレス',style:{width:'100%',padding:'9px',borderRadius:'4px',border:'1px solid #d1d5db',boxSizing:'border-box',marginBottom:'12px'}});
+  card.appendChild(inp);
+  const go=btn('この施術者へ共有','btn-pri',async()=>{
+    const v=(inp.value||'').trim();
+    if(!v){toast('ログインID または メールを入力してください');return;}
+    const body=v.includes('@')?{acupuncturist_email:v}:{acupuncturist_login_id:v};
+    const res=await api('/consent/'+cf.id+'/share',{method:'POST',body:JSON.stringify(body)});
+    if(res?.ok){toast('施術者（'+(res.shared_to_name||v)+'）へ共有しました');close();S.consentDetail=null;rr();}
+    else toast(res?.error||'共有に失敗しました');
+  });
+  card.appendChild(go);
+  card.appendChild(h('div',{style:{marginTop:'12px'}},btn('閉じる','btn-sec',()=>close())));
+  ov.appendChild(card);document.body.appendChild(ov);
+}
+
+// ── 相手法人（宛先）へ送付モーダル（確定同意書をNDA締結済み取引先の受信箱へ） ──
+function showDeliverConsentModal(cf){
+  const ov=h('div',{style:{position:'fixed',inset:'0',background:'rgba(15,23,42,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000',padding:'16px'}});
+  const close=()=>{try{document.body.removeChild(ov)}catch(e){}};
+  const card=h('div',{className:'card',style:{width:'100%',maxWidth:'480px',padding:'22px',maxHeight:'90vh',overflow:'auto'}});
+  card.appendChild(h('div',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'4px'}},'相手法人（宛先）へ送付'));
+  card.appendChild(h('div',{style:{fontSize:'12px',color:'var(--ink-m)',marginBottom:'14px',lineHeight:'1.6'}},'確定した同意書を、NDA締結済みの取引先法人の受信箱へ届けます。相手はログイン後に内容をPDFで確認できます。'));
+  const listWrap=h('div',{style:{marginBottom:'12px'}});
+  card.appendChild(listWrap);
+  const msg=h('textarea',{placeholder:'メッセージ（任意）',rows:'3',style:{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #d1d5db',boxSizing:'border-box',marginBottom:'12px',fontFamily:'inherit',fontSize:'13px'}});
+  card.appendChild(msg);
+  const checks={};
+  const renderPartners=()=>{
+    listWrap.innerHTML='';
+    const partners=(S.ndaList||[]).filter(n=>n.status==='active').map(n=>({orgId:n.is_requester?n.org_id_b:n.org_id_a,name:n.partner_org||n.partner_login_id||(n.is_requester?n.org_id_b:n.org_id_a)}));
+    if(!partners.length){
+      listWrap.appendChild(h('div',{style:{fontSize:'12px',color:'#92400e',padding:'10px',background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:'6px'}},'NDA締結済みの取引先がありません。先に「取引先（NDA）」で締結してください。'));
+      return;
+    }
+    listWrap.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'700',marginBottom:'6px'}},'送付先（NDA締結済み取引先）'));
+    partners.forEach(p=>{
+      const cbId='dlv_'+p.orgId;
+      const row=h('label',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'6px',marginBottom:'6px',cursor:'pointer',fontSize:'13px'}});
+      const cb=h('input',{type:'checkbox',id:cbId});
+      cb.addEventListener('change',()=>{checks[p.orgId]=cb.checked;});
+      row.appendChild(cb);
+      row.appendChild(h('span',null,p.name));
+      listWrap.appendChild(row);
+    });
+  };
+  if(typeof S.ndaList==='undefined'||!S.ndaList.length){
+    listWrap.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b'}},'取引先を読み込み中...'));
+    api('/nda/list',{silent404:true}).then(res=>{S.ndaList=res?.ndas||[];renderPartners();}).catch(()=>{S.ndaList=[];renderPartners();});
+  }else{renderPartners();}
+  const go=btn('送付する','btn-pri',async()=>{
+    const ids=Object.keys(checks).filter(k=>checks[k]);
+    if(!ids.length){toast('送付先を1件以上選んでください');return;}
+    const res=await api('/consent/'+cf.id+'/deliver',{method:'POST',body:JSON.stringify({recipient_org_ids:ids,message:(msg.value||'').trim()})});
+    if(res?.ok){toast(res.delivered+'件の取引先へ送付しました'+((res.skipped&&res.skipped.length)?('（'+res.skipped.length+'件はNDA未締結のためスキップ）'):''));close();S.consentDetail=null;rr();}
+    else toast(res?.error||'送付に失敗しました');
+  });
+  card.appendChild(go);
+  card.appendChild(h('div',{style:{marginTop:'12px'}},btn('閉じる','btn-sec',()=>close())));
+  ov.appendChild(card);document.body.appendChild(ov);
+}
+
+// ── 受信した同意書（相手法人から届いた確定同意書）一覧ページ ──
+function consentDeliveriesInboxPage(){
+  const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}},
+    h('a',{href:'#',style:{color:'var(--accent)',textDecoration:'none',fontSize:'13px'},onClick:e=>{e.preventDefault();S.page='consent';rr()}},'← 同意書メニュー')
+  ));
+  w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 12px'}},'受信した同意書'));
+  w.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',marginBottom:'14px',lineHeight:'1.7'}},'取引先法人から届いた確定済みの同意書です。タップして内容をPDFで確認できます。'));
+  if(!S.consentDeliveries){
+    api('/consent/deliveries/inbox').then(res=>{S.consentDeliveries=res?.items||[];rr()}).catch(()=>{S.consentDeliveries=[];rr()});
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'#94a3b8'}},'読み込み中...'));
+    return w;
+  }
+  const items=S.consentDeliveries;
+  if(!items.length){
+    w.appendChild(h('div',{style:{padding:'40px',textAlign:'center',color:'#94a3b8',background:'#f8fafc',borderRadius:'10px'}},'受信した同意書はありません。'));
+    return w;
+  }
+  const typeLabels={request_form:'訪問診療同意書（依頼書）',massage:'あマ指',acupuncture:'はり・きゅう',both:'はり・きゅう＋あマ指'};
+  const listEl=h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+  items.forEach(it=>{
+    const unread=!it.read_at;
+    const card=h('div',{
+      style:{padding:'14px 16px',background:'#fff',border:'1px solid '+(unread?'#fcd34d':'#e5e7eb'),borderLeft:'4px solid '+(unread?'#d97706':'#0891b2'),borderRadius:'10px',cursor:'pointer',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+      onClick:()=>openDeliveredConsent(it.id)
+    });
+    card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},
+      h('span',{style:{fontWeight:'800',fontSize:'14px'}},(it.sender_org_name||'取引先')),
+      unread?h('span',{style:{fontSize:'11px',fontWeight:'700',color:'#92400e',background:'#fef3c7',padding:'2px 10px',borderRadius:'999px'}},'未開封'):h('span',{style:{fontSize:'11px',color:'#94a3b8'}},'開封済')
+    ));
+    card.appendChild(h('div',{style:{fontSize:'13px',color:'#334155'}},'患者：'+(it.patient_name||'—')+'　／　'+(typeLabels[it.consent_type]||it.consent_type||'')));
+    if(it.message)card.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'4px'}},it.message));
+    card.appendChild(h('div',{style:{fontSize:'11px',color:'#94a3b8',marginTop:'4px'}},(it.created_at||'').replace('T',' ').slice(0,16)));
+    listEl.appendChild(card);
+  });
+  w.appendChild(listEl);
+  return w;
+}
+
+async function openDeliveredConsent(deliveryId){
+  const res=await api('/consent/deliveries/'+deliveryId);
+  if(!res?.ok||!res.snapshot||!res.snapshot.consent_form){toast(res?.error||'読み込みに失敗しました');return;}
+  // 既読化が反映されるよう一覧を再取得
+  S.consentDeliveries=null;
+  previewConsentFromPayload(res.snapshot.consent_form,res.snapshot.signatures||[]);
+  rr();
 }
 
 async function finalizeConsentSignedDoc(cfId){
@@ -5002,7 +5156,7 @@ function consentInboxPage(){
     return w;
   }
   const typeLabels={request_form:'訪問診療同意書（依頼書）',massage:'あマ指',acupuncture:'はり・きゅう',both:'はり・きゅう＋あマ指'};
-  const statusLabels={'draft':'署名待ち','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済'};
+  const statusLabels={'draft':'署名待ち','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','shared_to_therapist':'施術者へ共有済（署名待ち）','revoked':'取消し済'};
   const list=h('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}});
   items.forEach(it=>{
     const pending=it.status==='draft';
@@ -5094,6 +5248,15 @@ function acuMassagePage(){
   card5.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'同意書の発行元（保険医療機関）の住所・電話番号や、宛先医療機関（医師ログインID）を登録・編集します。'));
   card5.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'登録画面を開く →'));
   grid.appendChild(card5);
+  // カード6: 受信した同意書（取引先法人から届いた確定同意書）
+  const card6=h('div',{
+    style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
+    onClick:()=>{S.consentDeliveries=null;S.page='consent_deliveries_inbox';rr()}
+  });
+  card6.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'⑥ 受信した同意書'));
+  card6.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'NDA締結済みの取引先法人から届いた確定済みの同意書を確認し、内容をPDFで表示します。'));
+  card6.appendChild(h('div',{style:{fontSize:'12px',color:'#0891b2',fontWeight:'700'}},'受信箱を開く →'));
+  grid.appendChild(card6);
   w.appendChild(grid);
 
   // 参考情報セクション
