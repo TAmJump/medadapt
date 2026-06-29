@@ -3664,7 +3664,7 @@ function consentPage(){
   S.consentList.forEach(item=>{
     const statusLabels={'draft':'下書き','signed_by_doctor':'医師署名済','signed_by_patient':'確定','shared':'施術者共有済','revoked':'取消し済','renewed':'再同意発行済'};
     const statusColors={'draft':'#94a3b8','signed_by_doctor':'#f59e0b','signed_by_patient':'#16a34a','shared':'#0891b2','revoked':'#dc2626','renewed':'#6b7280'};
-    const typeLabels={'acupuncture':'はり・きゅう','massage':'あマ指','both':'はり・きゅう＋あマ指'};
+    const typeLabels={'acupuncture':'はり・きゅう','massage':'あマ指','both':'はり・きゅう＋あマ指','request_form':'訪問診療同意書（依頼書）'};
     const ptName=S._patientNameMap?.[item.patient_id]||'';
     const card=h('div',{
       style:{padding:'14px 16px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'8px',cursor:'pointer',transition:'all .15s'},
@@ -3678,7 +3678,10 @@ function consentPage(){
         ),
         h('div',{style:{fontSize:'12px',color:'#64748b'}},'同意日: '+item.consent_date+' / 有効期限: '+(item.expires_at||'').slice(0,10))
       ),
-      h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700',background:statusColors[item.status]||'#94a3b8',color:'#fff'}},statusLabels[item.status]||item.status)
+      h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+        h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700',background:statusColors[item.status]||'#94a3b8',color:'#fff'}},statusLabels[item.status]||item.status),
+        btn('PDF','btn-sm btn-pri',e=>{if(e&&e.stopPropagation)e.stopPropagation();previewConsentPDF(item.id);})
+      )
     ));
     list.appendChild(card);
   });
