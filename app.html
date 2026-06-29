@@ -4288,6 +4288,7 @@ async function previewConsentPDF(cfId){
   if(!detail?.consent_form){toast('データ取得失敗');return;}
   const cf=detail.consent_form;
   const sd=sdRes?.signed_document;
+  const doctorSig=(detail.signatures||[]).find(s=>s.signer_role==='doctor');
   // テンプレ選択: 厚労省様式の医師交付同意書（はり・きゅう / マッサージ） or コンパス依頼書（既定）
   let tplPath='assets/consent_form_template.html';
   let renderFn='consentTemplateRender';
@@ -4342,12 +4343,12 @@ async function previewConsentPDF(cfId){
     }catch(e){}
   }
   const data={
-    sd_id:sd?.id||'未確定',
-    content_hash:sd?.content_hash||cf.content_hash||'',
-    chain_index:sd?.chain_index||cf.chain_index||0,
+    sd_id:sd?.id||(doctorSig?('SE-'+(doctorSig.id||'').slice(0,8)):'未確定'),
+    content_hash:sd?.content_hash||doctorSig?.event_hash||cf.content_hash||'',
+    chain_index:sd?.chain_index||cf.chain_index||(doctorSig?'—':0),
     qr_image_base64:'',  // QR は別途生成
     verify_url:sd?.qr_payload||'',
-    addressee:cf.clinic_name||'医療法人コンパス',
+    addressee:fp.addressee||cf.clinic_name||'医療法人コンパス',
     visit_plan:cf.visit_plan||'年２回（６か月に１回）',
     difficulty_reasons:dr,
     consent_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
@@ -4355,7 +4356,8 @@ async function previewConsentPDF(cfId){
     exam_date:{year:reiwaYear,month:d.getMonth()+1,day:d.getDate()},
     patient:patientInfo,
     clinic:clinicCommon,
-    doctor:{name:cf.doctor_name||'後藤 基温',has_seal:!!sd},
+    doctor:{name:cf.doctor_name||'後藤 基温',has_seal:!!sd||!!doctorSig},
+    signature:doctorSig?{signed_at:doctorSig.signed_at,signer_label:(cf.doctor_name||'後藤 基温')+'　医師（医療法人コンパス）'}:(sd?{signed_at:sd.created_at}:null),
     notes:cf.notes||'',
     // 厚労省様式 V2 用：form_payload から症状・施術部位等を展開
     symptoms:fp.symptoms,

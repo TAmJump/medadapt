@@ -526,9 +526,10 @@ window.consentTemplateRender = function(data) {
   const certBanner = document.getElementById('e-cert-banner');
   if (data.signature && data.signature.signed_at) {
     certBanner.style.display = '';
-    const signerLabel = (data.patient && data.patient.name)
+    const signerLabel = data.signature.signer_label
+      || ((data.patient && data.patient.name)
       ? data.patient.name + ' 様（依頼者）'
-      : '依頼者';
+      : '依頼者');
     document.getElementById('cert-signer').textContent = signerLabel;
     document.getElementById('cert-timestamp').textContent = formatSignedTimeStd(data.signature.signed_at);
     document.getElementById('cert-tsa-authority').textContent =
