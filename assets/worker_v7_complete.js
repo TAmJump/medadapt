@@ -648,6 +648,61 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true });
   }
 
+  // ═══════════════════════════════════════════════
+  // アカウント削除：ログイン不要の Web 窓口
+  // Google Play User data policy / App Store 5.1.1(v) が要求する「アプリを再インストール
+  // せずに削除できる Web リソース」。 https://myaruze.tamjump.com/delete-account.html
+  // ※ 認証ミドルウェアより前に置くこと（Bearer トークンを持たない相手が叩くため）
+  // ═══════════════════════════════════════════════
+
+  // ── POST /account/delete-web（ID＋パスワードで本人確認 → その場で削除） ──
+  if (path === '/account/delete-web' && method === 'POST') {
+    const { loginId, password, confirm } = await request.json().catch(() => ({}));
+    if (confirm !== '削除') return err('確認欄に「削除」と入力してください');
+    const user = await authenticateForDeletion(env, loginId, password);
+    if (!user) return err('ログインIDまたはパスワードが違います', 401);
+    const scope = await getDeletionScope(env, user);
+    const result = await performAccountDeletion(env, user);
+    return json({ ok: true, scope: result.scope, orgName: scope.orgName || '' });
+  }
+
+  // ── POST /account/delete-preview-web（削除前に範囲を提示） ──
+  if (path === '/account/delete-preview-web' && method === 'POST') {
+    const { loginId, password } = await request.json().catch(() => ({}));
+    const user = await authenticateForDeletion(env, loginId, password);
+    if (!user) return err('ログインIDまたはパスワードが違います', 401);
+    const scope = await getDeletionScope(env, user);
+    return json({ ok: true, ...scope, name: user.name || '', loginId: user.login_id || '' });
+  }
+
+  // ── POST /account/delete-request（パスワードが分からない人の削除申請） ──
+  if (path === '/account/delete-request' && method === 'POST') {
+    const { loginId, contact, reason } = await request.json().catch(() => ({}));
+    if (!contact) return err('連絡先を入力してください');
+    const id = 'dr_' + crypto.randomUUID();
+    const now = new Date().toISOString();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    try {
+      await env.DB.prepare(
+        'INSERT INTO deletion_requests (id,login_id,contact,reason,status,source,requested_ip,created_at) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind(id, loginId || '', contact, reason || '', 'open', 'web', ip, now).run();
+    } catch (e) {
+      console.error('delete-request insert failed:', e.message);
+      return err('受付に失敗しました。時間をおいて再度お試しください', 500);
+    }
+    try {
+      await sendEmail(env, {
+        to: env.ADMIN_EMAIL || 'animalb001@gmail.com',
+        subject: '[ｍやるゼ！] アカウント削除の申請',
+        html: `<p>削除の申請を受け付けました。</p><ul>`
+          + `<li>受付ID: ${id}</li><li>ログインID: ${escapeHtml(loginId || '(未入力)')}</li>`
+          + `<li>連絡先: ${escapeHtml(contact)}</li><li>理由: ${escapeHtml(reason || '(未入力)')}</li>`
+          + `<li>受付日時: ${now}</li></ul>`,
+      });
+    } catch (e) { console.error('delete-request mail failed:', e.message); }
+    return json({ ok: true, requestId: id });
+  }
+
   // ── Token認証 ─────────────────────────────────────────────
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();
@@ -1134,6 +1189,38 @@ async function handleRequest(request, env, json, err) {
     const pwHash = await hashPassword(newPassword);
     await env.DB.prepare('UPDATE users SET pw_hash=?, pw=NULL WHERE id=?').bind(pwHash, currentUser.id).run();
     return json({ success: true });
+  }
+
+  // ═══════════════════════════════════════════════
+  // アカウント削除（アプリ内導線）
+  // Google Play User data policy は「アプリ内の削除導線」と「Webの削除窓口」の
+  // 両方を要求する。Webの窓口は認証ミドルウェアより前の /account/delete-web。
+  // ═══════════════════════════════════════════════
+
+  // ── GET /account/delete-preview（何がどれだけ消えるかを返す） ──
+  if (path === '/account/delete-preview' && method === 'GET') {
+    // アクティブ法人に切り替え中でも、削除するのは常に「自分のアカウント本体」なので
+    // セッションの上書きを受けていない素の users 行で判定する
+    const rawUser = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(currentUser.id).first();
+    if (!rawUser) return err('ユーザーが見つかりません', 404);
+    const scope = await getDeletionScope(env, rawUser);
+    return json({ ok: true, ...scope, name: rawUser.name || '', loginId: rawUser.login_id || '' });
+  }
+
+  // ── POST /account/delete（本人確認のうえ実行・取り消し不可） ──
+  if (path === '/account/delete' && method === 'POST') {
+    const { password, confirm } = await request.json().catch(() => ({}));
+    if (confirm !== '削除') return err('確認欄に「削除」と入力してください');
+    if (!password) return err('パスワードを入力してください');
+    const rawUser = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(currentUser.id).first();
+    if (!rawUser) return err('ユーザーが見つかりません', 404);
+    let pwOk = false;
+    if (rawUser.pw_hash) pwOk = await verifyPassword(password, rawUser.pw_hash);
+    else if (rawUser.pw) pwOk = (rawUser.pw === password);
+    if (!pwOk) return err('パスワードが違います', 401);
+    const scope = await getDeletionScope(env, rawUser);
+    const result = await performAccountDeletion(env, rawUser);
+    return json({ ok: true, scope: result.scope, orgName: scope.orgName || '' });
   }
 
 
@@ -3830,6 +3917,11 @@ async function initDB(db) {
     `CREATE INDEX IF NOT EXISTS idx_da_sd ON document_attestations(signed_document_id)`,
     `CREATE INDEX IF NOT EXISTS idx_da_user ON document_attestations(attester_user_id)`,
     `CREATE TABLE IF NOT EXISTS insurance_claim_log (id TEXT PRIMARY KEY, signed_document_id TEXT NOT NULL, org_id TEXT NOT NULL, patient_id TEXT, claim_kind TEXT NOT NULL, claim_points INTEGER NOT NULL, claim_unit TEXT NOT NULL, claim_month TEXT NOT NULL, claim_status TEXT NOT NULL, receipt_number TEXT, insurer_code TEXT, notes TEXT DEFAULT '', recorded_by TEXT NOT NULL, recorded_at TEXT NOT NULL)`,
+    // ── アカウント削除（Google Play User data policy / App Store 5.1.1(v) 必須要件） ──
+    // ログイン不要のWeb窓口から届いた「削除の申請」を保持する。本人確認できた場合は即時削除するため、
+    // ここに残るのは ID/パスワードで本人確認できなかったケースのみ。
+    `CREATE TABLE IF NOT EXISTS deletion_requests (id TEXT PRIMARY KEY, login_id TEXT DEFAULT '', contact TEXT DEFAULT '', reason TEXT DEFAULT '', status TEXT DEFAULT 'open', source TEXT DEFAULT 'web', requested_ip TEXT DEFAULT '', created_at TEXT NOT NULL, handled_at TEXT, handled_by TEXT DEFAULT '', note TEXT DEFAULT '')`,
+    `CREATE INDEX IF NOT EXISTS idx_deletion_requests_status ON deletion_requests(status)`,
     `CREATE INDEX IF NOT EXISTS idx_cl_sd ON insurance_claim_log(signed_document_id)`,
     `CREATE INDEX IF NOT EXISTS idx_cl_org ON insurance_claim_log(org_id)`,
     `CREATE INDEX IF NOT EXISTS idx_cl_month ON insurance_claim_log(org_id, claim_month)`,
@@ -3868,6 +3960,171 @@ async function ensureOrgMemberships(db) {
       "INSERT OR REPLACE INTO org_settings (org_id,skey,value,updated) VALUES ('__system__','migrated_orgs_v1','1',?)"
     ).bind(new Date().toISOString()).run();
   } catch (e) { console.error('ensureOrgMemberships:', e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// アカウント削除（Google Play User data policy / App Store 5.1.1(v)）
+// ═══════════════════════════════════════════════════════════
+
+// 申請メールに利用者入力をそのまま載せないためのエスケープ
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// 削除範囲は役割で変わる：
+//  - staff（法人に所属する個人）  → その人だけを削除。患者・帳票は法人（org admin の owner_email）
+//                                   が保有するデータなので法人側に残す。
+//  - admin（法人オーナー = id===org_id）→ その法人まるごと。所属スタッフの
+//                                   アカウントも含めて全て削除する。
+// 取り消しはできない。呼ぶ前に必ず本人確認（パスワード）を通すこと。
+
+// 削除前に「何がどれだけ消えるか」を数える。UIの確認画面と /account/delete-preview で使う。
+async function getDeletionScope(env, user) {
+  const orgId = user.org_id || user.id;
+  const isOwner = (user.role === 'admin' && orgId === user.id);
+  const scope = { scope: isOwner ? 'org' : 'staff', orgId, isOwner, counts: {}, orgName: '', subscription: null };
+  const count = async (sql, ...binds) => {
+    try { const r = await env.DB.prepare(sql).bind(...binds).first(); return (r && r.c) || 0; } catch (e) { return 0; }
+  };
+  if (isOwner) {
+    scope.orgName = user.org || '';
+    scope.counts.staff = await count("SELECT COUNT(*) c FROM users WHERE org_id=? AND id<>?", orgId, user.id);
+    scope.counts.patients = await count('SELECT COUNT(*) c FROM patients WHERE owner_email=?', user.email);
+    scope.counts.cases = await count('SELECT COUNT(*) c FROM cases WHERE owner_email=?', user.email);
+    scope.counts.consentForms = await count('SELECT COUNT(*) c FROM consent_forms WHERE org_id=?', orgId);
+    scope.counts.dischargeNotices = await count('SELECT COUNT(*) c FROM discharge_notices WHERE org_id=?', orgId);
+    scope.counts.ndas = await count('SELECT COUNT(*) c FROM org_ndas WHERE org_id_a=? OR org_id_b=?', orgId, orgId);
+    scope.counts.documents = await count('SELECT COUNT(*) c FROM documents WHERE owner_email=?', user.email);
+    try {
+      const sub = await env.DB.prepare("SELECT * FROM subscriptions WHERE org_id=? AND module_id='medical-adapt'").bind(orgId).first();
+      if (sub && sub.status !== 'cancelled' && sub.square_subscription_id) {
+        scope.subscription = { status: sub.status, member_count: sub.member_count };
+      }
+    } catch (e) {}
+  } else {
+    scope.counts.memberships = await count('SELECT COUNT(*) c FROM memberships WHERE login_id=?', user.login_id || '');
+    scope.counts.notifications = await count('SELECT COUNT(*) c FROM notifications WHERE user_id=?', user.id);
+  }
+  return scope;
+}
+
+// 実削除。戻り値は消したテーブルの記録（監査・レスポンス用）。
+async function performAccountDeletion(env, user) {
+  const orgId = user.org_id || user.id;
+  const isOwner = (user.role === 'admin' && orgId === user.id);
+  const done = [];
+  const run = async (sql, ...binds) => {
+    try { await env.DB.prepare(sql).bind(...binds).run(); done.push(sql.slice(0, 60)); }
+    catch (e) { console.error('delete step failed:', sql.slice(0, 60), e.message); }
+  };
+
+  if (!isOwner) {
+    // ── 個人（staff）のみ ──────────────────────────────
+    // 他者のデータを壊さないよう、この人を指している参照だけ先に外す
+    await run('UPDATE consent_forms SET sign_assignee_user_id=NULL WHERE sign_assignee_user_id=?', user.id);
+    await run('UPDATE consent_forms SET requested_doctor_user_id=NULL WHERE requested_doctor_user_id=?', user.id);
+    await run('DELETE FROM doctor_profiles WHERE user_id=?', user.id);
+    await run('DELETE FROM notifications WHERE user_id=?', user.id);
+    await run('DELETE FROM active_staff_log WHERE user_id=?', user.id);
+    await run('DELETE FROM memberships WHERE login_id=?', user.login_id || '\u0000');
+    await run('DELETE FROM sessions WHERE email=?', user.id);
+    await run('DELETE FROM users WHERE id=?', user.id);
+    return { scope: 'staff', steps: done.length };
+  }
+
+  // ── 法人オーナー：法人まるごと ────────────────────────
+  const email = user.email;
+
+  // 1) 課金：Square のサブスクを先に解約する（残すと請求が続く）
+  try {
+    const sub = await env.DB.prepare("SELECT * FROM subscriptions WHERE org_id=? AND module_id='medical-adapt'").bind(orgId).first();
+    if (sub && sub.square_subscription_id && sub.status !== 'cancelled') {
+      await squareCancelSubscription(env, sub.square_subscription_id);
+      done.push('square:cancel');
+      try {
+        await syncToParent(env, user.login_id, {
+          member_count: sub.member_count, square_subscription_id: sub.square_subscription_id,
+          started_at: sub.started_at, status: 'cancelled', ended_at: new Date().toISOString(),
+        });
+      } catch (e) {}
+    }
+  } catch (e) { console.error('delete: square cancel failed:', e.message); }
+
+  // 2) 子 → 親 の順で削除。IN(SELECT ...) を使うことでバインド変数の上限を避ける。
+  // 医療文書（signed_documents 配下）
+  await run('DELETE FROM medical_document_access_logs WHERE org_id=? OR signed_document_id IN (SELECT id FROM signed_documents WHERE org_id=?)', orgId, orgId);
+  await run('DELETE FROM medical_document_versions WHERE parent_signed_document_id IN (SELECT id FROM signed_documents WHERE org_id=?) OR new_signed_document_id IN (SELECT id FROM signed_documents WHERE org_id=?)', orgId, orgId);
+  await run('DELETE FROM medical_document_shares WHERE from_org_id=? OR to_org_id=?', orgId, orgId);
+  await run('DELETE FROM document_attestations WHERE signed_document_id IN (SELECT id FROM signed_documents WHERE org_id=?)', orgId);
+  await run('DELETE FROM insurance_claim_log WHERE org_id=?', orgId);
+  await run('DELETE FROM signed_documents WHERE org_id=?', orgId);
+
+  // 同意書
+  await run('DELETE FROM signature_events WHERE consent_form_id IN (SELECT id FROM consent_forms WHERE org_id=?)', orgId);
+  await run('DELETE FROM treatment_plans WHERE org_id=?', orgId);
+  // 送付済み同意書は、送り手側・受け手側どちらの箱からも消す（snapshot に患者情報が入っているため）
+  await run('DELETE FROM consent_deliveries WHERE sender_org_id=? OR recipient_org_id=?', orgId, orgId);
+  await run('DELETE FROM consent_forms WHERE org_id=?', orgId);
+
+  // 退院通知とその日程調整
+  await run('DELETE FROM schedule_votes WHERE slot_id IN (SELECT s.id FROM schedule_slots s JOIN schedule_polls p ON p.id=s.poll_id WHERE p.notice_id IN (SELECT id FROM discharge_notices WHERE org_id=?))', orgId);
+  await run('DELETE FROM schedule_votes WHERE voter_org_id=?', orgId);
+  await run('DELETE FROM schedule_slots WHERE poll_id IN (SELECT id FROM schedule_polls WHERE notice_id IN (SELECT id FROM discharge_notices WHERE org_id=?))', orgId);
+  await run('DELETE FROM schedule_polls WHERE notice_id IN (SELECT id FROM discharge_notices WHERE org_id=?)', orgId);
+  await run('DELETE FROM match_selections WHERE notice_id IN (SELECT id FROM discharge_notices WHERE org_id=?)', orgId);
+  await run('DELETE FROM notice_recipients WHERE notice_id IN (SELECT id FROM discharge_notices WHERE org_id=?)', orgId);
+  await run('DELETE FROM notice_recipients WHERE recipient_org_id=?', orgId);
+  await run('DELETE FROM discharge_notices WHERE org_id=?', orgId);
+
+  // 患者・記録（owner_email スコープ）
+  await run('DELETE FROM documents WHERE owner_email=?', email);
+  await run('DELETE FROM assessments WHERE owner_email=?', email);
+  await run('DELETE FROM monitors WHERE owner_email=?', email);
+  await run('DELETE FROM conferences WHERE owner_email=?', email);
+  await run('DELETE FROM cases WHERE owner_email=?', email);
+  await run('DELETE FROM patients WHERE owner_email=?', email);
+
+  // 法人まわり
+  await run('DELETE FROM org_ndas WHERE org_id_a=? OR org_id_b=?', orgId, orgId);
+  await run('DELETE FROM nda_templates WHERE org_id=?', orgId);
+  await run('DELETE FROM org_settings WHERE org_id=?', orgId);
+  await run('DELETE FROM invites WHERE org_id=?', orgId);
+  await run('DELETE FROM coupon_usages WHERE org_id=?', orgId);
+  await run('DELETE FROM pending_member_changes WHERE org_id=?', orgId);
+  await run('DELETE FROM billing_events WHERE org_id=?', orgId);
+  await run('DELETE FROM subscriptions WHERE org_id=?', orgId);
+  await run('DELETE FROM active_staff_log WHERE org_id=?', orgId);
+  await run('DELETE FROM memberships WHERE org_id=?', orgId);
+
+  // 所属していた人（オーナー本人＋スタッフ）
+  await run('UPDATE consent_forms SET sign_assignee_user_id=NULL WHERE sign_assignee_user_id IN (SELECT id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
+  await run('DELETE FROM doctor_profiles WHERE user_id IN (SELECT id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
+  await run('DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
+  await run('DELETE FROM memberships WHERE login_id IN (SELECT login_id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
+  await run('DELETE FROM sessions WHERE email IN (SELECT id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
+  await run('DELETE FROM users WHERE org_id=? OR id=?', orgId, orgId);
+  await run('DELETE FROM orgs WHERE id=?', orgId);
+
+  // hash_chain は改ざん防止の追記専用台帳で、ハッシュ値しか持たない（個人情報を含まない）。
+  // ここを削ると他法人の検証まで壊れるため、意図的に残す。
+
+  return { scope: 'org', steps: done.length };
+}
+
+// ログインIDまたはメール＋パスワードで本人確認する（セッション不要）。
+// Web窓口（アプリを消してしまった人）から呼ぶため、メール未確認・停止中でも通す。
+async function authenticateForDeletion(env, loginId, password) {
+  if (!loginId || !password) return null;
+  const key = String(loginId).trim();
+  const user = await env.DB.prepare('SELECT * FROM users WHERE login_id=? OR email=?')
+    .bind(key.toUpperCase(), key).first();
+  if (!user) return null;
+  let ok = false;
+  if (user.pw_hash) ok = await verifyPassword(password, user.pw_hash);
+  else if (user.pw) ok = (user.pw === password);
+  return ok ? user : null;
 }
 
 // ── パスワードハッシュ ────────────────────────────────────

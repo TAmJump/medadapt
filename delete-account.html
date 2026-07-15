@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アカウントの削除 - ｍやるゼ！</title>
+<meta name="description" content="ｍやるゼ！のアカウントと関連データの削除を、アプリをインストールしていない状態でも申請できます。">
+<style>
+  :root{
+    --bg:#f8fafc; --surface:#ffffff; --ink:#0f172a; --ink-m:#475569; --ink-l:#94a3b8;
+    --border:#e2e8f0; --brand:#0891b2; --danger:#dc2626; --danger-bg:#fef2f2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); line-height:1.8;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+    padding:24px 16px 64px;
+  }
+  .wrap{max-width:620px;margin:0 auto}
+  header{padding:8px 0 24px;border-bottom:1px solid var(--border);margin-bottom:28px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand img{width:44px;height:44px;border-radius:10px;border:1px solid var(--border)}
+  .brand-name{font-size:15px;font-weight:700;letter-spacing:.02em}
+  .brand-sub{font-size:11px;color:var(--ink-l)}
+  h1{font-size:22px;font-weight:800;margin:22px 0 10px}
+  h2{font-size:15px;font-weight:700;margin:0 0 10px}
+  p{font-size:14px;color:var(--ink-m);margin-bottom:12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:18px}
+  .card.danger{border-color:var(--danger)}
+  .field{margin-bottom:14px}
+  label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+  input,textarea{
+    width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:6px;
+    font-size:14px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  input:focus,textarea:focus{outline:none;border-color:var(--brand)}
+  textarea{resize:vertical;min-height:80px}
+  .hint{font-size:11px;color:var(--ink-l);margin-top:4px}
+  button{
+    padding:11px 20px;border-radius:6px;font-size:14px;font-weight:700;
+    font-family:inherit;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--ink);
+  }
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+  .btn-brand{background:var(--brand);border-color:var(--brand);color:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+  ul{margin:0 0 12px 20px;font-size:14px;color:var(--ink-m)}
+  li{margin-bottom:4px}
+  .scope{background:var(--danger-bg);border:1px solid var(--danger);border-radius:6px;padding:14px;margin-bottom:14px;font-size:13px}
+  .scope strong{color:var(--danger)}
+  .msg{font-size:13px;padding:11px 12px;border-radius:6px;margin-bottom:14px;display:none}
+  .msg.err{background:var(--danger-bg);border:1px solid var(--danger);color:var(--danger);display:block}
+  .msg.ok{background:#f0fdf4;border:1px solid #16a34a;color:#15803d;display:block}
+  .steps{counter-reset:s;list-style:none;margin-left:0}
+  .steps li{counter-increment:s;position:relative;padding-left:26px;margin-bottom:8px}
+  .steps li::before{
+    content:counter(s);position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;
+    border:1px solid var(--border);font-size:10px;font-weight:700;display:flex;align-items:center;
+    justify-content:center;color:var(--ink-m);background:#fff;
+  }
+  footer{border-top:1px solid var(--border);margin-top:32px;padding-top:20px;font-size:12px;color:var(--ink-l)}
+  footer a{color:var(--brand)}
+  .hidden{display:none}
+  @media(max-width:480px){h1{font-size:19px}.card{padding:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <img src="icon-pwa-512.png" alt="">
+      <div>
+        <div class="brand-name">ｍやるゼ！</div>
+        <div class="brand-sub">com.tamjump.medvoo ／ タムジ株式会社</div>
+      </div>
+    </div>
+  </header>
+
+  <h1>アカウントと関連データの削除</h1>
+  <p>ｍやるゼ！のアカウントと、それに紐づくデータの削除を、このページから申請できます。アプリのインストールや再ダウンロードは必要ありません。</p>
+
+  <div class="card">
+    <h2>削除されるデータ</h2>
+    <p>削除の範囲は、アカウントの役割によって変わります。</p>
+    <ul>
+      <li><strong>法人の代表アカウント</strong>の場合：法人・施設まるごと。所属スタッフのアカウント、患者・利用者情報、受入れ・移行ケース、同意書と署名、退院通知、NDA、診療情報提供書などの帳票、加算管理の記録、法人設定を全て削除します。契約中のサブスクリプションは削除と同時に解約します。</li>
+      <li><strong>スタッフのアカウント</strong>の場合：あなたのアカウントと、あなた個人に紐づく情報（所属、通知、医師プロフィール）を削除します。法人が保有する患者・帳票データは法人側に残ります。</li>
+    </ul>
+    <p>削除は取り消せません。実行後にデータを復元することはできません。</p>
+    <h2 style="margin-top:18px">削除されないもの</h2>
+    <p>改ざん防止のハッシュ台帳は、ハッシュ値のみを記録した追記専用の記録で、氏名・住所・病名などの情報を含みません。他の法人が保有する書類の真正性の検証に用いるため、削除の対象外です。</p>
+  </div>
+
+  <div class="card danger" id="auth-card">
+    <h2>方法1：ログインIDとパスワードで削除する</h2>
+    <p>ご自身で本人確認ができる場合は、この場ですぐに削除できます。</p>
+    <div class="msg" id="auth-msg"></div>
+
+    <div id="step-auth">
+      <div class="field">
+        <label for="loginId">ログインID または メールアドレス</label>
+        <input id="loginId" type="text" placeholder="ADM-XXXXXX / STF-XXXXXX" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">パスワード</label>
+        <input id="password" type="password" placeholder="パスワード" autocomplete="current-password">
+      </div>
+      <div class="row">
+        <button class="btn-brand" id="btn-check">削除される内容を確認する</button>
+      </div>
+    </div>
+
+    <div id="step-confirm" class="hidden">
+      <div class="scope" id="scope-box"></div>
+      <div class="field">
+        <label for="confirm">確認のため「削除」と入力してください</label>
+        <input id="confirm" type="text" placeholder="削除" autocomplete="off">
+        <div class="hint">この操作は取り消せません。</div>
+      </div>
+      <div class="row">
+        <button id="btn-back">やめる</button>
+        <button class="btn-danger" id="btn-delete">削除を実行する</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方法2：パスワードが分からない場合</h2>
+    <p>本人確認ができない場合は、こちらから削除を申請してください。タムジ株式会社が内容を確認のうえ対応し、ご連絡します。</p>
+    <div class="msg" id="req-msg"></div>
+    <div id="req-form">
+      <div class="field">
+        <label for="req-login">ログインID（分かる範囲で）</label>
+        <input id="req-login" type="text" placeholder="ADM-XXXXXX など" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="req-contact">ご連絡先（メールアドレスまたは電話番号）</label>
+        <input id="req-contact" type="text" placeholder="返信できる連絡先" autocomplete="off">
+        <div class="hint">本人確認のためご連絡します。</div>
+      </div>
+      <div class="field">
+        <label for="req-reason">補足（任意）</label>
+        <textarea id="req-reason" placeholder="法人名、ご担当者名など、本人確認の手がかりになる情報"></textarea>
+      </div>
+      <div class="row">
+        <button class="btn-brand" id="btn-request">削除を申請する</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>申請から削除までの流れ</h2>
+    <ol class="steps">
+      <li>上記のいずれかの方法で削除を申請します。</li>
+      <li>方法1（本人確認ができる場合）は、その場で即時に削除されます。</li>
+      <li>方法2（申請）は、ご連絡先へ本人確認のご連絡をしたうえで、確認できてから30日以内に削除します。</li>
+      <li>削除の完了後、ご連絡先へお知らせします。</li>
+    </ol>
+    <p>ご不明な点は <a href="https://tamjump.com/contact.html" target="_blank" rel="noopener">タムジ株式会社 お問い合わせ</a> までご連絡ください。</p>
+  </div>
+
+  <footer>
+    <p style="color:var(--ink-l)">タムジ株式会社 ／ ｍやるゼ！（com.tamjump.medvoo）<br>
+    <a href="https://tamjump.com/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a> ・
+    <a href="https://tamjump.com/terms.html" target="_blank" rel="noopener">利用規約</a> ・
+    <a href="app.html">アプリを開く</a></p>
+  </footer>
+
+</div>
+
+<script>
+const API = 'https://medadapt-api-v2.animalb001.workers.dev';
+
+function $(id){ return document.getElementById(id); }
+function show(el, kind, text){ el.className = 'msg ' + kind; el.textContent = text; }
+function hide(el){ el.className = 'msg'; el.textContent = ''; }
+
+async function post(path, body){
+  try{
+    const r = await fetch(API + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return await r.json();
+  }catch(e){
+    return { error: '通信に失敗しました。ネットワークをご確認ください。' };
+  }
+}
+
+// ── 方法1：本人確認 → 範囲提示 → 削除 ──
+$('btn-check').addEventListener('click', async () => {
+  const loginId = $('loginId').value.trim();
+  const password = $('password').value;
+  hide($('auth-msg'));
+  if(!loginId || !password){ show($('auth-msg'), 'err', 'ログインIDとパスワードを入力してください。'); return; }
+  $('btn-check').disabled = true;
+  const r = await post('/account/delete-preview-web', { loginId, password });
+  $('btn-check').disabled = false;
+  if(!r || !r.ok){ show($('auth-msg'), 'err', (r && r.error) || '確認に失敗しました。'); return; }
+
+  const box = $('scope-box');
+  const c = r.counts || {};
+  if(r.scope === 'org'){
+    box.innerHTML = '<strong>法人「' + (r.orgName || '') + '」を削除します。</strong><br>'
+      + 'スタッフ ' + (c.staff||0) + '名のアカウント、患者・利用者 ' + (c.patients||0) + '件、ケース ' + (c.cases||0) + '件、'
+      + '同意書 ' + (c.consentForms||0) + '件、退院通知 ' + (c.dischargeNotices||0) + '件、NDA ' + (c.ndas||0) + '件、'
+      + '帳票 ' + (c.documents||0) + '件を削除します。'
+      + (r.subscription ? '<br>契約中のサブスクリプションも同時に解約します。' : '');
+  }else{
+    box.innerHTML = '<strong>' + (r.name || '') + '（' + (r.loginId || '') + '）のアカウントを削除します。</strong><br>'
+      + '所属、通知、医師プロフィールを削除します。法人が保有する患者・帳票データは法人側に残ります。';
+  }
+  $('step-auth').classList.add('hidden');
+  $('step-confirm').classList.remove('hidden');
+});
+
+$('btn-back').addEventListener('click', () => {
+  $('step-confirm').classList.add('hidden');
+  $('step-auth').classList.remove('hidden');
+  $('confirm').value = '';
+});
+
+$('btn-delete').addEventListener('click', async () => {
+  const loginId = $('loginId').value.trim();
+  const password = $('password').value;
+  const confirm = $('confirm').value.trim();
+  hide($('auth-msg'));
+  if(confirm !== '削除'){ show($('auth-msg'), 'err', '確認欄に「削除」と入力してください。'); return; }
+  $('btn-delete').disabled = true;
+  const r = await post('/account/delete-web', { loginId, password, confirm });
+  $('btn-delete').disabled = false;
+  if(!r || !r.ok){ show($('auth-msg'), 'err', (r && r.error) || '削除に失敗しました。'); return; }
+  $('step-confirm').classList.add('hidden');
+  $('auth-card').innerHTML = '<h2>削除しました</h2>'
+    + '<p>' + (r.scope === 'org'
+        ? '法人「' + (r.orgName || '') + '」のデータとアカウントを削除しました。'
+        : 'アカウントを削除しました。')
+    + '</p><p>ご利用ありがとうございました。</p>';
+  window.scrollTo(0, 0);
+});
+
+// ── 方法2：削除の申請 ──
+$('btn-request').addEventListener('click', async () => {
+  const contact = $('req-contact').value.trim();
+  hide($('req-msg'));
+  if(!contact){ show($('req-msg'), 'err', 'ご連絡先を入力してください。'); return; }
+  $('btn-request').disabled = true;
+  const r = await post('/account/delete-request', {
+    loginId: $('req-login').value.trim(),
+    contact,
+    reason: $('req-reason').value.trim(),
+  });
+  $('btn-request').disabled = false;
+  if(!r || !r.ok){ show($('req-msg'), 'err', (r && r.error) || '受付に失敗しました。'); return; }
+  $('req-form').classList.add('hidden');
+  show($('req-msg'), 'ok', '削除の申請を受け付けました（受付ID: ' + r.requestId + '）。ご連絡先へ本人確認のご連絡をします。');
+});
+</script>
+</body>
+</html>

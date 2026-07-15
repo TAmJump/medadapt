@@ -7414,7 +7414,72 @@ pw.appendChild(h('div',{style:{marginTop:'12px'}},btn('パスワードを変更'
   else toast(res?.error||'変更に失敗しました');
 })));
 w.appendChild(pw);
+// アカウント削除セクション（Google Play / App Store の必須要件）
+const da=h('div',{className:'card',style:{marginBottom:'20px',border:'1px solid #ef4444'}});
+da.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'8px',color:'#b91c1c'}},'アカウントの削除'));
+da.appendChild(h('div',{id:'del_scope_note',style:{fontSize:'12px',color:'var(--ink-m)',lineHeight:'1.7',marginBottom:'12px'}},'削除範囲を確認しています…'));
+da.appendChild(h('div',{},btn('アカウントを削除する','btn-danger',()=>showDeleteAccountModal())));
+da.appendChild(h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'10px',lineHeight:'1.7'}},'ブラウザからも削除できます：',h('a',{href:'delete-account.html',target:'_blank',rel:'noopener',style:{color:'var(--brand)'}},'delete-account.html')));
+w.appendChild(da);
+// 削除範囲は毎回サーバーに問い合わせる（役割で変わるため）
+api('/account/delete-preview').then(r=>{
+  const el=document.getElementById('del_scope_note');if(!el||!r||!r.ok)return;
+  el.textContent='';
+  if(r.scope==='org'){
+    const c=r.counts||{};
+    el.appendChild(h('div',{style:{fontWeight:'700',color:'#b91c1c',marginBottom:'6px'}},'あなたは法人の代表アカウントです。削除すると法人「'+(r.orgName||'')+'」のデータが全て消えます。'));
+    el.appendChild(h('div',{},'消えるもの：スタッフ '+(c.staff||0)+'名 ／ 患者・利用者 '+(c.patients||0)+'件 ／ ケース '+(c.cases||0)+'件 ／ 同意書 '+(c.consentForms||0)+'件 ／ 退院通知 '+(c.dischargeNotices||0)+'件 ／ NDA '+(c.ndas||0)+'件 ／ 帳票 '+(c.documents||0)+'件'));
+    if(r.subscription)el.appendChild(h('div',{style:{marginTop:'6px'}},'契約中のサブスクリプションは削除と同時に解約されます。'));
+    el.appendChild(h('div',{style:{marginTop:'6px'}},'スタッフの方は、ご自身のアカウントだけを削除できます。'));
+  }else{
+    el.appendChild(h('div',{},'あなたのアカウントと、あなた個人に紐づく情報（所属・通知・医師プロフィール）を削除します。'));
+    el.appendChild(h('div',{style:{marginTop:'6px'}},'法人が保有する患者・帳票データは法人側に残ります。'));
+  }
+  el.appendChild(h('div',{style:{marginTop:'6px'}},'削除は取り消せません。'));
+});
 return w}
+
+// アカウント削除の確認モーダル。パスワードと「削除」の二重確認を必須にする。
+function showDeleteAccountModal(){
+  const ov=h('div',{style:{position:'fixed',inset:'0',background:'rgba(15,23,42,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000',padding:'16px'},onClick:e=>{if(e.target===ov)ov.remove()}});
+  const m=h('div',{className:'card',style:{width:'100%',maxWidth:'520px',padding:'22px',maxHeight:'90vh',overflow:'auto'}});
+  m.appendChild(h('h3',{style:{fontSize:'18px',fontWeight:'800',marginBottom:'10px',color:'#b91c1c'}},'アカウントを削除します'));
+  const note=h('div',{style:{fontSize:'12px',color:'var(--ink-m)',lineHeight:'1.8',marginBottom:'14px'}},'読み込み中…');
+  m.appendChild(note);
+  m.appendChild(h('div',{className:'field'},h('label',{for:'del_pw'},'パスワード'),h('input',{id:'del_pw',type:'password',placeholder:'本人確認のため入力してください',autocomplete:'new-password'})));
+  m.appendChild(h('div',{className:'field'},h('label',{for:'del_confirm'},'確認'),h('input',{id:'del_confirm',type:'text',placeholder:'削除',autocomplete:'off'}),h('div',{style:{fontSize:'11px',color:'var(--ink-m)',marginTop:'4px'}},'「削除」と入力してください')));
+  m.appendChild(h('div',{style:{display:'flex',gap:'8px',marginTop:'16px'}},
+    btn('やめる','btn-out',()=>ov.remove()),
+    btn('削除を実行','btn-danger',async()=>{
+      const pw=document.getElementById('del_pw')?.value||'';
+      const cf=document.getElementById('del_confirm')?.value?.trim()||'';
+      if(!pw){toast('パスワードを入力してください');return}
+      if(cf!=='削除'){toast('確認欄に「削除」と入力してください');return}
+      const res=await api('/account/delete',{method:'POST',body:JSON.stringify({password:pw,confirm:cf})});
+      if(res&&res.ok){
+        try{localStorage.removeItem('medadapt_token');localStorage.removeItem('medadapt-last-org')}catch(e){}
+        ov.remove();
+        alert(res.scope==='org'?'法人のデータとアカウントを削除しました。ご利用ありがとうございました。':'アカウントを削除しました。ご利用ありがとうございました。');
+        location.href=location.pathname;
+      }else toast(res?.error||'削除に失敗しました');
+    })
+  ));
+  ov.appendChild(m);document.body.appendChild(ov);
+  api('/account/delete-preview').then(r=>{
+    if(!r||!r.ok){note.textContent='削除範囲を取得できませんでした。';return}
+    note.textContent='';
+    if(r.scope==='org'){
+      const c=r.counts||{};
+      note.appendChild(h('div',{style:{fontWeight:'700',color:'#b91c1c'}},'法人「'+(r.orgName||'')+'」を削除します。'));
+      note.appendChild(h('div',{style:{marginTop:'6px'}},'スタッフ '+(c.staff||0)+'名のアカウント、患者・利用者 '+(c.patients||0)+'件、ケース '+(c.cases||0)+'件、同意書 '+(c.consentForms||0)+'件、退院通知 '+(c.dischargeNotices||0)+'件、NDA '+(c.ndas||0)+'件、帳票 '+(c.documents||0)+'件を削除します。'));
+      if(r.subscription)note.appendChild(h('div',{style:{marginTop:'6px'}},'契約中のサブスクリプションも同時に解約します。'));
+    }else{
+      note.appendChild(h('div',{},(r.name||'')+'（'+(r.loginId||'')+'）のアカウントを削除します。'));
+      note.appendChild(h('div',{style:{marginTop:'6px'}},'法人が保有する患者・帳票データは法人側に残ります。'));
+    }
+    note.appendChild(h('div',{style:{marginTop:'8px',fontWeight:'700'}},'この操作は取り消せません。'));
+  });
+}
 // --- PDF GENERATORS ---
 
 // v5.0.4: 居宅療養管理指導 PDF（介護保険算定対応）
