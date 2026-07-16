@@ -270,7 +270,93 @@ async function handleRequest(request, env, json, err) {
     const invite = await env.DB.prepare('SELECT * FROM invites WHERE token=? AND used=0').bind(inviteToken).first();
     if (!invite) return err('招待リンクが無効または使用済みです');
     if (new Date(invite.expires) < new Date()) return err('招待リンクの有効期限が切れています（7日間有効）');
-    return json({ org_id: invite.org_id, org_name: invite.org_name, email: invite.email });
+    return json({ org_id: invite.org_id, org_name: invite.org_name, email: invite.email, kind: invite.kind || 'staff' });
+  }
+
+  // ── POST /auth/therapist-register（施術者アカウント登録・認証不要）────
+  // 施術者（はり師・きゅう師／あん摩マッサージ指圧師）は招待元法人のスタッフではなく、
+  // 独立した事業者。よって org_id は自分自身を指す（＝招待元の課金人数に入らない）。
+  // 招待元法人とは org_therapists で「取引のある施術者」として紐づける。
+  if (path === '/auth/therapist-register' && method === 'POST') {
+    const { invite_token, email, password, name, facility } = await request.json().catch(() => ({}));
+    if (!invite_token || !password || !name) return err('必須項目が不足しています（お名前・パスワード）');
+    if (password.length < 8) return err('パスワードは8文字以上で入力してください');
+
+    const invite = await env.DB.prepare('SELECT * FROM invites WHERE token=? AND used=0').bind(invite_token).first();
+    if (!invite) return err('招待リンクが無効または使用済みです');
+    if (new Date(invite.expires) < new Date()) return err('招待リンクの有効期限が切れています');
+    if ((invite.kind || 'staff') !== 'therapist') return err('この招待リンクは施術者用ではありません');
+
+    const emailNorm = (email || '').trim().toLowerCase();
+    if (emailNorm) {
+      const dup = await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(emailNorm).first();
+      if (dup) return err('このメールアドレスは既に登録されています。お持ちのIDでログインし、施術者として登録済みの旨を招待元へお伝えください');
+    }
+
+    let loginId, attempts = 0;
+    while (attempts < 10) {
+      loginId = genLoginId('THR');
+      const ex = await env.DB.prepare('SELECT id FROM users WHERE login_id=?').bind(loginId).first();
+      if (!ex) break;
+      attempts++;
+    }
+
+    const id = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const pwHash = await hashPassword(password);
+    const now = new Date().toISOString();
+    const facilityName = (facility || '').toString().trim().slice(0, 120);
+
+    // org_id = 自分自身（独立事業者）。role = med_acupuncturist。
+    await env.DB.prepare(
+      'INSERT INTO users (id,login_id,email,pw,pw_hash,org,type,name,plan,usage,email_verified,role,org_id,status,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind(id, loginId, emailNorm, '', pwHash, facilityName, 'therapist', name, 'free', '{}', 1, 'med_acupuncturist', id, 'active', now).run();
+
+    await env.DB.prepare('UPDATE invites SET used=1 WHERE token=?').bind(invite_token).run();
+
+    // 招待元法人と紐づけ（共有先の選択肢に出るようにする）
+    try {
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO org_therapists (id,org_id,therapist_user_id,therapist_login_id,name,facility,status,created) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind('ot_' + genUuid(), invite.org_id, id, loginId, name, facilityName, 'active', now).run();
+    } catch (e) { console.error('org_therapists link failed:', e.message); }
+
+    // 招待元法人の管理者へ通知（ログインIDを手入力で聞き出す手間をなくす）
+    try {
+      const adminUser = await env.DB.prepare("SELECT id FROM users WHERE id=? OR (org_id=? AND role='admin') LIMIT 1").bind(invite.org_id, invite.org_id).first();
+      if (adminUser) {
+        await env.DB.prepare('INSERT INTO notifications (id,user_id,module_id,type,title,body,action_url,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+          .bind('NT-' + genUuid(), adminUser.id, 'consent', 'therapist_registered',
+            '施術者が登録されました', `${name} 様（${facilityName || '施術所名未登録'}）が施術者として登録されました。ログインID: ${loginId}。同意書の共有先として選べます。`,
+            '#page:consent_therapists', 0, now).run();
+      }
+    } catch (e) { /* 通知失敗は登録自体を妨げない */ }
+
+    if (emailNorm) {
+      try {
+        await sendEmail(env, {
+          to: emailNorm,
+          subject: '【ｍやるゼ！】施術者アカウント登録完了 - あなたのログインID',
+          html: `
+            <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
+              <h2 style="color:#0891b2;">施術者アカウント登録完了</h2>
+              <p>${escapeHtml(name)} 様</p>
+              <p>${escapeHtml(invite.org_name || '招待元の医療機関')} からの招待でｍやるゼ！の施術者アカウントを登録しました。</p>
+              <div style="background:#f0fdfa;border:1px solid #0891b2;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
+                <div style="font-size:12px;color:#64748b;">あなたのログインIDは</div>
+                <div style="font-size:28px;font-weight:900;color:#0891b2;letter-spacing:2px;">${loginId}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:4px;">このIDとパスワードでログインしてください</div>
+              </div>
+              <p style="font-size:13px;">医師が署名した同意書が共有されると、アプリに届きます。施術のもとでご本人・ご家族の署名を取得してください。</p>
+              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.tamjump.com/app.html</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+              <p style="font-size:11px;color:#999;">タムジ.Corp | ｍやるゼ！ 医療介護連携OS</p>
+            </div>
+          `
+        });
+      } catch (e) { console.error('therapist welcome mail failed:', e.message); }
+    }
+
+    return json({ success: true, login_id: loginId, message: '施術者アカウントを登録しました' });
   }
 
   // ── POST /auth/staff-register（スタッフ登録・認証不要）────
@@ -937,6 +1023,84 @@ async function handleRequest(request, env, json, err) {
       });
     }
     return json({ success: true, invite_url: inviteUrl, token: inviteToken });
+  }
+
+  // ── POST /therapist/invite（施術者の招待リンク発行）──────────
+  // 施術者はスタッフ招待（/staff/invite）と別経路。自法人に所属させず、独立アカウントを作らせる。
+  if (path === '/therapist/invite' && method === 'POST') {
+    if (!['admin', 'org_admin', 'med_clinic'].includes(currentUser.role)) return err('管理者のみ実行できます', 403);
+    const { email } = await request.json().catch(() => ({}));
+    const inviteToken = crypto.randomUUID();
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const id = 'inv_' + Date.now().toString(36);
+    const now = new Date().toISOString();
+    const orgId = currentUser.org_id || currentUser.id;
+    await env.DB.prepare('INSERT INTO invites (id,org_id,org_name,email,token,expires,used,created,kind) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(id, orgId, currentUser.org, email || '', inviteToken, expires, 0, now, 'therapist').run();
+    const inviteUrl = `https://myaruze.tamjump.com/app.html?tinvite=${inviteToken}`;
+    if (email) {
+      try {
+        await sendEmail(env, {
+          to: email,
+          subject: `【ｍやるゼ！】${currentUser.org} から施術者アカウントの招待が届いています`,
+          html: `
+            <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;">
+              <h2 style="color:#0891b2;">ｍやるゼ！ 施術者アカウントの招待</h2>
+              <p>${escapeHtml(currentUser.org || '')} から、はり師・きゅう師／あん摩マッサージ指圧師（施術者）としての登録の招待が届いています。</p>
+              <p style="font-size:13px;">登録すると、医師が署名した療養費の同意書がアプリに直接届きます。施術のもとでご本人・ご家族の署名を取得でき、書面のやり取りが不要になります。</p>
+              <a href="${inviteUrl}" style="display:inline-block;padding:12px 24px;background:#0891b2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;margin:16px 0;">施術者アカウントを作成する</a>
+              <p style="font-size:12px;color:#666;">このリンクは7日間有効です。</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+              <p style="font-size:11px;color:#999;">タムジ.Corp | ｍやるゼ！ 医療介護連携OS</p>
+            </div>
+          `
+        });
+      } catch (e) { console.error('therapist invite mail failed:', e.message); }
+    }
+    return json({ success: true, invite_url: inviteUrl, token: inviteToken });
+  }
+
+  // ── GET /therapists（取引のある施術者の一覧）─────────────────
+  if (path === '/therapists' && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    let rows = { results: [] };
+    try {
+      rows = await env.DB.prepare(
+        "SELECT id, therapist_user_id, therapist_login_id, name, facility, status, created FROM org_therapists WHERE org_id=? AND status='active' ORDER BY created ASC"
+      ).bind(orgId).all();
+    } catch (e) { /* 未マイグレーションのD1でも一覧は空で返す */ }
+    return json({ therapists: rows?.results || [] });
+  }
+
+  // ── POST /therapist/link（既に施術者アカウントを持つ人をIDで追加）──
+  if (path === '/therapist/link' && method === 'POST') {
+    if (!['admin', 'org_admin', 'med_clinic'].includes(currentUser.role)) return err('管理者のみ実行できます', 403);
+    const body = await request.json().catch(() => ({}));
+    const loginIdIn = (body.login_id || '').toString().trim();
+    const emailIn = (body.email || '').toString().trim().toLowerCase();
+    if (!loginIdIn && !emailIn) return err('施術者のログインID または メールアドレスを入力してください');
+    let t = null;
+    if (loginIdIn) t = await env.DB.prepare('SELECT id, login_id, name, org, role FROM users WHERE login_id=?').bind(loginIdIn).first();
+    if (!t && emailIn) t = await env.DB.prepare('SELECT id, login_id, name, org, role FROM users WHERE email=?').bind(emailIn).first();
+    if (!t) return err('該当するユーザーが見つかりません', 404);
+    if (t.role !== 'med_acupuncturist') return err('このIDは施術者アカウントではありません。招待リンクから施術者として登録してもらってください', 400);
+    const orgId = currentUser.org_id || currentUser.id;
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO org_therapists (id,org_id,therapist_user_id,therapist_login_id,name,facility,status,created) VALUES (?,?,?,?,?,?,?,?)'
+    ).bind('ot_' + genUuid(), orgId, t.id, t.login_id || '', t.name || '', t.org || '', 'active', now).run();
+    await env.DB.prepare("UPDATE org_therapists SET status='active' WHERE org_id=? AND therapist_user_id=?").bind(orgId, t.id).run();
+    return json({ ok: true, therapist_user_id: t.id, therapist_login_id: t.login_id || '', name: t.name || '' });
+  }
+
+  // ── POST /therapist/unlink（取引先施術者から外す。アカウント自体は消さない）──
+  if (path === '/therapist/unlink' && method === 'POST') {
+    if (!['admin', 'org_admin', 'med_clinic'].includes(currentUser.role)) return err('管理者のみ実行できます', 403);
+    const { therapist_user_id } = await request.json().catch(() => ({}));
+    if (!therapist_user_id) return err('therapist_user_idが必要です');
+    const orgId = currentUser.org_id || currentUser.id;
+    await env.DB.prepare("UPDATE org_therapists SET status='removed' WHERE org_id=? AND therapist_user_id=?").bind(orgId, therapist_user_id).run();
+    return json({ ok: true });
   }
 
   // ── GET /staff ────────────────────────────────────────────
@@ -2717,6 +2881,13 @@ async function handleRequest(request, env, json, err) {
     if (ac.role !== 'med_acupuncturist') return err('共有先が施術者（med_acupuncturist）アカウントではありません', 400);
     acId = ac.id;
     const now = new Date().toISOString();
+    // 手入力で共有した施術者は取引先として自動登録し、次回から選択肢に出す
+    try {
+      const _acFull = await env.DB.prepare('SELECT login_id, org FROM users WHERE id=?').bind(acId).first();
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO org_therapists (id,org_id,therapist_user_id,therapist_login_id,name,facility,status,created) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind('ot_' + genUuid(), (currentUser.org_id || currentUser.id), acId, _acFull?.login_id || '', ac.name || '', _acFull?.org || '', 'active', now).run();
+    } catch (e) { /* 紐づけ失敗は共有自体を妨げない */ }
     const newStatus = isRyouyouhi ? 'shared_to_therapist' : 'shared';
     await env.DB.prepare("UPDATE consent_forms SET status=?, shared_to_user_id=?, shared_at=?, updated_at=? WHERE id=?")
       .bind(newStatus, acId, now, now, cfId).run();
@@ -3862,6 +4033,13 @@ function genLoginId(prefix) {
 async function initDB(db) {
   const stmts = [
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, pw TEXT, pw_hash TEXT, org TEXT DEFAULT '', type TEXT DEFAULT '', name TEXT DEFAULT '', plan TEXT DEFAULT 'free', usage TEXT DEFAULT '{}', email_verified INTEGER DEFAULT 0, verify_token TEXT, reset_token TEXT, reset_expires TEXT, role TEXT DEFAULT 'admin', org_id TEXT, suspended INTEGER DEFAULT 0, status TEXT DEFAULT 'active', access_blocked_at TEXT, qr_token TEXT, created TEXT)`,
+    // ── users の後付けカラム（旧マイグレーション由来で本番D1には既にあるが initDB のDDLに無い）──
+    //    未適用のD1では login_id が無いまま idx_users_login_id を張ろうとして失敗し、
+    //    ログインID運用そのものが動かないため冪等に追加する。
+    `ALTER TABLE users ADD COLUMN login_id TEXT`,
+    `ALTER TABLE users ADD COLUMN last_login_at TEXT`,
+    `ALTER TABLE users ADD COLUMN billing_email TEXT`,
+    `ALTER TABLE users ADD COLUMN square_customer_id TEXT`,
     `CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT NOT NULL, user_login_id TEXT, created TEXT, expires TEXT)`,
     `CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
@@ -3870,6 +4048,11 @@ async function initDB(db) {
     `CREATE TABLE IF NOT EXISTS assessments (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, related_id TEXT DEFAULT '', owner_email TEXT NOT NULL, doc_type TEXT NOT NULL, title TEXT DEFAULT '', content TEXT NOT NULL, created_by TEXT DEFAULT '', created TEXT)`,
     `CREATE TABLE IF NOT EXISTS invites (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, org_name TEXT DEFAULT '', email TEXT DEFAULT '', token TEXT NOT NULL, expires TEXT, used INTEGER DEFAULT 0, created TEXT)`,
+    // ── 招待の種別（'staff' = 自法人スタッフ / 'therapist' = 外部の施術者）──
+    `ALTER TABLE invites ADD COLUMN kind TEXT DEFAULT 'staff'`,
+    // ── 取引のある施術者（法人 × 施術者ユーザー）。施術者は自法人スタッフではなく外部の独立アカウント ──
+    `CREATE TABLE IF NOT EXISTS org_therapists (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, therapist_user_id TEXT NOT NULL, therapist_login_id TEXT DEFAULT '', name TEXT DEFAULT '', facility TEXT DEFAULT '', status TEXT DEFAULT 'active', created TEXT, UNIQUE(org_id, therapist_user_id))`,
+    `CREATE INDEX IF NOT EXISTS idx_org_therapists_org ON org_therapists(org_id)`,
     `CREATE INDEX IF NOT EXISTS idx_patients_owner ON patients(owner_email)`,
     `CREATE INDEX IF NOT EXISTS idx_documents_patient ON documents(patient_id)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_id ON users(login_id)`,
@@ -3901,6 +4084,13 @@ async function initDB(db) {
     `ALTER TABLE consent_forms ADD COLUMN sign_call_url TEXT`,
     // ── 登録済みの本人・家族IDへ署名を依頼（アプリ内・受信箱で署名） ──
     `ALTER TABLE consent_forms ADD COLUMN sign_assignee_user_id TEXT`,
+    // ── 施術者への共有（療養費）。本番D1には手動マイグレーション由来で既にあるが、
+    //    initDB のDDLに無く、未適用のD1では /consent/:id/share が500になるため冪等に追加する。
+    `ALTER TABLE consent_forms ADD COLUMN shared_to_user_id TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN shared_at TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN pdf_data TEXT`,
+    `ALTER TABLE consent_forms ADD COLUMN pdf_filename TEXT`,
+    `CREATE INDEX IF NOT EXISTS idx_consent_forms_shared ON consent_forms(shared_to_user_id)`,
     // ── 確定同意書の 相手法人（宛先org）受信箱への配信（NDA締結済み取引先） ──
     `CREATE TABLE IF NOT EXISTS consent_deliveries (id TEXT PRIMARY KEY, consent_form_id TEXT, sender_org_id TEXT, sender_org_name TEXT, recipient_org_id TEXT, patient_name TEXT, consent_type TEXT, snapshot TEXT, message TEXT, status TEXT DEFAULT 'delivered', created_at TEXT, read_at TEXT)`,
     `CREATE INDEX IF NOT EXISTS idx_consent_deliveries_recipient ON consent_deliveries(recipient_org_id)`,
@@ -4025,6 +4215,9 @@ async function performAccountDeletion(env, user) {
     // 他者のデータを壊さないよう、この人を指している参照だけ先に外す
     await run('UPDATE consent_forms SET sign_assignee_user_id=NULL WHERE sign_assignee_user_id=?', user.id);
     await run('UPDATE consent_forms SET requested_doctor_user_id=NULL WHERE requested_doctor_user_id=?', user.id);
+    // 施術者アカウント：共有先の参照を外す（法人側の同意書は残し、別の施術者へ共有し直せるようにする）
+    await run('UPDATE consent_forms SET shared_to_user_id=NULL WHERE shared_to_user_id=?', user.id);
+    await run('DELETE FROM org_therapists WHERE therapist_user_id=?', user.id);
     await run('DELETE FROM doctor_profiles WHERE user_id=?', user.id);
     await run('DELETE FROM notifications WHERE user_id=?', user.id);
     await run('DELETE FROM active_staff_log WHERE user_id=?', user.id);
@@ -4090,6 +4283,9 @@ async function performAccountDeletion(env, user) {
   await run('DELETE FROM org_ndas WHERE org_id_a=? OR org_id_b=?', orgId, orgId);
   await run('DELETE FROM nda_templates WHERE org_id=?', orgId);
   await run('DELETE FROM org_settings WHERE org_id=?', orgId);
+  // 取引のある施術者との紐づけ。施術者は独立アカウントなので相手のアカウントは消さない
+  await run('DELETE FROM org_therapists WHERE org_id=?', orgId);
+  await run('DELETE FROM org_therapists WHERE therapist_user_id IN (SELECT id FROM users WHERE org_id=? OR id=?)', orgId, orgId);
   await run('DELETE FROM invites WHERE org_id=?', orgId);
   await run('DELETE FROM coupon_usages WHERE org_id=?', orgId);
   await run('DELETE FROM pending_member_changes WHERE org_id=?', orgId);
