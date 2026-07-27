@@ -689,6 +689,13 @@ async function genCallURL(){
     return {url:u,hostUrl:u};
   }
 }
+// 録画は Pro のみ。Whereby は URL に recording=on が無いとルームに録画ボタンを出さないので、
+// Free のときは付けない＝画面上にボタンが出ず、押しようがない状態になる。
+function hostUrlForCall(u){
+  if(!u)return u;
+  if(!S.user||S.user.plan!=='pro')return u;
+  return u+(u.indexOf('?')>=0?'&':'?')+'recording=on';
+}
 function addAudit(arr,action,detail){if(!arr)return;arr.push({t:now(),u:S.user?S.user.org_name||S.user.org:'sys',a:action,d:detail||''})}
 function revokeShareOnNG(c){
   // NGになったケースの患者に紐づく共有を取消（記録は残す）
@@ -2276,7 +2283,7 @@ if(c.callUrl){
   panel.appendChild(h('div',{style:{background:'#f0fdfa',border:'1px solid #0891b2',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',color:'#0891b2',wordBreak:'break-all',marginBottom:'14px'}},c.callUrl));
   panel.appendChild(h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
     h('button',{className:'btn btn-xs',style:{border:'1px solid #0891b2',color:'#0891b2',background:'#fff',borderRadius:'8px',padding:'6px 16px',fontWeight:'600',cursor:'pointer'},onClick:()=>{navigator.clipboard?.writeText(c.callUrl).then(()=>toast('URLをコピーしました'))}},'URLをコピー'),
-    h('button',{className:'btn btn-xs',style:{border:'1px solid #10b981',color:'#10b981',background:'#fff',borderRadius:'8px',padding:'6px 16px',fontWeight:'600',cursor:'pointer'},onClick:()=>{S.modal=showCallModal(c.hostCallUrl||c.callUrl,()=>{c.st='in_progress';addAudit(c.audit,'通話開始','');sv();rr();});rr();}},'主催者として開始'),
+    h('button',{className:'btn btn-xs',style:{border:'1px solid #10b981',color:'#10b981',background:'#fff',borderRadius:'8px',padding:'6px 16px',fontWeight:'600',cursor:'pointer'},onClick:()=>{S.modal=showCallModal(hostUrlForCall(c.hostCallUrl||c.callUrl),()=>{c.st='in_progress';addAudit(c.audit,'通話開始','');sv();rr();});rr();}},'主催者として開始'),
     h('button',{className:'btn btn-xs',style:{border:'1px solid #0891b2',color:'#0891b2',background:'#fff',borderRadius:'8px',padding:'6px 16px',fontWeight:'600',cursor:'pointer'},onClick:async()=>{toast('URL生成中...');const g=await genCallURL();if(!g)return;c.callUrl=g.url;c.hostCallUrl=g.hostUrl;addAudit(c.audit,'通話URL再生成',g.url);sv();toast('URL生成完了');rr();}},'URLを再生成')
   ));
   panel.appendChild(h('div',{style:{marginTop:'10px',fontSize:'11px',color:'var(--ink-m)',lineHeight:'1.7'}},'※ このルームは施錠されています。参加者にはコピーしたURLを配り、主催者が「主催者として開始」で入室してから、待機している方を1人ずつ許可してください。'));
@@ -2771,7 +2778,7 @@ const sw=h('div',{style:{marginTop:'14px'}});sw.appendChild(h('label',{style:{fo
 if(cn.sigDataUrl){setTimeout(()=>{try{const img=new Image();img.onload=()=>{const cv=document.querySelector('.sig');if(cv)cv.getContext('2d').drawImage(img,0,0)};img.src=cn.sigDataUrl}catch(e){}},100)}
 const br=h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap',marginTop:'12px'}});br.appendChild(btn('同意を保存','btn-pri',()=>{const nm=document.getElementById('csb_n')?.value||cn.name;if(!nm){toast('同意者氏名');return}obj.consent.name=nm;obj.consent.signed=true;obj.consent.signed_at=now();obj.consent.sigDataUrl=getSig()||'';if(!obj.audit)obj.audit=[];addAudit(obj.audit,'同意取得',nm);sv();toast('保存完了');rr()}));if(cn.signed)br.appendChild(bdg('同意済','var(--accent)'));w.appendChild(br);initSig('.sig');return w}
 // --- SHARED: Call panel ---
-function callPanel(obj,label){const w=h('div');const panel=h('div',{className:'call-panel'});panel.appendChild(h('h3',null,'オンライン '+label));panel.appendChild(h('div',{className:'call-sub'},'テレビ電話等'));if(obj.callUrl){panel.appendChild(h('div',{className:'call-url'},obj.callUrl));panel.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'center'}},btn('URLコピー','btn-sm btn-out',()=>{navigator.clipboard?.writeText(obj.callUrl).then(()=>toast('コピー'))}),btn('主催者として開始','btn-sm btn-green',()=>{S.modal=showCallModal(obj.hostCallUrl||obj.callUrl,()=>{if(!obj.audit)obj.audit=[];addAudit(obj.audit,'通話開始','');sv();});rr();})))}else{panel.appendChild(btn('通話URL生成','btn-pri',async()=>{toast('URL生成中...');const g=await genCallURL();if(!g)return;obj.callUrl=g.url;obj.hostCallUrl=g.hostUrl;if(!obj.audit)obj.audit=[];addAudit(obj.audit,'通話URL生成',g.url);sv();toast('URL生成完了');rr()}))}w.appendChild(panel);return w}
+function callPanel(obj,label){const w=h('div');const panel=h('div',{className:'call-panel'});panel.appendChild(h('h3',null,'オンライン '+label));panel.appendChild(h('div',{className:'call-sub'},'テレビ電話等'));if(obj.callUrl){panel.appendChild(h('div',{className:'call-url'},obj.callUrl));panel.appendChild(h('div',{style:{display:'flex',gap:'8px',justifyContent:'center'}},btn('URLコピー','btn-sm btn-out',()=>{navigator.clipboard?.writeText(obj.callUrl).then(()=>toast('コピー'))}),btn('主催者として開始','btn-sm btn-green',()=>{S.modal=showCallModal(hostUrlForCall(obj.hostCallUrl||obj.callUrl),()=>{if(!obj.audit)obj.audit=[];addAudit(obj.audit,'通話開始','');sv();});rr();})))}else{panel.appendChild(btn('通話URL生成','btn-pri',async()=>{toast('URL生成中...');const g=await genCallURL();if(!g)return;obj.callUrl=g.url;obj.hostCallUrl=g.hostUrl;if(!obj.audit)obj.audit=[];addAudit(obj.audit,'通話URL生成',g.url);sv();toast('URL生成完了');rr()}))}w.appendChild(panel);return w}
 // --- SHARED: Audit view ---
 function showCallModal(url, onStart){
   onStart&&onStart();
