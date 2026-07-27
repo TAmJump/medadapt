@@ -1670,60 +1670,111 @@ body {
     <h2 class="sec-title" style="text-align:center">まずは無料で。<br>本格運用はProで。</h2>
     <p class="sec-sub" style="text-align:center;margin:0 auto">通話・記録・同意・ログ、すべて込み。<br>解約は月末締め・当月末終了。</p>
 
-    <!-- Free / Pro 2-column cards -->
-    <div class="pricing-grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:44px;max-width:820px;margin-left:auto;margin-right:auto;">
+    <style>
+      .pt-cards{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:44px auto 36px;max-width:820px;}
+      .pt-card{background:var(--white);border:2px solid var(--border);border-radius:var(--r-lg);padding:32px 24px 28px;text-align:center;}
+      .pt-card.pro{border-color:var(--blue);box-shadow:0 16px 50px rgba(8,145,178,.15);}
+      .pt-tier{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-m);margin-bottom:6px;}
+      .pt-card.pro .pt-tier{color:var(--blue);}
+      .pt-price{font-size:2.8rem;font-weight:800;color:var(--ink);line-height:1;}
+      .pt-card.pro .pt-price{color:var(--blue);}
+      .pt-unit{font-size:.85rem;font-weight:500;color:var(--ink-m);}
+      .pt-note{font-size:.75rem;color:var(--ink-m);margin-top:8px;line-height:1.8;}
+      .pt-cta{display:block;text-align:center;padding:13px;border-radius:var(--r-pill);font-size:.85rem;font-weight:700;text-decoration:none;background:var(--blue-xl);color:var(--blue);margin-top:20px;transition:all .2s;}
+      .pt-cta.pro{background:var(--grad);color:#fff;box-shadow:0 4px 16px rgba(8,145,178,.3);}
+      .pt-wrap{max-width:820px;margin:0 auto;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--white);}
+      .pt-tbl{width:100%;border-collapse:collapse;}
+      .pt-tbl th{font-size:.75rem;font-weight:700;letter-spacing:.06em;color:var(--ink-m);text-align:center;padding:14px 8px;border-bottom:1px solid var(--border);background:var(--white);}
+      .pt-tbl th:first-child{text-align:left;padding-left:20px;}
+      .pt-tbl th.pro{color:var(--blue);}
+      .pt-tbl td{font-size:.82rem;padding:12px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--ink-l);white-space:nowrap;}
+      .pt-tbl td:first-child{text-align:left;padding-left:20px;color:var(--ink);white-space:normal;}
+      .pt-tbl tr:last-child td{border-bottom:none;}
+      .pt-tbl tr.pt-cat td{background:var(--blue-xl);font-size:.76rem;font-weight:700;letter-spacing:.1em;color:var(--blue-d);text-align:left;padding:11px 20px;border-top:1px solid var(--border);}
+      .pt-v{font-weight:700;color:var(--ink);}
+      .pt-p{font-weight:700;color:var(--blue);}
+      .pt-x{color:var(--ink-m);}
+      @media(max-width:640px){
+        .pt-cards{grid-template-columns:1fr;}
+        .pt-tbl td,.pt-tbl th{font-size:.76rem;padding:10px 6px;}
+        .pt-tbl td:first-child,.pt-tbl th:first-child{padding-left:12px;}
+      }
+    </style>
 
-      <!-- Free -->
-      <div style="background:var(--white);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-s);border:2px solid var(--border);display:flex;flex-direction:column;">
-        <div style="padding:32px 24px 20px;text-align:center;">
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--ink-m);text-transform:uppercase;margin-bottom:6px;">Free</div>
-          <div style="font-size:2.8rem;font-weight:800;color:var(--ink);">¥0</div>
-          <div style="font-size:.75rem;color:var(--ink-m);margin-top:4px;">会員登録無料</div>
-        </div>
-        <div style="padding:0 24px 28px;flex:1;display:flex;flex-direction:column;">
-          <a href="app.html#signup" style="display:block;text-align:center;padding:13px;border-radius:var(--r-pill);font-size:.85rem;font-weight:700;text-decoration:none;background:var(--blue-xl);color:var(--blue);transition:all .2s;margin-bottom:20px;">会員登録して始める →</a>
-          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">スタッフ追加</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">50名まで</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">患者・利用者登録</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">100件まで</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">受入れ・移行ケース</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1件まで</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">日程調整</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">オンライン通話URL</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">アセスメント</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">月1回</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">PDF/CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">サービス担当者会議・モニタリング</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">退院時共同指導書・自動作成</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink-m);">✕</td></tr>
-            <tr><td style="padding:10px 0;color:var(--ink-l);">監査ログ</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--ink);">閲覧のみ</td></tr>
-          </table>
-        </div>
+    <div class="pt-cards">
+      <div class="pt-card">
+        <div class="pt-tier">Free</div>
+        <div class="pt-price">&yen;0</div>
+        <div class="pt-note">会員登録のみ<br>まず試したい事業所向け</div>
+        <a href="app.html#signup" class="pt-cta">会員登録して始める &rarr;</a>
       </div>
-
-      <!-- Pro -->
-      <div style="background:var(--white);border-radius:var(--r-lg);overflow:hidden;box-shadow:0 16px 50px rgba(8,145,178,.15);border:2px solid var(--blue);display:flex;flex-direction:column;position:relative;">
-        <div style="padding:32px 24px 20px;text-align:center;">
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--blue);text-transform:uppercase;margin-bottom:6px;">Pro</div>
-          <div style="font-size:2.8rem;font-weight:800;color:var(--blue);">¥200<span style="font-size:.85rem;font-weight:500;color:var(--ink-m);">/ユーザー/月（税込）</span></div>
-          <div style="font-size:.78rem;color:var(--ink-m);margin-top:6px;">組織まとめ決済（代表者カードで一括請求）</div>
-          <div style="font-size:.75rem;color:var(--ink-m);margin-top:4px;">スタッフ何名でも利用可</div>
-        </div>
-        <div style="padding:0 24px 28px;flex:1;display:flex;flex-direction:column;">
-          <a href="app.html#pro" style="display:block;text-align:center;padding:13px;border-radius:var(--r-pill);font-size:.85rem;font-weight:700;text-decoration:none;background:var(--grad);color:#fff;box-shadow:0 4px 16px rgba(8,145,178,.3);transition:all .2s;margin-bottom:20px;">Proを始める →</a>
-          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">スタッフ追加</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">患者・利用者登録</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">受入れ・移行ケース</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">日程調整</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">オンライン通話URL</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">アセスメント</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">PDF/CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">サービス担当者会議・モニタリング</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">無制限</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 0;color:var(--ink-l);">退院時共同指導書・自動作成</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-            <tr><td style="padding:10px 0;color:var(--ink-l);">監査ログ・CSV出力</td><td style="padding:10px 0;font-weight:700;text-align:right;color:var(--blue);">○</td></tr>
-          </table>
-        </div>
+      <div class="pt-card pro">
+        <div class="pt-tier">Pro</div>
+        <div class="pt-price">&yen;200<span class="pt-unit">／ユーザー／月</span></div>
+        <div class="pt-note">表示は税抜（お支払いは税込 &yen;220）<br>組織まとめ決済・代表者カードで一括請求</div>
+        <a href="app.html#pro" class="pt-cta pro">Proを始める &rarr;</a>
       </div>
-
     </div>
-    <p style="text-align:center;font-size:.72rem;color:var(--ink-m);margin-top:20px;line-height:1.8;">※ 表示価格は税別です。解約は月末締め・当月末終了。解約後30日間はデータ閲覧・エクスポートが可能です。<br>※ 正確な監査ログのため、スタッフごとに個別IDの発行を推奨します。ID共用はログの精度低下につながります。</p>
+
+    <div class="pt-wrap">
+      <table class="pt-tbl">
+        <thead>
+          <tr><th>機能</th><th>Free</th><th class="pro">Pro</th></tr>
+        </thead>
+        <tbody>
+        <tr class="pt-cat"><td colspan="3">基本機能</td></tr>
+        <tr><td>スタッフ登録数</td><td class="pt-v">50名まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>患者・利用者登録数</td><td class="pt-v">100件まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>連携先法人（取引先）の登録数</td><td class="pt-v">無制限</td><td class="pt-p">無制限</td></tr>
+        <tr><td>施術者の登録・招待</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>複数法人の切り替え</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>患者・利用者のCSV取込</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>スタッフごとの個別ログインID</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">受入れ・移行連携</td></tr>
+        <tr><td>受入れ・移行ケース</td><td class="pt-v">月1件まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>日程調整（候補提示・確定）</td><td class="pt-v">ケース数に準ずる</td><td class="pt-p">無制限</td></tr>
+        <tr><td>退院通知の送信・受信</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>参加者の管理</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>退院時共同指導記録の自動生成</td><td class="pt-x">—</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">同意書・帳票</td></tr>
+        <tr><td>訪問診療の同意書 兼 計画書</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>あん摩マッサージ指圧の同意書（療養費）</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>はり・きゅうの同意書（療養費）</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>医師・本人・ご家族の電子署名</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>施術者への共有</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>改ざん検知（ハッシュチェーン＋QR検証）</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>診療情報提供書</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>居宅療養管理指導</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>歯科診療・指示書</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>PDF出力</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">記録</td></tr>
+        <tr><td>サービス担当者会議の記録</td><td class="pt-v">月1件まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>モニタリング記録</td><td class="pt-v">月1件まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>アセスメント</td><td class="pt-v">月1件まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>施術報告書</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">オンライン通話</td></tr>
+        <tr><td>通話URLの発行</td><td class="pt-v">月1回まで</td><td class="pt-p">無制限</td></tr>
+        <tr><td>1回あたりの通話時間</td><td class="pt-v">制限なし</td><td class="pt-p">制限なし</td></tr>
+        <tr><td>画面共有</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>待機室（ノック）</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>通話中のチャット</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">管理・セキュリティ</td></tr>
+        <tr><td>監査ログの閲覧</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>監査ログのCSV出力</td><td class="pt-x">—</td><td class="pt-p">○</td></tr>
+        <tr><td>加算管理（算定記録）</td><td class="pt-x">—</td><td class="pt-p">○</td></tr>
+        <tr><td>NDA（取引先）管理</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>災害時モード</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr class="pt-cat"><td colspan="3">サポート・契約</td></tr>
+        <tr><td>メールサポート</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>セットアップ代行（別途有償）</td><td class="pt-v">○</td><td class="pt-p">○</td></tr>
+        <tr><td>最低利用期間</td><td class="pt-v">なし</td><td class="pt-p">なし</td></tr>
+        <tr><td>解約</td><td class="pt-x">—</td><td class="pt-p">月末締め・当月末終了</td></tr>
+        <tr><td>解約後のデータ閲覧・書き出し</td><td class="pt-x">—</td><td class="pt-p">30日間</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="text-align:center;font-size:.72rem;color:var(--ink-m);margin-top:20px;line-height:1.8;">※ 表示価格はすべて税抜です。お支払いは税込 &yen;220／ユーザー／月となります。<br>※ Free の月次上限は暦月でリセットされます。<br>※ 解約は月末締め・当月末終了。解約後30日間はデータの閲覧・書き出しが可能です。<br>※ 正確な監査ログのため、スタッフごとに個別IDの発行を推奨します。ID共用はログの精度低下につながります。</p>
 
     <!-- 任意のセットアップ代行 -->
     <div style="margin-top:40px;padding:24px 20px;background:#f7fafb;border:1px solid var(--border);border-radius:12px;max-width:780px;margin-left:auto;margin-right:auto;">
@@ -1895,7 +1946,7 @@ body {
     <div class="faq-list">
       <div class="faq-item">
         <div class="faq-q">IDは1人1つ必要ですか？</div>
-        <div class="faq-a"><div class="faq-a-inner">正確な監査ログを残すため、スタッフごとに個別IDの発行を推奨しています。IDを共用すると「誰が操作したか」の記録精度が下がります。スタッフIDは月額200円で追加でき、管理者が招待リンクで簡単に発行できます。</div></div>
+        <div class="faq-a"><div class="faq-a-inner">正確な監査ログを残すため、スタッフごとに個別IDの発行を推奨しています。IDを共用すると「誰が操作したか」の記録精度が下がります。スタッフIDは月額200円（税抜）で追加でき、管理者が招待リンクで簡単に発行できます。</div></div>
       </div>
       <div class="faq-item">
         <div class="faq-q">対象ユーザーは？</div>
@@ -1927,7 +1978,7 @@ body {
       </div>
       <div class="faq-item">
         <div class="faq-q">料金はいくらですか？</div>
-        <div class="faq-a"><div class="faq-a-inner">会員登録は無料です。スタッフIDを追加する場合は1ID・月額200円です（税込）。解約手数料はありません。任意のセットアップ代行プランもご用意しています（¥19,800〜）。</div></div>
+        <div class="faq-a"><div class="faq-a-inner">会員登録は無料です。スタッフIDを追加する場合は1ID・月額200円（税抜／お支払いは税込220円）です。解約手数料はありません。任意のセットアップ代行プランもご用意しています（¥19,800〜）。</div></div>
       </div>
       <div class="faq-item">
         <div class="faq-q">社内会議や多職種カンファレンスにも使えますか？</div>

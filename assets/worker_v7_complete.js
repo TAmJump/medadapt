@@ -7,6 +7,13 @@
 // v6追加: /auth/reset で login_id にも対応
 // Bindings: DB (D1), AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, FROM_EMAIL
 
+// ── 料金（2026-07-27 改定）──────────────────────────────
+// 表示価格は税抜 200円/ユーザー/月。Square への実請求は税込 220円。
+// LP・アプリの表示は UNIT_PRICE_EXCL_TAX、決済に渡す金額は UNIT_PRICE_INCL_TAX を使うこと。
+const UNIT_PRICE_EXCL_TAX = 200;   // 税抜（表示価格）
+const CONSUMPTION_TAX_RATE = 0.10; // 消費税率
+const UNIT_PRICE_INCL_TAX = Math.round(UNIT_PRICE_EXCL_TAX * (1 + CONSUMPTION_TAX_RATE)); // 220
+
 export default {
   async fetch(request, env) {
     const cors = {
@@ -578,7 +585,7 @@ async function handleRequest(request, env, json, err) {
                     square_subscription_id: subscriptionId,
                     started_at: sub.started_at,
                     status: 'active',
-                    unit_price: 200,
+                    unit_price: UNIT_PRICE_INCL_TAX,
                   });
                 } else {
                   console.error('Phase 7 syncToParent skipped: admin login_id not found for org_id=', sub.org_id);
@@ -1952,7 +1959,7 @@ async function handleRequest(request, env, json, err) {
         square_subscription_id: sub.square_subscription_id,
         started_at: sub.started_at,
         status: 'active',
-        unit_price: 200,
+        unit_price: UNIT_PRICE_INCL_TAX,
       });
       return json({
         ok: true,
@@ -2012,7 +2019,7 @@ async function handleRequest(request, env, json, err) {
         "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
       ).bind(orgId).first();
       const memberCount = Math.max(1, cnt?.n || 1);
-      const amountJpy = 200 * memberCount;
+      const amountJpy = UNIT_PRICE_INCL_TAX * memberCount;
 
       // 4. 新 Subscription 作成
       const subRes = await squareCreateSubscription(env, squareCustomerId, newCardId, memberCount);
@@ -2109,7 +2116,7 @@ async function handleRequest(request, env, json, err) {
         "SELECT COUNT(*) as n FROM users WHERE org_id=? AND status='active'"
       ).bind(orgId).first();
       const memberCount = Math.max(1, cnt?.n || 1);
-      const amountJpy = 200 * memberCount;
+      const amountJpy = UNIT_PRICE_INCL_TAX * memberCount;
 
       // 4. CreateSubscription（price_override_money で動的金額）
       const subRes = await squareCreateSubscription(env, squareCustomerId, cardId, memberCount);
@@ -2416,7 +2423,7 @@ async function handleRequest(request, env, json, err) {
       member_count: sub.member_count || 1,
       pending_member_count: sub.pending_member_count,
       pending_changes,
-      amount_jpy: sub.amount_jpy || 200,
+      amount_jpy: sub.amount_jpy || UNIT_PRICE_INCL_TAX,
       started_at: sub.started_at,
       cancelled_at: sub.cancelled_at,
       last_billed_month: sub.last_billed_month,
@@ -4403,7 +4410,7 @@ function safeJson(str) {
 
 // ────────────────────────────────────────────────────────
 // Square Subscriptions API ヘルパー（v8 / B-2方式）
-// 1組織1サブスク・price_override_money で動的金額（200円 × member_count）
+// 1組織1サブスク・price_override_money で動的金額（税込220円 × member_count／表示は税抜200円）
 // ────────────────────────────────────────────────────────
 
 function genUuid() {
@@ -4462,7 +4469,7 @@ async function squareCreateCard(env, customerId, sourceId, verificationToken) {
 }
 
 async function squareCreateSubscription(env, customerId, cardId, memberCount) {
-  const amount = 200 * Math.max(1, memberCount || 1);
+  const amount = UNIT_PRICE_INCL_TAX * Math.max(1, memberCount || 1);
   return squareFetch(env, '/v2/subscriptions', 'POST', {
     idempotency_key: genUuid(),
     location_id: env.SQUARE_LOCATION_ID,
@@ -4480,7 +4487,7 @@ async function squareRetrieveSubscription(env, subscriptionId) {
 }
 
 async function squareUpdateSubscription(env, subscriptionId, memberCount, version) {
-  const amount = 200 * Math.max(1, memberCount || 1);
+  const amount = UNIT_PRICE_INCL_TAX * Math.max(1, memberCount || 1);
   return squareFetch(env, '/v2/subscriptions/' + encodeURIComponent(subscriptionId), 'PUT', {
     subscription: {
       price_override_money: { amount, currency: 'JPY' },
@@ -4619,7 +4626,7 @@ async function syncToParent(env, loginId, subData) {
           app_name: 'medadapt',
           plan: 'pro',
           seat_count: subData.member_count,
-          unit_price: subData.unit_price ?? 200,
+          unit_price: subData.unit_price ?? UNIT_PRICE_INCL_TAX,
           square_subscription_id: subData.square_subscription_id,
           started_at: subData.started_at,
           status: normalizedStatus,
@@ -4827,7 +4834,7 @@ async function recalcMemberCount(env, orgId) {
     let earliestPendingCount = null;
     for (const m of months) {
       runningCount -= monthlyDecrements[m];
-      const amount = 200 * runningCount;
+      const amount = UNIT_PRICE_INCL_TAX * runningCount;
       await env.DB.prepare(
         'INSERT INTO pending_member_changes (org_id, effective_month, member_count, amount_jpy, source_user_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)'
       ).bind(orgId, m, runningCount, amount, nowIso).run();
