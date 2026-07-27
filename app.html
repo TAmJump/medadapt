@@ -2793,6 +2793,15 @@ function showCallModal(url, onStart){
   closeBtn.onclick=()=>{document.body.removeChild(ov);S.modal=null;rr();};
   bar.appendChild(closeBtn);
   ov.appendChild(bar);
+  // 録画は自動では始まらない（トリガーが手動のため）。押し忘れると記録が残らないので、
+  // 通話画面の上に常時この注意を出す。iframe の中は外から状態を取れないので、
+  // 「録画中かどうか」ではなく「押さないと始まらない」を常に見せる方式にしている。
+  if(S.user&&S.user.plan==='pro'){
+    const note=document.createElement('div');
+    note.style.cssText='background:#fef3c7;color:#92400e;padding:8px 20px;font-size:12px;font-weight:700;line-height:1.6;flex-shrink:0;';
+    note.textContent='録画は自動では始まりません。記録を残す場合は、通話画面の録画ボタンを押してください。録画する前に、参加者と患者・ご家族の同意を得てください。';
+    ov.appendChild(note);
+  }
   const iframe=document.createElement('iframe');
   iframe.src=url;
   iframe.style.cssText='flex:1;border:none;width:100%;';
