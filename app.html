@@ -832,6 +832,12 @@ if(S.user.role==='admin'||S.user.role==='staff'){return pt.ownerEmail===getOwner
 function downloadCSV(rows,fn){const b='\uFEFF';const csv=rows.map(r=>r.map(c=>'"'+(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');const blob=new Blob([b+csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click()}
 function freeCheck(type){
   if(!S.user||S.user.plan==='pro')return true;
+  // オンライン通話は従量原価がかかるため Free では発行させない。
+  // 招待された通話への参加はURLさえあれば可能なので、体験の入口は残る。
+  if(type==='calls'){
+    toast('オンライン通話の発行はProプランの機能です。Freeプランでも、招待された通話には参加できます。');
+    return false;
+  }
   // 患者登録数チェック
   if(type==='patients'){
     if(D.patients.length>=100){toast('Freeプランは患者登録100件まで。Proプランへアップグレードすると無制限になります。');return false;}
