@@ -827,7 +827,7 @@ function freeCheck(type){
   if(!S.user||S.user.plan==='pro')return true;
   // 患者登録数チェック
   if(type==='patients'){
-    if(D.patients.length>=3){toast('Freeプランは患者登録3件まで。Proプランへアップグレードしてください。');return false;}
+    if(D.patients.length>=100){toast('Freeプランは患者登録100件まで。Proプランへアップグレードすると無制限になります。');return false;}
     return true;
   }
   const mo=now().slice(0,7);

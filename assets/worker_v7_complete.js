@@ -372,6 +372,12 @@ async function handleRequest(request, env, json, err) {
     const adminUser = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(invite.org_id).first();
     if (!adminUser) return err('法人情報が見つかりません');
 
+    // Freeプランのスタッフ上限（50名）を登録時にも確認（招待リンク経由の抜けを防ぐ）
+    if ((adminUser.plan || 'free') !== 'pro') {
+      const staffRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM users WHERE org_id=? AND role='staff'").bind(invite.org_id).first();
+      if ((staffRow?.c || 0) >= 50) return err('この法人はFreeプランのスタッフ上限（50名）に達しています。管理者にProプランへのアップグレードをご相談ください。');
+    }
+
     let loginId, attempts = 0;
     while (attempts < 10) {
       loginId = genLoginId('STF');
@@ -999,6 +1005,14 @@ async function handleRequest(request, env, json, err) {
   // ── POST /staff/invite（招待リンク発行・adminのみ）─────────
   if (path === '/staff/invite' && method === 'POST') {
     if (currentUser.role !== 'admin') return err('管理者のみ実行できます', 403);
+    // Freeプランのスタッフ上限（50名）。管理者本人は含めない。未使用の招待も枠を消費する。
+    if ((currentUser.plan || 'free') !== 'pro') {
+      const orgId = currentUser.org_id || currentUser.id;
+      const staffRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM users WHERE org_id=? AND role='staff'").bind(orgId).first();
+      const pendRow = await env.DB.prepare('SELECT COUNT(*) AS c FROM invites WHERE org_id=? AND used=0 AND (kind IS NULL OR kind=?)').bind(orgId, 'staff').first();
+      const staffTotal = (staffRow?.c || 0) + (pendRow?.c || 0);
+      if (staffTotal >= 50) return err('Freeプランはスタッフ50名までです。Proプランにアップグレードすると無制限になります。');
+    }
     const { email } = await request.json().catch(() => ({}));
     const inviteToken = crypto.randomUUID();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
