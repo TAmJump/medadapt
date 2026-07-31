@@ -15,7 +15,7 @@ const CONSUMPTION_TAX_RATE = 0.10; // 消費税率
 const UNIT_PRICE_INCL_TAX = Math.round(UNIT_PRICE_EXCL_TAX * (1 + CONSUMPTION_TAX_RATE)); // 220
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
@@ -28,6 +28,17 @@ export default {
         status, headers: { ...cors, 'Content-Type': 'application/json' }
       });
     const err = (msg, status = 400) => json({ error: msg }, status);
+
+    // ── Whereby の webhook だけは何よりも先に処理して即 200 を返す ──────────
+    // Whereby のタイムアウトは5秒。handleRequest に入ると initDB が毎回90本超の
+    // SQL を D1 に流すため間に合わず、ECONNABORTED で切られて INSERT まで届かない。
+    // 署名検証と保存は waitUntil に逃がし、応答だけ先に返す。
+    if (new URL(request.url).pathname === '/webhook/whereby' && request.method === 'POST') {
+      const raw = await request.text();
+      const sig = request.headers.get('whereby-signature') || '';
+      ctx.waitUntil(handleWherebyWebhook(raw, sig, env));
+      return json({ ok: true });
+    }
 
     try {
       return await handleRequest(request, env, json, err);
@@ -609,60 +620,6 @@ async function handleRequest(request, env, json, err) {
       }
     } catch (e) {
       console.error('webhook handler error:', e);
-    }
-    return json({ ok: true });
-  }
-
-  // ── POST /webhook/whereby（録画完了などの通知・認証不要・HMAC-SHA256検証）──
-  // Whereby は 5xx を返すと2回まで再送し、5秒でタイムアウトする。
-  // 処理に失敗しても 200 を返して再送ループを避け、原因はログに残す方針。
-  if (path === '/webhook/whereby' && method === 'POST') {
-    const raw = await request.text();
-    try {
-      const secret = env.WHEREBY_WEBHOOK_SECRET;
-      if (secret) {
-        const sig = request.headers.get('whereby-signature') || '';
-        const m = /t=([^,]+),v1=([0-9a-f]+)/i.exec(sig);
-        if (!m) { console.error('whereby webhook: signature header missing'); return json({ ok: true }); }
-        const ts = m[1], given = m[2].toLowerCase();
-        const enc = new TextEncoder();
-        const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-        const hexOf = async (msg) => Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(msg))))
-          .map(b => b.toString(16).padStart(2, '0')).join('');
-        // 公式サンプルは JSON.stringify(body) で署名するが、実際に届くのは生のボディ。
-        // どちらでも通るように両方で照合する。
-        let ok = (await hexOf(ts + '.' + raw)) === given;
-        if (!ok) { try { ok = (await hexOf(ts + '.' + JSON.stringify(JSON.parse(raw)))) === given; } catch (e) {} }
-        if (!ok) { console.error('whereby webhook: signature mismatch'); return json({ ok: true }); }
-        // リプレイ対策（5分）
-        if (Math.abs(Date.now() - parseInt(ts, 10) * 1000) > 5 * 60 * 1000) {
-          console.error('whereby webhook: timestamp too old'); return json({ ok: true });
-        }
-      } else {
-        console.warn('whereby webhook: WHEREBY_WEBHOOK_SECRET 未設定のため署名検証をスキップ');
-      }
-
-      const ev = JSON.parse(raw);
-      if (ev.type === 'recording.finished') {
-        const d = ev.data || {};
-        // roomName は先頭にスラッシュが付いて届く（例 "/af0b7b66-..."）
-        const roomName = String(d.roomName || '').replace(/^\//, '');
-        const filename = d.filename || '';
-        const recId = d.recordingId || ('rec_' + crypto.randomUUID());
-        // 通話URLにルーム名が含まれるケースを引き当てる
-        let caseId = null, ownerEmail = null;
-        if (roomName) {
-          const hit = await env.DB.prepare("SELECT id, owner_email FROM cases WHERE data LIKE ? LIMIT 1")
-            .bind('%' + roomName + '%').first();
-          if (hit) { caseId = hit.id; ownerEmail = hit.owner_email; }
-        }
-        await env.DB.prepare(
-          'INSERT OR REPLACE INTO call_recordings (id, room_name, filename, status, case_id, owner_email, created) VALUES (?,?,?,?,?,?,?)'
-        ).bind(recId, roomName, filename, d.status || 'completed', caseId, ownerEmail, new Date().toISOString()).run();
-        console.log('recording.finished stored:', recId, roomName, caseId || '(ケース未特定)');
-      }
-    } catch (e) {
-      console.error('whereby webhook handler error:', e);
     }
     return json({ ok: true });
   }
@@ -4142,7 +4099,70 @@ function genLoginId(prefix) {
 }
 
 // ── DB初期化 ──────────────────────────────────────────────
+// ── Whereby の webhook 本体（fetch から waitUntil で呼ばれる）────────────
+// ここに来た時点で HTTP 応答はもう返している。失敗しても再送は起きないので、
+// 原因は必ずログに残すこと。
+async function handleWherebyWebhook(raw, sigHeader, env) {
+  try {
+    const secret = env.WHEREBY_WEBHOOK_SECRET;
+    if (secret) {
+      const m = /t=([^,]+),v1=([0-9a-f]+)/i.exec(sigHeader);
+      if (!m) { console.log('whereby webhook: signature header missing'); return; }
+      const ts = m[1], given = m[2].toLowerCase();
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const hexOf = async (msg) => Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(msg))))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      // 公式サンプルは JSON.stringify(body) で署名するが、実際に届くのは生のボディ。
+      // どちらでも通るように両方で照合する。
+      let ok = (await hexOf(ts + '.' + raw)) === given;
+      if (!ok) { try { ok = (await hexOf(ts + '.' + JSON.stringify(JSON.parse(raw)))) === given; } catch (e) {} }
+      if (!ok) { console.log('whereby webhook: signature mismatch'); return; }
+      // リプレイ対策（5分）。t= が秒かミリ秒かは仕様が確定していないので両方許す。
+      const n = parseInt(ts, 10);
+      if (Number.isFinite(n)) {
+        const asMs = n > 1e11 ? n : n * 1000;
+        if (Math.abs(Date.now() - asMs) > 5 * 60 * 1000) {
+          console.log('whereby webhook: timestamp too old', ts);
+          return;
+        }
+      }
+    } else {
+      console.log('whereby webhook: WHEREBY_WEBHOOK_SECRET 未設定のため署名検証をスキップ');
+    }
+
+    const ev = JSON.parse(raw);
+    console.log('whereby webhook received:', ev.type || '(type無し)');
+    if (ev.type !== 'recording.finished') return;
+
+    const d = ev.data || {};
+    // roomName は先頭にスラッシュが付いて届く（例 "/aac81af8-..."）
+    const roomName = String(d.roomName || '').replace(/^\//, '');
+    const filename = d.filename || '';
+    const recId = d.recordingId || ('rec_' + crypto.randomUUID());
+    // 万一テーブルが無い環境でも落ちないように
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS call_recordings (id TEXT PRIMARY KEY, room_name TEXT, filename TEXT, status TEXT, case_id TEXT, owner_email TEXT, created TEXT)').run();
+    // 通話URLにルーム名が含まれるケースを引き当てる
+    let caseId = null, ownerEmail = null;
+    if (roomName) {
+      const hit = await env.DB.prepare("SELECT id, owner_email FROM cases WHERE data LIKE ? LIMIT 1")
+        .bind('%' + roomName + '%').first();
+      if (hit) { caseId = hit.id; ownerEmail = hit.owner_email; }
+    }
+    await env.DB.prepare(
+      'INSERT OR REPLACE INTO call_recordings (id, room_name, filename, status, case_id, owner_email, created) VALUES (?,?,?,?,?,?,?)'
+    ).bind(recId, roomName, filename, d.status || 'completed', caseId, ownerEmail, new Date().toISOString()).run();
+    console.log('recording.finished stored:', recId, roomName, caseId || '(ケース未特定)', ownerEmail || '(owner未特定)');
+  } catch (e) {
+    console.error('whereby webhook handler error:', e && e.message);
+  }
+}
+
+// 同じ isolate 内では一度だけ走らせる。毎リクエスト90本超の SQL を D1 に流していたため、
+// 応答が数秒遅れ、Whereby の webhook が5秒のタイムアウトに間に合わなかった。
+let dbInited = false;
 async function initDB(db) {
+  if (dbInited) return;
   const stmts = [
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT, pw TEXT, pw_hash TEXT, org TEXT DEFAULT '', type TEXT DEFAULT '', name TEXT DEFAULT '', plan TEXT DEFAULT 'free', usage TEXT DEFAULT '{}', email_verified INTEGER DEFAULT 0, verify_token TEXT, reset_token TEXT, reset_expires TEXT, role TEXT DEFAULT 'admin', org_id TEXT, suspended INTEGER DEFAULT 0, status TEXT DEFAULT 'active', access_blocked_at TEXT, qr_token TEXT, created TEXT)`,
     // ── users の後付けカラム（旧マイグレーション由来で本番D1には既にあるが initDB のDDLに無い）──
@@ -4243,9 +4263,17 @@ async function initDB(db) {
   ];
   for (const sql of stmts) {
     try { await db.prepare(sql).run(); } catch (e) {
-      if (!e.message?.includes('already exists')) console.error('initDB error:', e.message);
+      // 適用済みのマイグレーションが返す無害なエラーは無視する。
+      // これを毎回ログに出していたため、1リクエストあたり20行以上の赤いエラーが
+      // 積み上がり、Observability のイベント数を無駄に消費していた。
+      const msg = e.message || '';
+      const benign = msg.includes('already exists')
+        || msg.includes('duplicate column name')
+        || msg.includes('no such column');
+      if (!benign) console.error('initDB error:', msg);
     }
   }
+  dbInited = true;
 }
 
 // 既存 users から orgs / memberships を一度だけバックフィル（冪等・非破壊）
