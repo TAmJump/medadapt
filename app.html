@@ -2289,7 +2289,7 @@ function hubCases(pt){if(S.caseId){const c=D.cases.find(x=>x.id===S.caseId);if(c
 const w=h('div');w.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},h('div',{className:'section-label'},'受入れ・移行ケース'),btn('+ 新規','btn-sm btn-pri',()=>{if(!freeCheck('cases'))return;const defParts=[];if(pt.members)pt.members.filter(m=>m.active).forEach(m=>{defParts.push({name:m.name||'',org:m.org||''})});if(S.user)defParts.push({name:S.user.name||'',org:S.user.org||''});const c={id:'c_'+uid(),pn:pt.name,patientId:pt.id,dd:pt.dd||'',st:'draft',ca:now().slice(0,10),slots:[],apt:null,callUrl:'',parts:defParts,consent:{},record:{generated:false,text:''},audit:[]};addAudit(c.audit,'ケース作成',pt.name);D.cases.push(c);freeIncrement('cases');sv();S.caseId=c.id;S.caseTab='schedule';toast('作成完了');rr()})));
 ptCases(pt.id).forEach(c=>{const sl={draft:{l:'下書き',c:'#94a3b8'},scheduling:{l:'調整中',c:'#0e7490'},confirmed:{l:'確定',c:'#0e7490'},in_progress:{l:'実施中',c:'#1e293b'},completed:{l:'完了',c:'var(--accent)'},ng_facility:{l:'受入れNG',c:'#dc2626'},ng_patient:{l:'入居者NG',c:'#dc2626'}}[c.st]||{l:'—',c:'#94a3b8'};w.appendChild(h('div',{className:'card',style:{marginBottom:'8px',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',opacity:c.st.startsWith('ng')?'.6':'1'},onClick:()=>{S.caseId=c.id;S.caseTab='schedule';rr()}},h('div',null,bdg(sl.l,sl.c)),h('div',{style:{flex:1}},h('div',{style:{fontWeight:'600'}},c.dd?'移行：'+c.dd:'移行日未定'),h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},'作成：'+c.ca+(c.ngReason?' ／ NG理由：'+c.ngReason:''))),h('div',{style:{color:'var(--ink-m)'}},'→')))});if(!ptCases(pt.id).length)w.appendChild(h('div',{style:{color:'var(--ink-m)',textAlign:'center',padding:'32px'}},'ケースなし'));return w}
 function caseDetail(c){const w=h('div');w.appendChild(h('span',{style:{cursor:'pointer',fontSize:'13px',color:'var(--accent)',fontWeight:'600'},onClick:()=>{S.caseId=null;rr()}},'← ケース一覧'));const isNG=c.st==='ng_facility'||c.st==='ng_patient';if(isNG){w.appendChild(h('div',{style:{margin:'16px 0',padding:'16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:'12px'}},h('div',{style:{fontWeight:'700',color:'#dc2626',marginBottom:'4px'}},c.st==='ng_facility'?'受入れ側からNGとなりました':'入居者側からNGとなりました'),h('div',{style:{fontSize:'12px',color:'#991b1b'}},c.ngReason?'理由：'+c.ngReason:''),h('div',{style:{fontSize:'11px',color:'#94a3b8',marginTop:'4px'}},'※ アセスメント・面談の記録は保持されます')))}if(!isNG&&c.st!=='completed'){w.appendChild(h('div',{style:{display:'flex',gap:'8px',margin:'12px 0',flexWrap:'wrap'}},btn('受入れ側NG','btn-xs btn-danger',()=>{const reason=prompt('NG理由（受入れ側）');if(reason===null)return;c.st='ng_facility';c.ngReason=reason||'';c.ngDate=now();addAudit(c.audit,'受入れ側NG',reason||'');revokeShareOnNG(c);sv();toast('受入れ側NG');rr()}),btn('入居者側NG','btn-xs btn-danger',()=>{const reason=prompt('NG理由（入居者・家族側）');if(reason===null)return;c.st='ng_patient';c.ngReason=reason||'';c.ngDate=now();addAudit(c.audit,'入居者側NG',reason||'');revokeShareOnNG(c);sv();toast('入居者側NG');rr()})))}const tabs=h('div',{className:'tabs',style:{marginTop:'12px'}});['schedule','call','consent','members','record','audit'].forEach(t=>{tabs.appendChild(h('div',{className:'tab'+(S.caseTab===t?' active':''),onClick:()=>{S.caseTab=t;rr()}},{schedule:'日程調整',call:'通話',consent:'同意・署名',members:'参加者',record:'記録',audit:'監査ログ'}[t]))});w.appendChild(tabs);
-const fn={schedule:()=>caseScheduleTab(c),call:()=>caseCallTab(c),consent:()=>caseConsentTab(c),members:()=>caseMembersTab(c),record:()=>caseRecordTab(c),audit:()=>auditView(c.audit||[])};w.appendChild((fn[S.caseTab]||fn.schedule)());return w}
+const fn={schedule:()=>caseScheduleTab(c),call:()=>caseCallTab(c),consent:()=>caseConsentTab(c),members:()=>caseMembersTab(c),record:()=>caseRecordTab(c),audit:()=>caseAuditTab(c)};w.appendChild((fn[S.caseTab]||fn.schedule)());return w}
 function caseScheduleTab(c){const w=h('div');w.appendChild(h('h3',{style:{fontSize:'16px',fontWeight:'700',marginBottom:'12px'}},'候補日程'));const addRow=h('div',{style:{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}});addRow.appendChild(h('input',{type:'date',id:'ns_d',style:{width:'160px'}}));addRow.appendChild(h('input',{type:'text',id:'ns_t',placeholder:'14:00',style:{width:'100px',textAlign:'center'}}));addRow.appendChild(btn('+ 追加','btn-sm btn-pri',()=>{const d=document.getElementById('ns_d')?.value,t=document.getElementById('ns_t')?.value;if(!d){toast('日付必須');return}c.slots.push({id:'sl_'+uid(),date:d,time:t||'未定',st:'proposed'});if(c.st==='draft')c.st='scheduling';addAudit(c.audit,'候補追加',d+' '+t);sv();rr()}));w.appendChild(addRow);c.slots.forEach(sl=>{const isC=sl.st==='confirmed';w.appendChild(h('div',{className:'slot'+(isC?' confirmed':'')},h('div',{style:{flex:1}},h('div',{style:{fontWeight:'600'}},sl.date+' '+sl.time),h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},isC?'✓ 確定':'候補')),!isC?btn('確定','btn-xs btn-green',()=>{c.slots.forEach(s2=>{s2.st=s2.id===sl.id?'confirmed':'rejected'});c.st='confirmed';c.apt={date:sl.date,time:sl.time};genCallURL().then(g=>{addAudit(c.audit,'日程確定',sl.date);if(g){c.callUrl=g.url;c.hostCallUrl=g.hostUrl;addAudit(c.audit,'通話URL自動生成',g.url)}sv();rr()})}):null,btn('×','btn-xs btn-danger',()=>{c.slots=c.slots.filter(s2=>s2.id!==sl.id);sv();rr()})))});return w}
 function caseCallTab(c){const w=h('div');
 const panel=h('div',{style:{background:'#fff',border:'2px solid #0891b2',borderRadius:'16px',padding:'20px'}});
@@ -2858,6 +2858,32 @@ function showCallModal(url, onStart){
   document.body.appendChild(ov);
   return null;
 }
+// 通話録画。Whereby の recording.finished を worker が受けて call_recordings に保存している。
+// ケースを開いたときに一覧を取り、監査ログに「録画を保存」の行として差し込む。
+function loadRecordings(caseId){
+  if(!caseId)return;
+  if(!S.recCache)S.recCache={};
+  if(S.recCache[caseId]!==undefined)return;
+  S.recCache[caseId]='loading';
+  api('/recordings?case_id='+encodeURIComponent(caseId)).then(res=>{
+    S.recCache[caseId]=(res&&res.recordings)||[];
+    rr();
+  }).catch(()=>{S.recCache[caseId]=[]});
+}
+// 署名付きURLはその都度発行する（15分で失効するので保存しない）
+async function openRecording(recId){
+  toast('録画URLを発行中...');
+  try{
+    const res=await api('/recordings/'+encodeURIComponent(recId)+'/url');
+    if(res&&res.url){window.open(res.url,'_blank')}
+  }catch(e){toast('録画URLを発行できませんでした')}
+}
+function caseAuditTab(c){
+  loadRecordings(c.id);
+  const recs=(S.recCache&&Array.isArray(S.recCache[c.id]))?S.recCache[c.id]:[];
+  const merged=(c.audit||[]).concat(recs.map(r=>({t:r.created,u:'システム',a:'録画を保存',d:r.filename,_recId:r.id})));
+  return auditView(merged);
+}
 function auditView(audit){
   const w=h('div');
   if(!audit||!audit.length){w.appendChild(h('div',{style:{color:'var(--ink-m)',textAlign:'center',padding:'40px'}},'ログなし'));return w}
@@ -2901,7 +2927,14 @@ function auditView(audit){
   view.forEach(a=>{
     const item=h('div',{className:'timeline-item'});
     item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));
-    item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));
+    const act=h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:''));
+    if(a._recId){
+      act.appendChild(h('span',{
+        style:{marginLeft:'8px',color:'#0891b2',fontWeight:'700',cursor:'pointer',textDecoration:'underline',whiteSpace:'nowrap'},
+        onClick:()=>openRecording(a._recId)
+      },'▶ 再生・ダウンロード'));
+    }
+    item.appendChild(act);
     tl.appendChild(item);
   });
   w.appendChild(tl);

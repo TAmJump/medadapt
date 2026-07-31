@@ -613,6 +613,60 @@ async function handleRequest(request, env, json, err) {
     return json({ ok: true });
   }
 
+  // ── POST /webhook/whereby（録画完了などの通知・認証不要・HMAC-SHA256検証）──
+  // Whereby は 5xx を返すと2回まで再送し、5秒でタイムアウトする。
+  // 処理に失敗しても 200 を返して再送ループを避け、原因はログに残す方針。
+  if (path === '/webhook/whereby' && method === 'POST') {
+    const raw = await request.text();
+    try {
+      const secret = env.WHEREBY_WEBHOOK_SECRET;
+      if (secret) {
+        const sig = request.headers.get('whereby-signature') || '';
+        const m = /t=([^,]+),v1=([0-9a-f]+)/i.exec(sig);
+        if (!m) { console.error('whereby webhook: signature header missing'); return json({ ok: true }); }
+        const ts = m[1], given = m[2].toLowerCase();
+        const enc = new TextEncoder();
+        const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        const hexOf = async (msg) => Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(msg))))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        // 公式サンプルは JSON.stringify(body) で署名するが、実際に届くのは生のボディ。
+        // どちらでも通るように両方で照合する。
+        let ok = (await hexOf(ts + '.' + raw)) === given;
+        if (!ok) { try { ok = (await hexOf(ts + '.' + JSON.stringify(JSON.parse(raw)))) === given; } catch (e) {} }
+        if (!ok) { console.error('whereby webhook: signature mismatch'); return json({ ok: true }); }
+        // リプレイ対策（5分）
+        if (Math.abs(Date.now() - parseInt(ts, 10) * 1000) > 5 * 60 * 1000) {
+          console.error('whereby webhook: timestamp too old'); return json({ ok: true });
+        }
+      } else {
+        console.warn('whereby webhook: WHEREBY_WEBHOOK_SECRET 未設定のため署名検証をスキップ');
+      }
+
+      const ev = JSON.parse(raw);
+      if (ev.type === 'recording.finished') {
+        const d = ev.data || {};
+        // roomName は先頭にスラッシュが付いて届く（例 "/af0b7b66-..."）
+        const roomName = String(d.roomName || '').replace(/^\//, '');
+        const filename = d.filename || '';
+        const recId = d.recordingId || ('rec_' + crypto.randomUUID());
+        // 通話URLにルーム名が含まれるケースを引き当てる
+        let caseId = null, ownerEmail = null;
+        if (roomName) {
+          const hit = await env.DB.prepare("SELECT id, owner_email FROM cases WHERE data LIKE ? LIMIT 1")
+            .bind('%' + roomName + '%').first();
+          if (hit) { caseId = hit.id; ownerEmail = hit.owner_email; }
+        }
+        await env.DB.prepare(
+          'INSERT OR REPLACE INTO call_recordings (id, room_name, filename, status, case_id, owner_email, created) VALUES (?,?,?,?,?,?,?)'
+        ).bind(recId, roomName, filename, d.status || 'completed', caseId, ownerEmail, new Date().toISOString()).run();
+        console.log('recording.finished stored:', recId, roomName, caseId || '(ケース未特定)');
+      }
+    } catch (e) {
+      console.error('whereby webhook handler error:', e);
+    }
+    return json({ ok: true });
+  }
+
   // ════════════════════════════════════════════════════════════
   // 公開エンドポイント（認証不要・QR や検証 URL から第三者がアクセス可能）
   // ════════════════════════════════════════════════════════════
@@ -1238,6 +1292,43 @@ async function handleRequest(request, env, json, err) {
     await env.DB.prepare('DELETE FROM sessions WHERE email=?').bind(target.id).run();
     await recalcMemberCount(env, orgId);
     return json({ success: true });
+  }
+
+  // ── GET /recordings?case_id=xxx（ケースの録画一覧）──────────
+  if (path === '/recordings' && method === 'GET') {
+    const caseId = url.searchParams.get('case_id');
+    if (!caseId) return err('case_id が必要です');
+    const orgId = currentUser.org_id || currentUser.id;
+    let ownerEmail = currentUser.email;
+    if (currentUser.role !== 'admin') {
+      const adminUser = await env.DB.prepare('SELECT email FROM users WHERE id=? AND role=?').bind(orgId, 'admin').first();
+      ownerEmail = adminUser?.email || currentUser.email;
+    }
+    const rows = await env.DB.prepare(
+      'SELECT id, filename, status, created FROM call_recordings WHERE case_id=? AND owner_email=? ORDER BY created DESC'
+    ).bind(caseId, ownerEmail).all();
+    return json({ recordings: rows.results || [] });
+  }
+
+  // ── GET /recordings/:id/url（期限付きの再生・ダウンロードURLを発行）──
+  const recUrlMatch = path.match(/^\/recordings\/([^/]+)\/url$/);
+  if (recUrlMatch && method === 'GET') {
+    const orgId = currentUser.org_id || currentUser.id;
+    let ownerEmail = currentUser.email;
+    if (currentUser.role !== 'admin') {
+      const adminUser = await env.DB.prepare('SELECT email FROM users WHERE id=? AND role=?').bind(orgId, 'admin').first();
+      ownerEmail = adminUser?.email || currentUser.email;
+    }
+    const rec = await env.DB.prepare('SELECT * FROM call_recordings WHERE id=? AND owner_email=?')
+      .bind(recUrlMatch[1], ownerEmail).first();
+    if (!rec) return err('録画が見つかりません', 404);
+    try {
+      const signed = await presignS3GetUrl(env, rec.filename, 900);
+      return json({ url: signed, filename: rec.filename, expires_in: 900 });
+    } catch (e) {
+      console.error('presign error:', e);
+      return err('録画URLを発行できませんでした。Cloudflare の変数 REC_AWS_ACCESS_KEY_ID / REC_AWS_SECRET_ACCESS_KEY / REC_S3_BUCKET を確認してください');
+    }
   }
 
   // ── GET /sync ─────────────────────────────────────────────
@@ -4064,6 +4155,9 @@ async function initDB(db) {
     `CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT NOT NULL, user_login_id TEXT, created TEXT, expires TEXT)`,
     `CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
+    // v16: 通話の録画（Whereby の recording.finished を受けて保存）
+    `CREATE TABLE IF NOT EXISTS call_recordings (id TEXT PRIMARY KEY, room_name TEXT, filename TEXT, status TEXT, case_id TEXT, owner_email TEXT, created TEXT)`,
+    `CREATE INDEX IF NOT EXISTS idx_call_recordings_case ON call_recordings(case_id, owner_email)`,
     `CREATE TABLE IF NOT EXISTS conferences (id TEXT PRIMARY KEY, patient_id TEXT, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS monitors (id TEXT PRIMARY KEY, patient_id TEXT, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
     `CREATE TABLE IF NOT EXISTS assessments (id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, owner_email TEXT NOT NULL, data TEXT NOT NULL, created TEXT, updated TEXT)`,
@@ -4402,6 +4496,48 @@ async function sendEmail(env, { to, subject, html }) {
   const res = await fetch(endpoint, { method: 'POST', headers: { ...hdrs, Authorization: authHeader }, body });
   if (!res.ok) { const text = await res.text(); console.error('SES error:', res.status, text); throw new Error(`SES送信エラー: ${res.status}`); }
   return res.json();
+}
+
+// S3 の署名付きGET URL を作る（AWS SigV4・クエリ文字列方式）。
+// 使う鍵は録画用の whereby-recorder（S3のみ許可）で、SES 用の鍵とは別に持たせる。
+async function presignS3GetUrl(env, key, expiresSec) {
+  const bucket = env.REC_S3_BUCKET || 'myaruze-recordings';
+  const region = env.REC_S3_REGION || 'ap-northeast-1';
+  const ak = env.REC_AWS_ACCESS_KEY_ID;
+  const sk = env.REC_AWS_SECRET_ACCESS_KEY;
+  if (!ak || !sk) throw new Error('REC_AWS_ACCESS_KEY_ID / REC_AWS_SECRET_ACCESS_KEY が未設定です');
+  const host = `${bucket}.s3.${region}.amazonaws.com`;
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const timeStr = now.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const enc = new TextEncoder();
+  const sign = async (k, msg) => {
+    const kk = typeof k === 'string' ? enc.encode(k) : k;
+    const ck = await crypto.subtle.importKey('raw', kk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return new Uint8Array(await crypto.subtle.sign('HMAC', ck, enc.encode(msg)));
+  };
+  const hex = buf => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+  const sha256 = async str => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(str))));
+  // キーの各セグメントを個別にエンコードする（スラッシュは残す）
+  const canonicalUri = '/' + String(key).split('/').map(seg => encodeURIComponent(seg)).join('/');
+  const credentialScope = `${dateStr}/${region}/s3/aws4_request`;
+  const q = new URLSearchParams();
+  q.set('X-Amz-Algorithm', 'AWS4-HMAC-SHA256');
+  q.set('X-Amz-Credential', `${ak}/${credentialScope}`);
+  q.set('X-Amz-Date', timeStr);
+  q.set('X-Amz-Expires', String(expiresSec || 900));
+  q.set('X-Amz-SignedHeaders', 'host');
+  // AWS はクエリをキー順に並べた形で署名する
+  const canonicalQuery = Array.from(q.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1)
+    .map(([k2, v2]) => `${encodeURIComponent(k2)}=${encodeURIComponent(v2)}`).join('&');
+  const canonicalRequest = `GET\n${canonicalUri}\n${canonicalQuery}\nhost:${host}\n\nhost\nUNSIGNED-PAYLOAD`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${timeStr}\n${credentialScope}\n${await sha256(canonicalRequest)}`;
+  const kDate = await sign('AWS4' + sk, dateStr);
+  const kRegion = await sign(kDate, region);
+  const kService = await sign(kRegion, 's3');
+  const kSigning = await sign(kService, 'aws4_request');
+  const signature = hex(await sign(kSigning, stringToSign));
+  return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
 }
 
 function safeJson(str) {
