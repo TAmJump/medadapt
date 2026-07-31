@@ -2794,22 +2794,18 @@ function showCallModal(url, onStart){
   closeBtn.textContent='通話を終了して戻る';
   closeBtn.style.cssText='background:#dc2626;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;';
   closeBtn.onclick=()=>{document.body.removeChild(ov);S.modal=null;rr();};
-  bar.appendChild(closeBtn);
-  ov.appendChild(bar);
-  // 録画ボタンは ｍ 側に置く。Whereby の通話画面の録画ボタンは PC にしか出ず、
-  // スマホ・タブレットでは押せないため（実機で確認済み）。
-  // Web Component の startRecording()/stopRecording() を呼ぶ方式にすると端末を問わない。
+  // 録画ボタンはヘッダー内に置く。以前は黄色い注意帯を全幅で出していたが、
+  // 画面を圧迫して通話の邪魔になるためやめた。注意文はボタンの title に持たせる。
   let recBtn=null,isRec=false;
   if(S.user&&S.user.plan==='pro'){
-    const note=document.createElement('div');
-    note.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:12px;font-weight:700;line-height:1.6;flex-shrink:0;display:flex;align-items:center;gap:12px;justify-content:space-between;';
-    note.appendChild(h('span',{},'録画は自動では始まりません。記録を残す場合は右のボタンを押してください。録画する前に、参加者と患者・ご家族の同意を得てください。'));
     recBtn=document.createElement('button');
-    recBtn.textContent='録画を開始';
-    recBtn.style.cssText='flex-shrink:0;background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;';
-    note.appendChild(recBtn);
-    ov.appendChild(note);
+    recBtn.textContent='● 録画';
+    recBtn.title='録画は自動では始まりません。録画する前に、参加者と患者・ご家族の同意を得てください。';
+    recBtn.style.cssText='background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:auto;margin-right:10px;white-space:nowrap;';
+    bar.appendChild(recBtn);
   }
+  bar.appendChild(closeBtn);
+  ov.appendChild(bar);
   const media=document.createElement('div');
   media.style.cssText='flex:1;min-height:0;position:relative;';
   ov.appendChild(media);
@@ -2822,11 +2818,11 @@ function showCallModal(url, onStart){
       try{
         if(!isRec){
           embed.startRecording();isRec=true;
-          recBtn.textContent='録画を停止';recBtn.style.background='#0f766e';
+          recBtn.textContent='■ 録画を停止';recBtn.style.background='#dc2626';recBtn.style.borderColor='#dc2626';
           toast('録画を開始しました');
         }else{
           embed.stopRecording();isRec=false;
-          recBtn.textContent='録画を開始';recBtn.style.background='#dc2626';
+          recBtn.textContent='● 録画';recBtn.style.background='transparent';recBtn.style.borderColor='rgba(255,255,255,.5)';
           toast('録画を停止しました');
         }
       }catch(e){toast('録画を操作できませんでした')}
