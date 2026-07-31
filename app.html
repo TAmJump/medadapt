@@ -76,6 +76,9 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
 <meta name="apple-mobile-web-app-title" content="ｍやるゼ！">
 <meta name="mobile-web-app-capable" content="yes">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<!-- Whereby の Web Component。iframe と違い startRecording()/stopRecording() を呼べる。
+     モバイルの Whereby 画面には録画ボタンが出ないため、ｍ側にボタンを置く目的で使う。 -->
+<script src="https://cdn.srv.whereby.com/embed/v2-embed.js" type="module"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -2793,20 +2796,54 @@ function showCallModal(url, onStart){
   closeBtn.onclick=()=>{document.body.removeChild(ov);S.modal=null;rr();};
   bar.appendChild(closeBtn);
   ov.appendChild(bar);
-  // 録画は自動では始まらない（トリガーが手動のため）。押し忘れると記録が残らないので、
-  // 通話画面の上に常時この注意を出す。iframe の中は外から状態を取れないので、
-  // 「録画中かどうか」ではなく「押さないと始まらない」を常に見せる方式にしている。
+  // 録画ボタンは ｍ 側に置く。Whereby の通話画面の録画ボタンは PC にしか出ず、
+  // スマホ・タブレットでは押せないため（実機で確認済み）。
+  // Web Component の startRecording()/stopRecording() を呼ぶ方式にすると端末を問わない。
+  let recBtn=null,isRec=false;
   if(S.user&&S.user.plan==='pro'){
     const note=document.createElement('div');
-    note.style.cssText='background:#fef3c7;color:#92400e;padding:8px 20px;font-size:12px;font-weight:700;line-height:1.6;flex-shrink:0;';
-    note.textContent='録画は自動では始まりません。記録を残す場合は、通話画面の録画ボタンを押してください。録画する前に、参加者と患者・ご家族の同意を得てください。';
+    note.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:12px;font-weight:700;line-height:1.6;flex-shrink:0;display:flex;align-items:center;gap:12px;justify-content:space-between;';
+    note.appendChild(h('span',{},'録画は自動では始まりません。記録を残す場合は右のボタンを押してください。録画する前に、参加者と患者・ご家族の同意を得てください。'));
+    recBtn=document.createElement('button');
+    recBtn.textContent='録画を開始';
+    recBtn.style.cssText='flex-shrink:0;background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;';
+    note.appendChild(recBtn);
     ov.appendChild(note);
   }
-  const iframe=document.createElement('iframe');
-  iframe.src=url;
-  iframe.style.cssText='flex:1;border:none;width:100%;';
-  iframe.allow='camera;microphone;fullscreen;display-capture;';
-  ov.appendChild(iframe);
+  const media=document.createElement('div');
+  media.style.cssText='flex:1;min-height:0;position:relative;';
+  ov.appendChild(media);
+  const embed=document.createElement('whereby-embed');
+  embed.setAttribute('room',url);
+  embed.style.cssText='width:100%;height:100%;border:none;display:block;';
+  media.appendChild(embed);
+  if(recBtn){
+    recBtn.onclick=()=>{
+      try{
+        if(!isRec){
+          embed.startRecording();isRec=true;
+          recBtn.textContent='録画を停止';recBtn.style.background='#0f766e';
+          toast('録画を開始しました');
+        }else{
+          embed.stopRecording();isRec=false;
+          recBtn.textContent='録画を開始';recBtn.style.background='#dc2626';
+          toast('録画を停止しました');
+        }
+      }catch(e){toast('録画を操作できませんでした')}
+    };
+  }
+  // Web Component が読み込めなかったときは従来どおり iframe で開く（通話自体は必ず使えるようにする）
+  setTimeout(()=>{
+    if(!customElements.get('whereby-embed')){
+      media.innerHTML='';
+      const ifr=document.createElement('iframe');
+      ifr.src=url;
+      ifr.style.cssText='width:100%;height:100%;border:none;display:block;';
+      ifr.allow='camera;microphone;fullscreen;display-capture;';
+      media.appendChild(ifr);
+      if(recBtn){recBtn.disabled=true;recBtn.style.opacity='.5';recBtn.style.cursor='default'}
+    }
+  },5000);
   document.body.appendChild(ov);
   return null;
 }
