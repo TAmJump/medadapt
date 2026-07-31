@@ -2829,16 +2829,34 @@ function showCallModal(url, onStart){
   embed.style.cssText='width:100%;height:100%;border:none;display:block;';
   media.appendChild(embed);
   if(recBtn){
+    // ボタンの見た目は「押したから」ではなく、Whereby から届く recording_status_change の
+    // 実状態で切り替える。以前は押した時点で「録画を開始しました」と出していたため、
+    // Whereby 側で黙って捨てられていても成功に見えてしまっていた。
+    let waitTimer=null;
+    const paint=st=>{
+      isRec=(st==='started'||st==='starting');
+      recBtn.textContent=isRec?'■ 録画を停止':'● 録画';
+      recBtn.style.background=isRec?'#dc2626':'transparent';
+      recBtn.style.borderColor=isRec?'#dc2626':'rgba(255,255,255,.5)';
+    };
+    embed.addEventListener('recording_status_change',e=>{
+      const st=(e&&e.detail&&e.detail.status)||'';
+      if(waitTimer){clearTimeout(waitTimer);waitTimer=null}
+      paint(st);
+      if(st==='started')toast('録画を開始しました');
+      if(st==='stopped')toast('録画を停止しました。数分後に監査ログに出ます');
+    });
     recBtn.onclick=()=>{
       try{
         if(!isRec){
-          embed.startRecording();isRec=true;
-          recBtn.textContent='■ 録画を停止';recBtn.style.background='#dc2626';recBtn.style.borderColor='#dc2626';
-          toast('録画を開始しました');
+          if(typeof embed.startRecording!=='function'){toast('通話画面がまだ準備できていません。数秒待ってからもう一度押してください');return}
+          embed.startRecording();
+          toast('録画を開始しています...');
+          if(waitTimer)clearTimeout(waitTimer);
+          waitTimer=setTimeout(()=>{toast('録画を開始できませんでした。Whereby の Allowed domains にこのサイトのドメインが登録されているか確認してください')},10000);
         }else{
-          embed.stopRecording();isRec=false;
-          recBtn.textContent='● 録画';recBtn.style.background='transparent';recBtn.style.borderColor='rgba(255,255,255,.5)';
-          toast('録画を停止しました');
+          embed.stopRecording();
+          toast('録画を停止しています...');
         }
       }catch(e){toast('録画を操作できませんでした')}
     };
