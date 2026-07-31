@@ -671,6 +671,21 @@ async function getDocument(docId){
   return null;
 }
 function now(){return new Date().toISOString()}
+// 日時の表示用。保存は now()＝UTC の ISO 文字列だが、そのまま切り出すと UTC が
+// そのまま画面に出て日本だと9時間ずれる。末尾が Z の ISO だけ端末の地域時刻に直す。
+// datetime-local などタイムゾーンを持たない文字列は変換せずそのまま出す。
+function fmtDT(v){
+  if(!v)return'';
+  const str=String(v);
+  if(/Z$/.test(str)){
+    const d=new Date(str);
+    if(!isNaN(d.getTime())){
+      const p=n=>String(n).padStart(2,'0');
+      return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+    }
+  }
+  return fmtDT(str);
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 async function genCallURL(){
   // Free は月1回まで（ｍで唯一の従量原価のため発行元で判定する）。上限時は null を返す
@@ -1492,7 +1507,7 @@ loadDocuments(pt.id).then(docs=>{
     const row=h('div',{style:{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'var(--bg)',border:'1px solid var(--border)',borderRadius:'10px',marginBottom:'8px',fontSize:'12px'}});
     row.appendChild(h('div',{style:{flex:1}},
       h('div',{style:{fontWeight:'700'}},doc.title||typeLabel[doc.doc_type]||doc.doc_type),
-      h('div',{style:{fontSize:'10px',color:'var(--ink-m)',marginTop:'2px'}},doc.created.slice(0,16).replace('T',' ')+'　作成者：'+(doc.created_by||'—'))
+      h('div',{style:{fontSize:'10px',color:'var(--ink-m)',marginTop:'2px'}},fmtDT(doc.created)+'　作成者：'+(doc.created_by||'—'))
     ));
     row.appendChild(btn('内容を見る','btn-xs btn-out',async()=>{
       const full=await getDocument(doc.id);
@@ -1654,7 +1669,7 @@ function hubStatusReports(pt){
     if(r.condition)card.appendChild(h('div',{style:{color:'var(--ink-m)',marginTop:'2px'}},r.condition));
     if(r.notifiedTargets&&r.notifiedTargets.length)card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'連絡先：'+r.notifiedTargets.map(t=>t.label).join('、')));
     if(r.note)card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'11px'}},'備考：'+r.note));
-    card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'10px'}},(r.created||'').slice(0,16).replace('T',' ')+(r.by?'　'+r.by:'')));
+    card.appendChild(h('div',{style:{color:'var(--ink-l)',marginTop:'4px',fontSize:'10px'}},fmtDT((r.created||''))+(r.by?'　'+r.by:'')));
     w.appendChild(card);
   });
   return w;
@@ -1705,7 +1720,7 @@ function hubInsurance(pt){
     w.appendChild(h('div',{style:{padding:'8px 12px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',marginBottom:'10px',fontSize:'11px',color:'var(--ink-m)'}},'オンライン資格確認は未確認です。最新の資格情報をご確認ください。'));
   }
   const box=h('div',{className:'ins-noprint',style:{border:'1px solid var(--border)',borderRadius:'12px',padding:'14px 16px',fontSize:'12px',lineHeight:'1.9'}});
-  if(revealed)box.appendChild(h('div',{style:{display:'inline-block',fontSize:'10px',fontWeight:'700',color:'#b91c1c',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'2px 8px',marginBottom:'8px'}},'全表示中｜閲覧 '+((S.user&&(S.user.org_name||S.user.org))||'')+'　'+now().slice(0,16).replace('T',' ')));
+  if(revealed)box.appendChild(h('div',{style:{display:'inline-block',fontSize:'10px',fontWeight:'700',color:'#b91c1c',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'2px 8px',marginBottom:'8px'}},'全表示中｜閲覧 '+((S.user&&(S.user.org_name||S.user.org))||'')+'　'+fmtDT(now())));
   const m=i.medical||{},c=i.care||{};
   const rowKV=(label,val,masked)=>h('div',{style:{display:'flex',gap:'10px'}},h('span',{style:{minWidth:'104px',color:'var(--ink-m)',fontWeight:'600'}},label),h('span',{style:{fontWeight:'600',fontFamily:masked&&!revealed?'monospace':'inherit',letterSpacing:masked&&!revealed?'.04em':'normal'}},val||'—'));
   if(m.type||m.insurerNo||m.number){
@@ -1737,7 +1752,7 @@ function hubInsurance(pt){
     });
   }
   if(i.note)box.appendChild(h('div',{style:{marginTop:'8px',color:'var(--ink-m)'}},'備考：'+i.note));
-  if(i.updatedAt)box.appendChild(h('div',{style:{marginTop:'8px',fontSize:'10px',color:'var(--ink-l)'}},'更新：'+i.updatedAt.slice(0,16).replace('T',' ')+(i.updatedBy?'　'+i.updatedBy:'')));
+  if(i.updatedAt)box.appendChild(h('div',{style:{marginTop:'8px',fontSize:'10px',color:'var(--ink-l)'}},'更新：'+fmtDT(i.updatedAt)+(i.updatedBy?'　'+i.updatedBy:'')));
   w.appendChild(box);
   w.appendChild(h('div',{className:'ins-print-note',style:{display:'none',padding:'10px 12px',border:'1px dashed var(--border)',borderRadius:'10px',fontSize:'12px',color:'var(--ink-m)'}},'保険情報は画面でのみ表示されます（印刷では番号を出力しません）。'));
   const foot=h('div',{style:{marginTop:'10px',fontSize:'10px',color:'var(--ink-l)',lineHeight:'1.7'}});
@@ -1823,7 +1838,7 @@ w.appendChild(h('div',{className:'section-label'},'次にやること'));if(!tod
 else todos.forEach(td=>{w.appendChild(h('div',{className:'todo-card',onClick:()=>{S.hubTab=td.tab;if(td.cid){S.caseId=td.cid;S.caseTab=td.ct}rr()}},h('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'var(--accent)',flexShrink:0}}),h('div',{className:'todo-content'},h('div',{className:'todo-title'},td.short))))});
 // All activity
 const all=[];ptCases(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'退院'})));ptConfs(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'担当者会議'})));ptMons(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'モニタ'})));ptAssess(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'アセス'})));(pt.audit||[]).forEach(a=>all.push({...a,src:'患者'}));all.sort((a,b)=>(b.t||'').localeCompare(a.t||''));
-if(all.length){if(!S.tlFilter)S.tlFilter='all';w.appendChild(h('div',{className:'section-label',style:{marginTop:'28px'}},'最近のアクティビティ'));const chips=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}});[['all','すべて'],['退院','退院'],['担当者会議','会議'],['モニタ','モニタ'],['アセス','アセス'],['患者','患者']].forEach(p=>{const v=p[0],l=p[1],ac=S.tlFilter===v;chips.appendChild(h('div',{style:{padding:'5px 12px',borderRadius:'16px',fontSize:'11px',cursor:'pointer',background:ac?'var(--accent)':'var(--surface)',color:ac?'#fff':'var(--ink-m)',border:'1px solid '+(ac?'var(--accent)':'var(--border)'),fontWeight:ac?'700':'500',transition:'all .15s'},onClick:()=>{S.tlFilter=v;S.tlExpand=false;rr()}},l))});w.appendChild(chips);const fil=S.tlFilter==='all'?all:all.filter(a=>a.src===S.tlFilter);if(!fil.length){w.appendChild(h('div',{style:{padding:'16px',textAlign:'center',color:'var(--ink-l)',fontSize:'12px',background:'var(--surface)',borderRadius:'10px'}},'該当するアクティビティはありません'));return w}const vis=S.tlExpand?fil:fil.slice(0,5);const tl=h('div',{className:'timeline'});vis.forEach(a=>{const item=h('div',{className:'timeline-item'});item.appendChild(h('div',{className:'tl-time'},a.t?a.t.slice(0,16).replace('T',' '):'','　',bdg(a.src,'#94a3b8')));item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));tl.appendChild(item)});w.appendChild(tl);if(fil.length>5){w.appendChild(h('div',{style:{textAlign:'center',marginTop:'10px'}},h('span',{style:{cursor:'pointer',fontSize:'12px',color:'var(--accent)',fontWeight:'700',padding:'6px 16px',background:'var(--accent-l)',borderRadius:'16px',display:'inline-block'},onClick:()=>{S.tlExpand=!S.tlExpand;rr()}},S.tlExpand?'閉じる':'もっと見る ('+(fil.length-5)+'件)')))}}return w}
+if(all.length){if(!S.tlFilter)S.tlFilter='all';w.appendChild(h('div',{className:'section-label',style:{marginTop:'28px'}},'最近のアクティビティ'));const chips=h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}});[['all','すべて'],['退院','退院'],['担当者会議','会議'],['モニタ','モニタ'],['アセス','アセス'],['患者','患者']].forEach(p=>{const v=p[0],l=p[1],ac=S.tlFilter===v;chips.appendChild(h('div',{style:{padding:'5px 12px',borderRadius:'16px',fontSize:'11px',cursor:'pointer',background:ac?'var(--accent)':'var(--surface)',color:ac?'#fff':'var(--ink-m)',border:'1px solid '+(ac?'var(--accent)':'var(--border)'),fontWeight:ac?'700':'500',transition:'all .15s'},onClick:()=>{S.tlFilter=v;S.tlExpand=false;rr()}},l))});w.appendChild(chips);const fil=S.tlFilter==='all'?all:all.filter(a=>a.src===S.tlFilter);if(!fil.length){w.appendChild(h('div',{style:{padding:'16px',textAlign:'center',color:'var(--ink-l)',fontSize:'12px',background:'var(--surface)',borderRadius:'10px'}},'該当するアクティビティはありません'));return w}const vis=S.tlExpand?fil:fil.slice(0,5);const tl=h('div',{className:'timeline'});vis.forEach(a=>{const item=h('div',{className:'timeline-item'});item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'','　',bdg(a.src,'#94a3b8')));item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));tl.appendChild(item)});w.appendChild(tl);if(fil.length>5){w.appendChild(h('div',{style:{textAlign:'center',marginTop:'10px'}},h('span',{style:{cursor:'pointer',fontSize:'12px',color:'var(--accent)',fontWeight:'700',padding:'6px 16px',background:'var(--accent-l)',borderRadius:'16px',display:'inline-block'},onClick:()=>{S.tlExpand=!S.tlExpand;rr()}},S.tlExpand?'閉じる':'もっと見る ('+(fil.length-5)+'件)')))}}return w}
 // --- ASSESSMENT (定期タスク) ---
 function hubAssess(pt){if(S.assId){const a=D.assessments.find(x=>x.id===S.assId);if(a)return assessDetail(a,pt)}
 const w=h('div');w.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},h('div',{className:'section-label'},'アセスメント'),h('div',{style:{display:'flex',gap:'6px'}},btn('+ 入居前','btn-xs btn-pri',()=>createAssess(pt,'pre_admission')),btn('+ 定期','btn-xs btn-out',()=>createAssess(pt,'periodic')),btn('+ 臨時','btn-xs btn-out',()=>createAssess(pt,'adhoc')),btn('+ 事故後','btn-xs btn-danger',()=>createAssess(pt,'post_incident')))));
@@ -2129,7 +2144,7 @@ function showExternalDocDetail(d,pt){
   const row=(l,v)=>{const r=h('div',{style:{display:'flex',gap:'12px'}});r.appendChild(h('div',{style:{width:'120px',fontWeight:'700',color:'var(--ink-m)'}},l));r.appendChild(h('div',{style:{flex:1,wordBreak:'break-all'}},v||'—'));return r};
   meta.appendChild(row('発行元',d.from_org_name||'—'));
   meta.appendChild(row('発行日',d.issued_date||'—'));
-  meta.appendChild(row('受領日時',d.received_at?d.received_at.slice(0,16).replace('T',' '):'—'));
+  meta.appendChild(row('受領日時',d.received_at?fmtDT(d.received_at):'—'));
   meta.appendChild(row('署名レベル',sigInfo.l));
   if(d.retention_required){
     meta.appendChild(row('法定保存','義務あり（'+d.retention_years+'年）'));
@@ -2168,7 +2183,7 @@ function showExternalDocDetail(d,pt){
     const tbl=h('div',{style:{fontSize:'11px',background:'#f8fafc',borderRadius:'8px',padding:'8px 12px',maxHeight:'200px',overflow:'auto'}});
     logs.slice().reverse().forEach(l=>{
       const row=h('div',{style:{padding:'4px 0',borderBottom:'1px dashed #cbd5e1'}});
-      row.appendChild(h('span',{style:{color:'var(--ink-m)'}},(l.t||'').slice(0,16).replace('T',' ')+' '));
+      row.appendChild(h('span',{style:{color:'var(--ink-m)'}},fmtDT((l.t||''))+' '));
       row.appendChild(h('span',{style:{fontWeight:'700'}},l.action||'view'));
       row.appendChild(h('span',{style:{color:'var(--ink-m)'}},' by '+(l.user||l.org||'—')));
       tbl.appendChild(row);
@@ -2720,7 +2735,7 @@ h('div',null,
 h('div',{style:{fontWeight:'700',fontSize:'13px',marginBottom:'4px'}},def.title),
 h('div',{style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'4px'}},bdg(e.srcLabel,'var(--accent)'),bdg('同意済','var(--accent)')),
 h('div',{style:{fontSize:'12px',color:'var(--ink-m)'}},'同意者：'+e.name+'（'+e.rel+'）'),
-h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},e.date?e.date.slice(0,16).replace('T',' '):'')),
+h('div',{style:{fontSize:'11px',color:'var(--ink-m)'}},e.date?fmtDT(e.date):'')),
 h('div',{style:{display:'flex',gap:'6px',flexShrink:0}},btn('プレビュー','btn-sm btn-out',()=>{showSignedConsentPreview(pt,def,e)}),btn('PDF','btn-sm btn-pri',()=>{genSignedConsentPDF(pt,def,e)}))));
 w.appendChild(card)});
 return w}
@@ -2885,7 +2900,7 @@ function auditView(audit){
   const tl=h('div',{className:'timeline'});
   view.forEach(a=>{
     const item=h('div',{className:'timeline-item'});
-    item.appendChild(h('div',{className:'tl-time'},a.t?a.t.slice(0,16).replace('T',' '):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));
+    item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));
     item.appendChild(h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:'')));
     tl.appendChild(item);
   });
@@ -4743,7 +4758,7 @@ function consentNewPage(){
     box.appendChild(h('div',{style:{fontSize:'12px',fontWeight:'800',color:'#0369a1',marginBottom:'8px'}},'一時保存した下書き（'+wips.length+'件）— 患者ごとにアカウントへ保存。どの端末からでも再開できます'));
     wips.forEach(wip=>{
       const row=h('div',{style:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap',padding:'7px 0',borderTop:'1px dashed #bae6fd'}});
-      row.appendChild(h('span',{style:{flex:'1',minWidth:'180px',fontSize:'12px',color:'#0c4a6e'}},(wip.patientName||'患者未選択')+'　／　'+(typeL[wip.consent_type]||wip.consent_type||'')+'　／　'+(wip.at||'').replace('T',' ').slice(0,16)));
+      row.appendChild(h('span',{style:{flex:'1',minWidth:'180px',fontSize:'12px',color:'#0c4a6e'}},(wip.patientName||'患者未選択')+'　／　'+(typeL[wip.consent_type]||wip.consent_type||'')+'　／　'+fmtDT((wip.at||''))));
       row.appendChild(btn('再開','btn-sm btn-pri',()=>{applyWip(wip);S._editingWipId=wip.id;toast('「'+(wip.patientName||'患者未選択')+'」の下書きを再開しました');try{window.scrollTo(0,0)}catch(e){}}));
       row.appendChild(btn('削除','btn-sm btn-out',()=>{if(!confirm('この下書きを削除しますか？'))return;D.consentDrafts=(D.consentDrafts||[]).filter(d=>d.id!==wip.id);if(S._editingWipId===wip.id)S._editingWipId=null;try{fetch(API+'/sync',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token},body:JSON.stringify(D)}).catch(()=>{})}catch(e){}rr();}));
       box.appendChild(row);
@@ -4755,7 +4770,7 @@ function consentNewPage(){
     let wip=null;try{const s=localStorage.getItem('medadapt-consent-wip');if(s)wip=JSON.parse(s);}catch(e){}
     if(wip){
       const banner=h('div',{style:{padding:'10px 14px',background:'#fefce8',border:'1px solid #fde047',borderRadius:'8px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}});
-      banner.appendChild(h('span',{style:{fontSize:'12px',color:'#854d0e',flex:'1',minWidth:'180px'}},'入力途中の下書きがあります（'+(wip.at||'').replace('T',' ').slice(0,16)+'）。復元しますか？'));
+      banner.appendChild(h('span',{style:{fontSize:'12px',color:'#854d0e',flex:'1',minWidth:'180px'}},'入力途中の下書きがあります（'+fmtDT((wip.at||''))+'）。復元しますか？'));
       banner.appendChild(btn('復元する','btn-sm btn-pri',()=>{applyWip(wip);banner.remove();toast('下書きを復元しました');}));
       banner.appendChild(btn('破棄','btn-sm btn-out',()=>{try{localStorage.removeItem('medadapt-consent-wip')}catch(e){}banner.remove();}));
       form.insertBefore(banner,form.firstChild);
@@ -4813,7 +4828,7 @@ function consentDetailPage(){
   ));
   // アプリ内 署名依頼の送信状況
   if(cf.send_status==='sent'){
-    const sentTxt='署名依頼を宛先医師へ送信済み（'+(cf.sent_at||'').slice(0,16).replace('T',' ')+'）。宛先が署名すると通知が届きます。';
+    const sentTxt='署名依頼を宛先医師へ送信済み（'+fmtDT((cf.sent_at||''))+'）。宛先が署名すると通知が届きます。';
     w.appendChild(h('div',{style:{padding:'10px 14px',background:'#eff6ff',border:'1px solid #93c5fd',borderRadius:'6px',marginBottom:'12px',fontSize:'12px',color:'#1e40af'}},sentTxt));
   }
   // 改ざん検知情報
@@ -4941,7 +4956,7 @@ function consentDetailPage(){
         const read=!!it.read_at;
         list.appendChild(h('div',{style:{padding:'8px 12px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',fontSize:'12px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
           h('span',{style:{fontWeight:'700'}},it.recipient_org_name||it.recipient_login_id||it.recipient_org_id),
-          h('span',{style:{padding:'2px 10px',borderRadius:'999px',fontSize:'11px',fontWeight:'700',color:read?'#166534':'#92400e',background:read?'#dcfce7':'#fef3c7'}},read?('開封済 '+(it.read_at||'').replace('T',' ').slice(0,16)):'未開封')
+          h('span',{style:{padding:'2px 10px',borderRadius:'999px',fontSize:'11px',fontWeight:'700',color:read?'#166534':'#92400e',background:read?'#dcfce7':'#fef3c7'}},read?('開封済 '+fmtDT((it.read_at||''))):'未開封')
         ));
       });
       delivBox.appendChild(list);
@@ -5180,7 +5195,7 @@ function consentDeliveriesInboxPage(){
     ));
     card.appendChild(h('div',{style:{fontSize:'13px',color:'#334155'}},'患者：'+(it.patient_name||'—')+'　／　'+(typeLabels[it.consent_type]||it.consent_type||'')));
     if(it.message)card.appendChild(h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'4px'}},it.message));
-    card.appendChild(h('div',{style:{fontSize:'11px',color:'#94a3b8',marginTop:'4px'}},(it.created_at||'').replace('T',' ').slice(0,16)));
+    card.appendChild(h('div',{style:{fontSize:'11px',color:'#94a3b8',marginTop:'4px'}},fmtDT((it.created_at||''))));
     listEl.appendChild(card);
   });
   w.appendChild(listEl);
@@ -5492,7 +5507,7 @@ function consentInboxPage(){
     });
     card.appendChild(h('div',null,
       h('div',{style:{fontWeight:'700',fontSize:'14px',marginBottom:'2px'}},(it.patient_name||'（患者名なし）')+'　'+(typeLabels[it.consent_type]||it.consent_type)),
-      h('div',{style:{fontSize:'12px',color:'#64748b'}},'同意日 '+(it.consent_date||'—')+'　/　受信 '+((it.sent_at||'').slice(0,16).replace('T',' ')||'—'))
+      h('div',{style:{fontSize:'12px',color:'#64748b'}},'同意日 '+(it.consent_date||'—')+'　/　受信 '+(fmtDT((it.sent_at||''))||'—'))
     ));
     card.appendChild(h('span',{style:{fontSize:'12px',fontWeight:'700',padding:'4px 10px',borderRadius:'999px',color:pending?'#92400e':'#0891b2',background:pending?'#fef3c7':'#e0f2fe'}},pending?'署名待ち':(statusLabels[it.status]||it.status)));
     list.appendChild(card);
@@ -5979,7 +5994,7 @@ function showReferralModal(ex,presetPid){
       h('div',{style:{fontSize:'12px',fontWeight:'700',color:r.acknowledged_at?'#15803d':'#92400e',marginBottom:'4px'}},
         r.acknowledged_at?'受領確認済': '受領待ち'),
       h('div',{style:{fontSize:'11px',color:'#64748b'}},
-        r.acknowledged_at?(r.acknowledged_at.slice(0,16).replace('T',' ')+(r.acknowledged_by?' by '+r.acknowledged_by:'')):'宛先機関側で受領確認の操作待ち'),
+        r.acknowledged_at?(fmtDT(r.acknowledged_at)+(r.acknowledged_by?' by '+r.acknowledged_by:'')):'宛先機関側で受領確認の操作待ち'),
       !r.acknowledged_at?btn('（手動で）受領確認','btn-xs btn-out',()=>{
         r.acknowledged_at=now();r.acknowledged_by=prompt('受領した宛先医師名（任意）')||'宛先機関';
         addAudit(r.audit,'受領確認',r.acknowledged_by);
@@ -7375,7 +7390,7 @@ w.appendChild(h('div',{className:'page-title'},'設定'));
     const row=(k,v)=>{grid.appendChild(h('span',{style:{color:'var(--ink-m)'}},k));grid.appendChild(h('span',{style:{fontWeight:'600',wordBreak:'break-all'}},v))};
     row('同意者',(rec.name||'')+'（'+(rec.staffId||'')+'）');
     row('所属',rec.org_name||rec.org||'');
-    row('同意日時',(rec.at||'').replace('T',' ').slice(0,16));
+    row('同意日時',fmtDT((rec.at||'')));
     row('誓約書ver',Object.entries(rec.versions||{}).map(([k,v])=>k+':'+v).join(' / '));
     row('同意ハッシュ',h('span',{style:{fontFamily:'monospace',fontSize:'10px'}},(rec.hash||'').slice(0,32)+'…'));
     cc.appendChild(grid);
@@ -8298,7 +8313,7 @@ function showConsentLogModal(){
       const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'12px 14px',fontSize:'12px',lineHeight:'1.7'}});
       card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}},
         h('span',{style:{fontWeight:'700'}},(r.name||'（無名）')+'　'+(r.staffId||'')),
-        h('span',{style:{color:'var(--ink-m)'}},(r.at||'').replace('T',' ').slice(0,16))));
+        h('span',{style:{color:'var(--ink-m)'}},fmtDT((r.at||'')))));
       card.appendChild(h('div',{style:{color:'var(--ink-m)'}},(r.org_name||r.org||'')+(r.role?'／'+({admin:'管理者',staff:'スタッフ'}[r.role]||r.role):'')));
       card.appendChild(h('div',{style:{color:'var(--ink-m)'}},'誓約書ver: '+Object.entries(r.versions||{}).map(([k,v])=>k+':'+v).join(' / ')+'　施行: '+(r.effective||'')));
       card.appendChild(h('div',{style:{fontFamily:'monospace',fontSize:'10px',color:'var(--ink-l)',wordBreak:'break-all'}},'hash: '+(r.hash||'')));
@@ -8340,7 +8355,7 @@ function showOpLogModal(){
   else{
     const box=h('div',{style:{maxHeight:'56vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:'6px'}});
     logs.forEach(r=>{const row=h('div',{style:{border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',lineHeight:'1.6'}});
-      row.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}},h('span',{style:{fontWeight:'700'}},r.action),h('span',{style:{color:'var(--ink-m)'}},(r.at||'').replace('T',' ').slice(0,16))));
+      row.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}},h('span',{style:{fontWeight:'700'}},r.action),h('span',{style:{color:'var(--ink-m)'}},fmtDT((r.at||'')))));
       row.appendChild(h('div',{style:{color:'var(--ink-m)'}},(r.name||'')+'（'+(r.org||'')+'）'+(r.detail?'　'+r.detail:'')));
       box.appendChild(row);});
     m.appendChild(box);
@@ -8444,7 +8459,7 @@ function disasterPage(){
   w.appendChild(active
     ? h('div',{style:{background:'#fef2f2',border:'2px solid #dc2626',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
         h('div',{style:{fontWeight:'800',color:'#dc2626',fontSize:'15px',marginBottom:'4px'}},'● 災害時モード 稼働中'),
-        h('div',{style:{fontSize:'12px',color:'#991b1b'}},'低帯域表示（画像オフ）／安否・連絡・薬剤・記録を優先。'+(D.disaster.activatedAt?'開始: '+D.disaster.activatedAt.replace('T',' ').slice(0,16):'')))
+        h('div',{style:{fontSize:'12px',color:'#991b1b'}},'低帯域表示（画像オフ）／安否・連絡・薬剤・記録を優先。'+(D.disaster.activatedAt?'開始: '+fmtDT(D.disaster.activatedAt):'')))
     : h('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
         h('div',{style:{fontWeight:'700',color:'#15803d',fontSize:'14px'}},'平常運用中'),
         h('div',{style:{fontSize:'12px',color:'#166534',marginTop:'2px'}},'災害発生時は管理者がモードをONにすると、安否確認・一斉通知・緊急連絡が前面に出ます。')));
@@ -8514,7 +8529,7 @@ function disasterPage(){
     const box=h('div',{style:{marginTop:'12px',display:'flex',flexDirection:'column',gap:'8px'}});
     bcs.forEach(b=>{const read=(b.reads||[]).some(r=>r.staffId===myStaffId());
       const card=h('div',{style:{border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px'}});
-      card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}},h('span',{style:{fontSize:'11px',color:'var(--ink-m)'}},(b.by||'')+(b.byOrg?'（'+b.byOrg+'）':'')+'　'+(b.at||'').replace('T',' ').slice(0,16)),(u.role==='admin'?h('span',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:'700'}},'既読 '+((b.reads||[]).length)):null)));
+      card.appendChild(h('div',{style:{display:'flex',justifyContent:'space-between',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}},h('span',{style:{fontSize:'11px',color:'var(--ink-m)'}},(b.by||'')+(b.byOrg?'（'+b.byOrg+'）':'')+'　'+fmtDT((b.at||''))),(u.role==='admin'?h('span',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:'700'}},'既読 '+((b.reads||[]).length)):null)));
       card.appendChild(h('div',{style:{fontSize:'13px',lineHeight:'1.7',whiteSpace:'pre-wrap'}},b.text));
       card.appendChild(h('div',{style:{marginTop:'8px'}},read?h('span',{style:{fontSize:'11px',color:'#16a34a',fontWeight:'700'}},'✓ 既読'):btn('既読にする','btn-xs btn-out',()=>markBroadcastRead(b))));
       box.appendChild(card);});
