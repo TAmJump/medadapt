@@ -2926,7 +2926,8 @@ function auditView(audit){
   const tl=h('div',{className:'timeline'});
   view.forEach(a=>{
     const item=h('div',{className:'timeline-item'});
-    item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'',(a.src?'　'+bdg(a.src,'#94a3b8'):null)));
+    // ★ 文字列と要素を + で連結すると "[object HTMLSpanElement]" になる。別々の子として渡す。
+    item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'',(a.src?'　':null),(a.src?bdg(a.src,'#94a3b8'):null)));
     const act=h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:''));
     if(a._recId){
       act.appendChild(h('span',{
