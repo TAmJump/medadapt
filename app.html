@@ -2770,7 +2770,7 @@ d.appendChild(h('div',null,'同意者：'+e.name+'（'+e.rel+'）'));
 if(e.sig){d.appendChild(h('div',{style:{marginTop:'8px'}},'署名：'));d.appendChild(h('img',{src:e.sig,style:{maxWidth:'220px',maxHeight:'70px'}}))}
 d.appendChild(h('div',{style:{fontSize:'10px',color:'#666',textAlign:'center',marginTop:'24px'}},(S.user?.org||'')+'｜'+APP_CONFIG.name));
 cn.appendChild(d);genPdf(cn,def.title+'_'+pt.name+'.pdf')}
-function hubAudit(pt){const w=h('div');w.appendChild(h('div',{className:'section-label'},'全監査ログ'));const all=[];ptCases(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'退院'})));ptConfs(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'担当者会議'})));ptMons(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'モニタ'})));ptAssess(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'アセス'})));(pt.audit||[]).forEach(a=>all.push({...a,src:'患者'}));all.sort((a,b)=>(b.t||'').localeCompare(a.t||''));w.appendChild(auditView(all));w.appendChild(h('div',{style:{marginTop:'12px'}},btn('全ログCSV','btn-out',()=>{if(S.user&&S.user.plan!=='pro'){toast('監査ログのCSV出力はProプランの機能です');return}downloadCSV([['日時','種別','操作者','アクション','詳細'],...all.map(a=>[a.t,a.src,a.u,a.a,a.d])],'監査ログ_'+pt.name+'.csv')})));return w}
+function hubAudit(pt){const w=h('div');w.appendChild(h('div',{className:'section-label'},'全監査ログ'));const all=[];ptCases(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'退院'})));ptConfs(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'担当者会議'})));ptMons(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'モニタ'})));ptAssess(pt.id).forEach(c=>(c.audit||[]).forEach(a=>all.push({...a,src:'アセス'})));(pt.audit||[]).forEach(a=>all.push({...a,src:'患者'}));ptRecordings(pt).forEach(r=>all.push(r));all.sort((a,b)=>(b.t||'').localeCompare(a.t||''));w.appendChild(auditView(all));w.appendChild(h('div',{style:{marginTop:'12px'}},btn('全ログCSV','btn-out',()=>{if(S.user&&S.user.plan!=='pro'){toast('監査ログのCSV出力はProプランの機能です');return}downloadCSV([['日時','種別','操作者','アクション','詳細'],...all.map(a=>[a.t,a.src,a.u,a.a,a.d])],'監査ログ_'+pt.name+'.csv')})));return w}
 // --- SHARED: Consent+Sign block ---
 function consentSignBlock(obj,defId){const w=h('div');if(!obj.consent)obj.consent={};const cn=obj.consent;const def=consentDefs().find(d=>d.id===defId)||consentDefs()[0];
 // E-sig notice
@@ -2871,12 +2871,22 @@ function loadRecordings(caseId){
   }).catch(()=>{S.recCache[caseId]=[]});
 }
 // 署名付きURLはその都度発行する（15分で失効するので保存しない）
-async function openRecording(recId){
-  toast('録画URLを発行中...');
+async function openRecording(recId,dl){
+  toast(dl?'保存用URLを発行中...':'録画を開いています...');
   try{
-    const res=await api('/recordings/'+encodeURIComponent(recId)+'/url');
+    const res=await api('/recordings/'+encodeURIComponent(recId)+'/url'+(dl?'?dl=1':''));
     if(res&&res.url){window.open(res.url,'_blank')}
   }catch(e){toast('録画URLを発行できませんでした')}
+}
+// 患者ハブの「⑥ 記録・監査」用。その患者の全ケースぶんの録画をまとめて返す。
+function ptRecordings(pt){
+  const out=[];
+  ptCases(pt.id).forEach(c=>{
+    loadRecordings(c.id);
+    const recs=(S.recCache&&Array.isArray(S.recCache[c.id]))?S.recCache[c.id]:[];
+    recs.forEach(r=>out.push({t:r.created,u:'システム',a:'録画を保存',d:r.filename,_recId:r.id,src:'録画'}));
+  });
+  return out;
 }
 function caseAuditTab(c){
   loadRecordings(c.id);
@@ -2930,10 +2940,12 @@ function auditView(audit){
     item.appendChild(h('div',{className:'tl-time'},a.t?fmtDT(a.t):'',(a.src?'　':null),(a.src?bdg(a.src,'#94a3b8'):null)));
     const act=h('div',{className:'tl-action'},a.a+(a.d?' — '+a.d:''));
     if(a._recId){
-      act.appendChild(h('span',{
+      const lnk=(label,dl)=>h('span',{
         style:{marginLeft:'8px',color:'#0891b2',fontWeight:'700',cursor:'pointer',textDecoration:'underline',whiteSpace:'nowrap'},
-        onClick:()=>openRecording(a._recId)
-      },'▶ 再生・ダウンロード'));
+        onClick:()=>openRecording(a._recId,dl)
+      },label);
+      act.appendChild(lnk('▶ 再生',false));
+      act.appendChild(lnk('⤓ 保存',true));
     }
     item.appendChild(act);
     tl.appendChild(item);

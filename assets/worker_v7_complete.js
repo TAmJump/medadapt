@@ -1280,7 +1280,7 @@ async function handleRequest(request, env, json, err) {
       .bind(recUrlMatch[1], ownerEmail).first();
     if (!rec) return err('録画が見つかりません', 404);
     try {
-      const signed = await presignS3GetUrl(env, rec.filename, 900);
+      const signed = await presignS3GetUrl(env, rec.filename, 900, { download: url.searchParams.get('dl') === '1' });
       return json({ url: signed, filename: rec.filename, expires_in: 900 });
     } catch (e) {
       console.error('presign error:', e);
@@ -4528,7 +4528,10 @@ async function sendEmail(env, { to, subject, html }) {
 
 // S3 の署名付きGET URL を作る（AWS SigV4・クエリ文字列方式）。
 // 使う鍵は録画用の whereby-recorder（S3のみ許可）で、SES 用の鍵とは別に持たせる。
-async function presignS3GetUrl(env, key, expiresSec) {
+// opts.download を真にすると保存ダイアログ、既定はブラウザ内で再生。
+// Whereby が上げた .mp4 は Content-Type が汎用バイナリ扱いになるため、
+// response-content-type を署名クエリで上書きしないと再生されずダウンロードになる。
+async function presignS3GetUrl(env, key, expiresSec, opts) {
   const bucket = env.REC_S3_BUCKET || 'myaruze-recordings';
   const region = env.REC_S3_REGION || 'ap-northeast-1';
   const ak = env.REC_AWS_ACCESS_KEY_ID;
@@ -4555,6 +4558,10 @@ async function presignS3GetUrl(env, key, expiresSec) {
   q.set('X-Amz-Date', timeStr);
   q.set('X-Amz-Expires', String(expiresSec || 900));
   q.set('X-Amz-SignedHeaders', 'host');
+  const ext = String(key).split('.').pop().toLowerCase();
+  const ctype = ext === 'mkv' ? 'video/x-matroska' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+  q.set('response-content-type', ctype);
+  q.set('response-content-disposition', (opts && opts.download) ? 'attachment' : 'inline');
   // AWS はクエリをキー順に並べた形で署名する
   const canonicalQuery = Array.from(q.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1)
     .map(([k2, v2]) => `${encodeURIComponent(k2)}=${encodeURIComponent(v2)}`).join('&');
