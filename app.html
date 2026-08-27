@@ -1486,7 +1486,7 @@ const fn={overview:()=>{const sec=h('div');
     btn('当日状態報告','btn-xs btn-out',()=>showStatusReportModal(pt))
   ));
   actionBar.appendChild(agRow('管理',
-    btn('加算管理','btn-xs btn-out',()=>{S.page='claims';rr()})
+    btn('加算管理','btn-xs btn-out',()=>{S.claimsFrom=S.page;S.page='claims';rr()})
   ));
   sec.appendChild(actionBar);
   sec.appendChild(hubInsurance(pt));
@@ -5626,7 +5626,7 @@ function acuMassagePage(){
   // カード3: 加算管理（療養費同意書交付料 B013）
   const card3=h('div',{
     style:{padding:'18px 20px',background:'#fff',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',transition:'all .15s',boxShadow:'0 1px 3px rgba(0,0,0,.04)'},
-    onClick:()=>{S.page='claims';rr()}
+    onClick:()=>{S.claimsFrom=S.page;S.page='claims';rr()}
   });
   card3.appendChild(h('div',{style:{fontSize:'14px',fontWeight:'800',color:'#0891b2',marginBottom:'6px'}},'③ 療養費同意書交付料を算定'));
   card3.appendChild(h('div',{style:{fontSize:'12px',color:'#475569',lineHeight:'1.7',marginBottom:'10px'}},'B013 療養費同意書交付料（100点）の算定対象一覧を確認し、月次集計を取得します。'));
@@ -6095,6 +6095,14 @@ function showReferralModal(ex,presetPid){
 // ===========================================================
 function claimsPage(){
   const w=h('div',{style:{padding:'24px',maxWidth:'960px'}});
+  // 他ページと同じ戻り導線。どこから開いたかを S.claimsFrom に控えてあるので、そこへ戻す。
+  // 左メニューから直接開いた場合は控えが無いので患者・利用者へ戻す。
+  const _back=S.claimsFrom;
+  w.appendChild(h('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px',flexWrap:'wrap'}},
+    h('button',{style:{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:'13px',padding:'0',fontFamily:'inherit'},
+      onClick:()=>{S.claimsFrom=null;S.page=_back||'patients';rr()}},
+      _back==='consent'?'← 同意書に戻る':'← 戻る')
+  ));
   w.appendChild(h('h2',{style:{fontSize:'20px',fontWeight:'800',margin:'0 0 8px'}},'加算管理（医療保険算定）'));
   w.appendChild(h('div',{style:{fontSize:'13px',color:'#64748b',marginBottom:'16px'}},'療養費同意書交付料 100点・退院時共同指導料・訪問看護退院時共同指導加算 等'));
   if(!S.claimSummary){
