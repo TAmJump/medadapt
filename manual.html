@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>操作マニュアル｜ｍやるゼ！</title>
+<style>  :root{
+    --teal:#0891b2; --teal-d:#0e5f73;
+    --ink:#152028; --ink-m:#5b6b76; --ink-l:#8a99a3;
+    --line:#dfe6ea; --tint:#f2fafc; --amber:#b45309;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+  body{margin:0;background:#fff;color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP","Meiryo",sans-serif;
+    font-size:15px;line-height:1.85;-webkit-font-smoothing:antialiased;}
+  .sheet{max-width:920px;margin:0 auto;padding:56px 32px 96px;}
+
+  .masthead{border-bottom:3px solid var(--teal);padding-bottom:22px;margin-bottom:30px;}
+  .eyebrow{font-size:11px;letter-spacing:.22em;color:var(--teal);font-weight:700;margin-bottom:10px;}
+  h1{font-size:31px;line-height:1.35;margin:0 0 10px;font-weight:800;}
+  .sub{font-size:14px;color:var(--ink-m);margin:0;}
+  .meta{font-size:12px;color:var(--ink-l);margin-top:14px;}
+
+  h2{font-size:20px;font-weight:800;margin:0 0 16px;padding-bottom:9px;border-bottom:1px solid var(--line);}
+  h2 .n{color:var(--teal);margin-right:10px;font-size:15px;letter-spacing:.06em;}
+  h3{font-size:15.5px;font-weight:800;margin:28px 0 8px;color:var(--teal-d);}
+  p{margin:0 0 12px;}
+  .lead{font-size:15px;color:var(--ink-m);margin-bottom:22px;}
+  a{color:var(--teal);}
+
+  .toc{border:1px solid var(--line);border-radius:12px;padding:20px 26px;margin:0 0 46px;page-break-inside:avoid;}
+  .toc-t{font-size:13px;font-weight:800;letter-spacing:.1em;color:var(--teal);margin-bottom:12px;}
+  .toc ol{margin:0;padding-left:0;list-style:none;counter-reset:t;
+    column-count:2;column-gap:32px;}
+  .toc li{counter-increment:t;margin-bottom:9px;font-size:14px;break-inside:avoid;padding-left:32px;position:relative;}
+  .toc li:before{content:counter(t,decimal-leading-zero);color:#a9c6d0;font-weight:700;font-size:11px;
+    position:absolute;left:0;top:2px;letter-spacing:.02em;}
+  .toc a{text-decoration:none;color:var(--ink);}
+  .toc .d{color:var(--ink-l);font-size:12.5px;}
+
+  .appcard{display:flex;align-items:center;gap:20px;flex-wrap:wrap;border:1px solid var(--line);
+    border-radius:12px;padding:18px 20px;margin:18px 0 26px;page-break-inside:avoid;}
+  .appcard .ic{width:62px;height:62px;border-radius:13px;flex-shrink:0;display:block;}
+  .appcard .txt{flex:1;min-width:170px;}
+  .appcard .nm{font-size:17px;font-weight:800;line-height:1.3;}
+  .appcard .ds{font-size:12.5px;color:var(--ink-m);margin-top:4px;line-height:1.6;}
+  .get{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .badge{height:46px;display:block;}
+  .qrbox{text-align:center;}
+  .qrbox img{width:84px;height:84px;display:block;border:1px solid var(--line);border-radius:6px;padding:5px;background:#fff;}
+  .qrbox span{display:block;font-size:10.5px;color:var(--ink-l);margin-top:5px;}
+  .qrpair{display:flex;gap:26px;flex-wrap:wrap;margin:14px 0 2px;}
+  .qrpair .qrbox img{width:96px;height:96px;}
+
+  .fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:16px 0;}
+  .fcard{border:1px solid var(--line);border-radius:11px;padding:16px 18px;page-break-inside:avoid;}
+  .fcard .fn{font-size:11px;font-weight:800;color:var(--teal);letter-spacing:.08em;}
+  .fcard .ft{font-size:15px;font-weight:800;margin:5px 0 7px;}
+  .fcard ul{margin:0;padding-left:1.2em;font-size:13px;color:var(--ink-m);}
+  .fcard li{margin-bottom:3px;}
+
+  .role{border-left:3px solid var(--teal);padding:2px 0 2px 16px;margin:0 0 18px;page-break-inside:avoid;}
+  .role .rt{font-size:11px;color:var(--ink-l);font-weight:700;letter-spacing:.06em;}
+  .role .rn{font-size:15px;font-weight:800;margin-bottom:4px;}
+  .role p{font-size:13.5px;color:var(--ink-m);margin:0;}
+
+  ol,ul{margin:0 0 14px;padding-left:1.35em;}
+  li{margin-bottom:7px;}
+  ol.tight li,ul.tight li{margin-bottom:4px;}
+
+  .box{border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0;}
+  .box-t{font-size:13px;font-weight:800;margin-bottom:8px;color:var(--teal-d);}
+  .box p:last-child,.box ul:last-child,.box ol:last-child{margin-bottom:0;}
+  .note{border-left:3px solid var(--teal);background:var(--tint);padding:13px 16px;margin:14px 0;font-size:13.5px;border-radius:0 8px 8px 0;}
+  .warn{border-left:3px solid var(--amber);background:#fffaf0;padding:13px 16px;margin:14px 0;font-size:13.5px;border-radius:0 8px 8px 0;}
+  .note p:last-child,.warn p:last-child{margin-bottom:0;}
+  .warn-t{font-weight:800;color:var(--amber);}
+
+  code,.mono{font-family:"SFMono-Regular",Consolas,"Courier New",monospace;background:#f4f7f8;
+    border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:13px;word-break:break-all;}
+
+  table{border-collapse:collapse;width:100%;font-size:13.5px;margin:14px 0;}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top;}
+  th{background:var(--tint);font-weight:800;color:var(--teal-d);}
+  td.c,th.c{text-align:center;width:19%;}
+  tr.cat td{background:#f7fafb;font-weight:800;color:var(--teal);font-size:12.5px;letter-spacing:.04em;}
+  .yes{color:var(--teal);font-weight:800;}
+  .no{color:var(--ink-l);}
+
+  .shots{display:grid;grid-template-columns:repeat(2,1fr);gap:28px 26px;margin:20px 0 8px;align-items:start;}
+  .shot{margin:0;page-break-inside:avoid;}
+  .shot img{width:100%;display:block;border:1px solid var(--line);border-radius:10px;background:#fff;image-rendering:auto;}
+  .shot figcaption{font-size:12.5px;color:var(--ink-m);margin-top:9px;line-height:1.75;}
+  .shot .cn{font-weight:800;color:var(--ink);display:block;font-size:13.5px;margin-bottom:2px;}
+
+  .qa{border-top:1px solid var(--line);padding:15px 0;page-break-inside:avoid;}
+  .qa:last-child{border-bottom:1px solid var(--line);}
+  .q{font-weight:800;margin-bottom:5px;}
+  .a{color:var(--ink-m);font-size:14px;margin:0;}
+
+  section{margin-bottom:52px;}
+  .foot{border-top:3px solid var(--teal);margin-top:56px;padding-top:20px;font-size:12.5px;color:var(--ink-m);}
+  .mailbig{font-size:19px;font-weight:800;color:var(--teal);}
+
+  @media print{
+    body{font-size:10.5pt;line-height:1.7;}
+    .sheet{max-width:none;padding:0;}
+    @page{size:A4;margin:16mm 13mm 18mm;
+      @bottom-center{content:counter(page);font-size:9pt;color:#8a99a3;}}
+    section{page-break-before:always;break-before:page;}
+    #intro{page-break-before:avoid;break-before:avoid;}
+    .toc{page-break-before:always;break-before:page;}
+    h2{page-break-after:avoid;}
+    .toc a{color:var(--ink);}
+  }
+  @media (max-width:640px){
+    .sheet{padding:32px 18px 64px;}
+    h1{font-size:24px;}
+    .toc ol{column-count:1;}
+    .fgrid,.shots{grid-template-columns:1fr;}
+  }
+
+  /* この章でできること */
+  .goal{background:var(--tint);border:1px solid #cdeaf2;border-radius:9px;
+    padding:11px 15px;font-size:13.5px;margin:0 0 18px;color:var(--ink);}
+  .goal span{display:block;font-size:10.5px;letter-spacing:.1em;font-weight:800;color:var(--teal);margin-bottom:3px;}
+
+  /* はじめに */
+  .intro{border-bottom:1px solid var(--line);padding-bottom:8px;}
+  .checklist{display:grid;gap:9px;margin:14px 0 18px;}
+  .ck{display:flex;gap:13px;align-items:flex-start;border:1px solid var(--line);
+    border-radius:9px;padding:11px 14px;page-break-inside:avoid;}
+  .ckn{flex-shrink:0;width:23px;height:23px;border-radius:50%;background:var(--teal);color:#fff;
+    font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+  .ck strong{display:block;font-size:14px;}
+  .ck span{display:block;font-size:12.5px;color:var(--ink-m);line-height:1.6;}
+
+  /* 目次のページ番号 */
+  .toc li a{display:flex;align-items:baseline;gap:9px;}
+  .toc .tl{flex:0 1 auto;}
+  .toc .dots{flex:1 1 auto;min-width:16px;align-self:flex-start;
+    border-bottom:1px dotted #c3d0d7;transform:translateY(-5px);}
+  .toc .pg{flex:0 0 auto;font-weight:800;color:var(--ink);font-size:13.5px;
+    font-variant-numeric:tabular-nums;min-width:22px;text-align:right;}
+
+  /* Web公開版の上部バー（印刷時は消える） */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.94);
+    backdrop-filter:saturate(180%) blur(8px);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;padding:10px 20px;}
+  .tb-sp{flex:1;}
+  .tb-home{font-size:13px;color:var(--teal);text-decoration:none;font-weight:700;}
+  .tb-print{font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;
+    background:var(--teal);color:#fff;border:none;border-radius:8px;padding:8px 16px;}
+  .tb-print:hover{background:var(--teal-d);}
+  @media print{ .topbar{display:none;} }
+</style></head><body><div class="topbar">
+  <a class="tb-home" href="index.html">← ｍやるゼ！トップへ</a>
+  <span class="tb-sp"></span>
+  <button class="tb-print" onclick="window.print()">印刷・PDFで保存</button>
+</div>
+<div class="sheet">
+
+<header class="masthead">
+  <div class="eyebrow">医療介護連携OS</div>
+  <h1>ｍやるゼ！ 操作マニュアル</h1>
+  <p class="sub">できること・アプリの入れかた・登録・画面ごとの使いかた</p>
+  <p class="meta">タムジ株式会社</p>
+</header>
+
+<div class="appcard">
+  <img loading="lazy" class="ic" src="images/manual/daf931a7fb12.png" alt="ｍやるゼ！">
+  <div class="txt">
+    <div class="nm">ｍやるゼ！</div>
+    <div class="ds">医療・介護の法人間連携OS（NDA・退院通知・面談）</div>
+  </div>
+  <div class="get">
+    <a href="https://play.google.com/store/apps/details?id=com.tamjump.medvoo&amp;pcampaignid=web_share"><img loading="lazy" class="badge" src="images/manual/4b63b976d103.svg" alt="Google Play で手に入れよう"></a>
+    <span class="qrbox"><img loading="lazy" src="images/manual/ba39fea33220.svg" alt=""><span>スマホで読み取る</span></span>
+  </div>
+</div>
+
+<p class="lead">
+  ｍやるゼ！は、病院・介護施設・訪問看護・在宅医・ケアマネジャー・薬局・歯科・施術所などが、
+  ひとりの患者さんについての情報を同じ画面で共有するためのアプリです。
+  退院前の受入れ調整、サービス担当者会議、モニタリング、同意書のやりとりを、
+  電話とファックスの往復なしで進められます。
+</p>
+
+<div class="note"><p><strong>まずは無料でお試しください。</strong>
+カード登録なしで、Freeプランのまますぐ使いはじめられます。
+使い勝手を確かめてから、必要になった時点でProプランに切り替えられます。</p></div>
+
+<section id="intro" class="intro">
+  <h2><span class="n">はじめに</span>このガイドの使いかた</h2>
+
+  <p>ｍやるゼ！は多くの職種で使うため、機能がたくさんあります。
+  <strong>全部を読む必要はありません。</strong>ご自分の立場に合うところだけ読んでください。</p>
+
+  <h3>立場別・どこから読めばよいか</h3>
+  <table>
+    <tr><th style="width:32%">あなたの立場</th><th>読む順番</th></tr>
+    <tr><td><strong>これから導入する方</strong><br>（管理者になる方）</td>
+        <td>03 アプリを開く → 04 法人を登録する → 05 画面の基本操作 → 07 職員を招待する → 08 患者を登録する</td></tr>
+    <tr><td><strong>招待された職員の方</strong></td>
+        <td>03 アプリを開く → 05 画面の基本操作 → 06 ダッシュボード → 08・09・10</td></tr>
+    <tr><td><strong>医師の方</strong></td>
+        <td>05 画面の基本操作 → 11 同意書 → 18 設定（医師認証）</td></tr>
+    <tr><td><strong>施術者の方</strong></td>
+        <td>03 アプリを開く → 11 同意書 → 15 連携先・施術者</td></tr>
+    <tr><td><strong>検討中の方</strong></td>
+        <td>01 できること → 02 職種別 → 21 Free と Pro のちがい</td></tr>
+  </table>
+
+  <h3>最初の30分でやること</h3>
+  <p>導入を決めたら、この順に進めてください。ここまで終われば、あとは使いながら覚えられます。</p>
+  <div class="checklist">
+    <div class="ck"><span class="ckn">1</span><div><strong>アプリを開く</strong><span>Androidはストアから、iPhoneはSafariでホーム画面に追加</span></div></div>
+    <div class="ck"><span class="ckn">2</span><div><strong>法人を登録する</strong><span>Freeで構いません。あとから切り替えられます</span></div></div>
+    <div class="ck"><span class="ckn">3</span><div><strong>確認メールを開いてログインIDを控える</strong><span>ここが最もつまずきやすいところです</span></div></div>
+    <div class="ck"><span class="ckn">4</span><div><strong>ログインする</strong><span>次回からは自動で入れます</span></div></div>
+    <div class="ck"><span class="ckn">5</span><div><strong>患者・利用者を1件だけ登録してみる</strong><span>名前だけで構いません</span></div></div>
+    <div class="ck"><span class="ckn">6</span><div><strong>職員を1人招待してみる</strong><span>リンクを送るだけです</span></div></div>
+  </div>
+
+  <h3>読みかたの目印</h3>
+  <table>
+    <tr><td style="width:32%"><span class="mono">ADM-XXXXXX</span></td><td>実際に画面に出る文字や、入力する内容です</td></tr>
+    <tr><td><strong>「◯◯」</strong></td><td>画面上のボタンやタブの名前です。そのまま探してください</td></tr>
+    <tr><td><div class="note" style="margin:0;padding:8px 12px;font-size:12.5px;">水色の枠</div></td><td>知っておくと役に立つ補足です</td></tr>
+    <tr><td><div class="warn" style="margin:0;padding:8px 12px;font-size:12.5px;">オレンジの枠</div></td><td>気をつけていただきたいことです</td></tr>
+  </table>
+
+  <div class="note"><p><strong>このガイドを印刷する場合</strong>　ブラウザで開いて <span class="mono">Ctrl</span> ＋ <span class="mono">P</span>（Macは <span class="mono">⌘</span> ＋ <span class="mono">P</span>）を押し、
+  「PDFに保存」を選ぶと、そのままPDFになります。必要な章だけ印刷することもできます。</p></div>
+</section>
+<nav class="toc"><div class="toc-t">目次</div><ol><li><a href="#s01"><span class="tl"><strong>ｍやるゼ！でできること</strong><br><span class="d">6つの中核機能</span></span><span class="dots"></span><span class="pg">5</span></a></li><li><a href="#s02"><span class="tl"><strong>職種別・どう使うか</strong><br><span class="d">立場ごとの使いどころ</span></span><span class="dots"></span><span class="pg">7</span></a></li><li><a href="#s03"><span class="tl"><strong>アプリを開く</strong><br><span class="d">Android・iPhone・パソコン</span></span><span class="dots"></span><span class="pg">8</span></a></li><li><a href="#s04"><span class="tl"><strong>法人を登録する</strong><br><span class="d">管理者の方が最初に1回だけ</span></span><span class="dots"></span><span class="pg">10</span></a></li><li><a href="#s05"><span class="tl"><strong>画面の基本操作</strong><br><span class="d">メニューの開き方と、どこに何があるか</span></span><span class="dots"></span><span class="pg">12</span></a></li><li><a href="#s06"><span class="tl"><strong>ダッシュボード</strong><br><span class="d">いま何をすべきかを一目で</span></span><span class="dots"></span><span class="pg">14</span></a></li><li><a href="#s07"><span class="tl"><strong>職員を招待する</strong><br><span class="d">招待リンクを送るだけ</span></span><span class="dots"></span><span class="pg">16</span></a></li><li><a href="#s08"><span class="tl"><strong>患者・利用者を登録する</strong><br><span class="d">ここが日々の作業の入口です</span></span><span class="dots"></span><span class="pg">18</span></a></li><li><a href="#s09"><span class="tl"><strong>患者の画面</strong><br><span class="d">7つのタブで作業します</span></span><span class="dots"></span><span class="pg">19</span></a></li><li><a href="#s10"><span class="tl"><strong>受入れ・移行を進める</strong><br><span class="d">日程調整からオンライン通話まで</span></span><span class="dots"></span><span class="pg">22</span></a></li><li><a href="#s11"><span class="tl"><strong>同意書を発行する</strong><br><span class="d">オンライン実施の同意・療養費の同意書</span></span><span class="dots"></span><span class="pg">25</span></a></li><li><a href="#s12"><span class="tl"><strong>各種の帳票をつくる</strong><br><span class="d">診療情報提供書・居宅療養管理指導・歯科</span></span><span class="dots"></span><span class="pg">34</span></a></li><li><a href="#s13"><span class="tl"><strong>退院通知を送る</strong><br><span class="d">受入れ先を探す・決まった先へ知らせる</span></span><span class="dots"></span><span class="pg">36</span></a></li><li><a href="#s14"><span class="tl"><strong>NDA（秘密保持契約）</strong><br><span class="d">患者情報をやりとりする前に</span></span><span class="dots"></span><span class="pg">37</span></a></li><li><a href="#s15"><span class="tl"><strong>ほかの事業所・施術者とつながる</strong><br><span class="d">連携先の登録</span></span><span class="dots"></span><span class="pg">38</span></a></li><li><a href="#s16"><span class="tl"><strong>加算管理</strong><br><span class="d">算定の対象を取りこぼさない</span></span><span class="dots"></span><span class="pg">39</span></a></li><li><a href="#s17"><span class="tl"><strong>災害時モード</strong><br><span class="d">連絡がつかない状況に備える</span></span><span class="dots"></span><span class="pg">40</span></a></li><li><a href="#s18"><span class="tl"><strong>設定</strong><br><span class="d">誓約・外部アプリ・医師認証・パスワード</span></span><span class="dots"></span><span class="pg">41</span></a></li><li><a href="#s19"><span class="tl"><strong>Proプランを申し込む</strong><br><span class="d">カードの登録・変更・解約</span></span><span class="dots"></span><span class="pg">43</span></a></li><li><a href="#s20"><span class="tl"><strong>アカウントを削除する</strong><br><span class="d">取り消せない手続きです</span></span><span class="dots"></span><span class="pg">46</span></a></li><li><a href="#s21"><span class="tl"><strong>Free と Pro のちがい</strong><br><span class="d">機能一覧・料金・切り替え方</span></span><span class="dots"></span><span class="pg">48</span></a></li><li><a href="#s22"><span class="tl"><strong>やりたいことから探す</strong><br><span class="d">逆引きの早見表</span></span><span class="dots"></span><span class="pg">52</span></a></li><li><a href="#s23"><span class="tl"><strong>困ったときは</strong><br><span class="d">よくあるつまずき</span></span><span class="dots"></span><span class="pg">54</span></a></li><li><a href="#s24"><span class="tl"><strong>用語集</strong><br><span class="d">このガイドに出てくることば</span></span><span class="dots"></span><span class="pg">56</span></a></li><li><a href="#s25"><span class="tl"><strong>お問い合わせ</strong></span><span class="dots"></span><span class="pg">58</span></a></li></ol></nav><section id="s01"><h2><span class="n">01</span>ｍやるゼ！でできること</h2>
+<p class="lead">受入れ・移行・在宅連携に必要なものを、1つのアプリにまとめています。</p>
+<div class="fgrid">
+  <div class="fcard"><div class="fn">1 / 日程調整</div><div class="ft">電話の往復をなくす</div><ul>
+    <li>病院・施設・ご家族の空き時間を共有</li><li>候補日を出すと相手が○△×で回答</li>
+    <li>最多希望の日時に自動で確定</li><li>確定と同時に通話URLを自動発行</li></ul></div>
+  <div class="fcard"><div class="fn">2 / アセスメント</div><div class="ft">受入れ前の評価をオンラインで</div><ul>
+    <li>心身の状態・医療処置・リスクの確認</li><li>ご家族の意向</li>
+    <li>受入可否の判断</li><li>チェック式なので誰が入力しても同じ品質</li></ul></div>
+  <div class="fcard"><div class="fn">3 / 共同指導</div><div class="ft">集まらずに実施・記録する</div><ul>
+    <li>退院前指導をオンラインで実施</li><li>医療処置・服薬・生活指導の共有</li>
+    <li>訪問看護・施設も同席できる</li><li>記録は算定に沿ったテンプレート</li></ul></div>
+  <div class="fcard"><div class="fn">4 / 会議・モニタリング</div><div class="ft">利用開始後もつながる</div><ul>
+    <li>サービス担当者会議</li><li>月次モニタリング</li>
+    <li>状態変化の共有</li><li>ご家族の同席も可能</li></ul></div>
+  <div class="fcard"><div class="fn">5 / 電子同意</div><div class="ft">紙・ハンコ・郵送を減らす</div><ul>
+    <li>タブレットの画面上で署名</li><li>電子署名とタイムスタンプを付与</li>
+    <li>PDFをその場で出力</li><li>各種記録もテンプレート化</li></ul></div>
+  <div class="fcard"><div class="fn">6 / 監査ログ</div><div class="ft">証跡をそのまま提示する</div><ul>
+    <li>誰が・いつ・何をしたかを保存</li><li>誰が同意したかの履歴</li>
+    <li>会議の参加者記録</li><li>実地指導・監査のときにそのまま提示</li></ul></div>
+</div>
+
+<h3>書類は「あとから書き換えられない」形で残ります</h3>
+<p>同意書・指示書だけでなく、退院時共同指導記録、サービス担当者会議、モニタリング、アセスメント、
+居宅療養管理指導、診療情報提供書、歯科診療情報提供書まで、アプリの中で作られるすべての帳票に、
+<strong>電子署名・タイムスタンプ・ハッシュチェーン</strong>が付きます。
+紙のハンコ・確定日付・台帳が持っていた役割を、電子で担保する仕組みです。</p>
+<table>
+  <tr><th style="width:26%">仕組み</th><th>役割</th></tr>
+  <tr><td><strong>電子署名</strong></td><td>本人にしか作れない鍵で署名します。実印・自署にあたる本人証明です</td></tr>
+  <tr><td><strong>タイムスタンプ</strong></td><td>認定された時刻認証局が時刻を封印します。公証役場の確定日付にあたります</td></tr>
+  <tr><td><strong>ハッシュチェーン</strong></td><td>発行済みの書類を時系列でつなぎます。1件でも差し替えると全体が崩れて検知できます</td></tr>
+</table>
+<p>発行した書類にはQRコードが付きます。読み取ると、その書類が発行時から変わっていないかを第三者でも確認できます。</p>
+
+<h3>訪問マッサージ・はり・きゅうの連携にも対応しています</h3>
+<p>医師の同意書交付から、施術者の施術報告書の投稿、療養費請求までをつなぎます。
+施術者は専用の画面で同意書をすぐ受け取れます。有効期限（通常6か月・変形徒手矯正術は1か月）も自動で管理されます。</p>
+</section><section id="s02"><h2><span class="n">02</span>職種別・どう使うか</h2>
+<p class="lead">現場が違えば、抱えている困りごとも違います。立場ごとの使いどころをまとめました。</p>
+<div class="role"><div class="rt">病院</div><div class="rn">退院調整看護師</div>
+<p>退院前の調整・電話・書類に時間を取られている方へ。日程調整、カンファレンスの記録、退院通知が1つの画面で完結します。</p></div>
+<div class="role"><div class="rt">介護施設</div><div class="rn">入居相談員／生活相談員</div>
+<p>受入アセスメントが紙と聞き取り中心で、情報の漏れがクレームにつながっている方へ。アセスメントとNDAの締結を、入居前にオンラインで済ませられます。</p></div>
+<div class="role"><div class="rt">訪問看護</div><div class="rn">訪問看護ステーション</div>
+<p>移動と書類の負担で算定漏れが起きている方へ。オンラインで同席して算定に対応し、記録はテンプレート化。月次モニタリングの機能もあります。</p></div>
+<div class="role"><div class="rt">居宅介護支援</div><div class="rn">ケアマネジャー</div>
+<p>サービス担当者会議の開催調整・記録・更新でケアプランが遅れている方へ。会議、モニタリング、状態変化の共有をシステム上に集約できます。</p></div>
+<div class="role"><div class="rt">薬局・在宅</div><div class="rn">在宅訪問薬剤師</div>
+<p>病院からの情報がファックスや口頭中心で、服薬指導の内容が散らばっている方へ。医師の指示・服薬指導・モニタリングの履歴が、書き換えできない形で残ります。</p></div>
+<div class="role"><div class="rt">歯科</div><div class="rn">歯科医師・歯科衛生士</div>
+<p>歯科訪問診療の指示書や診療情報提供書を、アプリの中で作成・送付できます。</p></div>
+<div class="role"><div class="rt">施術所</div><div class="rn">訪問マッサージ・はり・きゅうの施術者</div>
+<p>同意書の交付や施術報告書の期限管理が煩雑で、療養費の返戻が不安な方へ。同意書と報告書を専用画面で受け取り、PDFが自動で発行されます。</p></div>
+</section><section id="s03"><h2><span class="n">03</span>アプリを開く</h2><p class="goal"><span>この章でできること</span>お使いの端末に ｍやるゼ！ を入れて、開けるようになります。</p>
+<p>お使いの端末によって手順が違います。該当するものだけお読みください。</p>
+
+<div class="box"><div class="box-t">Android のスマートフォン・タブレット</div>
+<ol class="tight">
+  <li>Google Play ストアを開く</li>
+  <li>検索欄に <strong>mやるゼ</strong> と入力して検索する</li>
+  <li>水色のアイコンの「ｍやるゼ！」を選び、インストールする</li>
+</ol>
+<p style="margin:12px 0 8px;font-size:13px;color:var(--ink-m);">下のQRコードをカメラで読み取ると、ストアのページが直接開きます。</p>
+<div class="get">
+  <a href="https://play.google.com/store/apps/details?id=com.tamjump.medvoo&amp;pcampaignid=web_share"><img loading="lazy" class="badge" src="images/manual/4b63b976d103.svg" alt="Google Play で手に入れよう"></a>
+  <span class="qrbox"><img loading="lazy" src="images/manual/ba39fea33220.svg" alt=""><span>Google Play</span></span>
+</div></div>
+
+<div class="box"><div class="box-t">iPhone・iPad</div>
+<p style="font-size:13.5px;">App Store には出していません。Safari で開いて、ホーム画面にアイコンを置いてお使いください。アプリと同じように起動できます。</p>
+<ol class="tight">
+  <li>Safari で <code>https://myaruze.tamjump.com</code> を開く</li>
+  <li>画面下の共有ボタン（四角に上向きの矢印）を押す</li>
+  <li>メニューを下にたどって「ホーム画面に追加」を選ぶ</li>
+  <li>右上の「追加」を押す</li>
+</ol>
+<div class="get" style="margin-top:12px;">
+  <span class="qrbox"><img loading="lazy" src="images/manual/bd5c389f51ca.svg" alt=""><span>myaruze.tamjump.com</span></span>
+  <span style="font-size:13px;color:var(--ink-m);">カメラでこのQRコードを読み取ると、<br>手順1のページが開きます。</span>
+</div>
+<p style="margin-top:12px;font-size:13px;color:var(--ink-m);">※ Chrome など Safari 以外のブラウザでは「ホーム画面に追加」が出ません。Safari で開いてください。</p></div>
+
+<div class="box"><div class="box-t">パソコン</div>
+<p style="font-size:13.5px;margin-bottom:0;">インストールは不要です。ブラウザで <code>https://myaruze.tamjump.com</code> を開いてください。Chrome、Edge、Safari のいずれでも動きます。</p></div>
+
+<div class="note"><p>スマートフォン・タブレット・パソコンのどれでも、同じデータが見られます。
+外出先ではスマートフォン、事務所ではパソコン、という使い分けができます。</p></div>
+</section><section id="s04"><h2><span class="n">04</span>法人を登録する</h2><p class="goal"><span>この章でできること</span>法人を登録して、自分のログインIDを受け取れるようになります。</p>
+<p class="lead">この作業は、事業所でおひとり（管理者になる方）だけが行います。
+ほかの職員の方は <a href="#s07">07 職員を招待する</a> に進んでください。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/acbe73704264.jpg" alt="ステップ1：プランを選ぶ"><figcaption><span class="cn">ステップ1：プランを選ぶ</span>最初の画面で「新規法人登録」を押すと、この画面になります。<strong>Free</strong> と <strong>Pro</strong> のカードが出るので、まずは <strong>Free</strong> で構いません。あとから切り替えられます。選んだら「次へ」を押します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/144acd5e2527.jpg" alt="ステップ2：法人情報と管理者を入力する"><figcaption><span class="cn">ステップ2：法人情報と管理者を入力する</span>法人名、種別、管理者名、メールアドレス、パスワード（8文字以上）を入力します。種別は「病院／介護施設／訪問看護／在宅医／居宅介護支援／福祉用具／薬局／歯科／リハビリ施設／その他」から選びます。入力できたら「法人登録」を押します。</figcaption></figure></div>
+<div class="warn"><p><span class="warn-t">個人では登録できません。</span><br>
+登録は法人・事業所の単位です。</p></div>
+
+<h3>ステップ3：確認メールを受け取る</h3>
+<p>入力したメールアドレスに、件名「<strong>【ｍやるゼ！】メールアドレスの確認</strong>」のメールが届きます。</p>
+<div class="note"><p><strong>このメールの中に、あなたのログインIDが書かれています。</strong>
+<span class="mono">ADM-</span> から始まる6文字のIDです。今後のログインに毎回使いますので、
+メモしておくか、メールを消さずに残しておいてください。</p></div>
+<div class="warn"><p><span class="warn-t">メールが届かないときは</span><br>
+迷惑メールフォルダをご確認ください。それでも見つからない場合は、登録完了画面の「確認メールを再送する」を押してください。</p></div>
+
+<h3>ステップ4：ログインする</h3>
+<ol class="tight">
+  <li>届いたメールの <strong>「メールアドレスを確認する」</strong> ボタンを押します。
+    <span style="font-size:13px;color:var(--ink-m);">（このリンクは24時間で使えなくなります）</span></li>
+  <li>アプリに戻り、<strong>ログインID</strong> と <strong>パスワード</strong> を入力します。</li>
+  <li><strong>「ログイン」</strong>を押します。</li>
+</ol>
+<p>これで使いはじめられます。次回からは自動でログインされます。
+ログイン画面には「QRコードでログイン」もあります。ほかの端末に表示したQRコードを読み取ってログインする方法です。</p>
+</section><section id="s05"><h2><span class="n">05</span>画面の基本操作</h2><p class="goal"><span>この章でできること</span>メニューを開いて、目的の画面にたどり着けるようになります。</p>
+<p>スマートフォンでは、画面の左上にある <strong>青い三本線のボタン</strong> がメニューです。
+ここを押すと、左からメニューが出てきます。パソコンでは最初から左側に表示されています。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/68fee44e1d10.jpg" alt="メニュー（上半分）"><figcaption><span class="cn">メニュー（上半分）</span>上から「患者・利用者」「ダッシュボード」「スタッフ管理」「退院通知」「NDA管理」「同意書」「診療情報提供書」「居宅療養管理指導」「歯科診療・指示書」と並びます。日々いちばん使うのは、いちばん上の <strong>患者・利用者</strong> です。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/3927fe60b8ab.jpg" alt="メニュー（下半分）"><figcaption><span class="cn">メニュー（下半分）</span>続けて「加算管理」「災害時モード」「設定」「通知」。その下に、いま使っている法人名、<strong>別の法人・施設を連携</strong>、ログイン中のお名前、ログアウトが並びます。左上の「Pro」または「Free」の表示で、いまのプランが分かります。</figcaption></figure></div>
+<div class="note"><p>メニューを閉じるときは、右上の <strong>×</strong> を押すか、
+メニューの外側（暗くなっている部分）を押してください。</p></div>
+</section><section id="s06"><h2><span class="n">06</span>ダッシュボード</h2><p class="goal"><span>この章でできること</span>今日やるべきことが、開いた瞬間に分かるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/7da2b5600780.jpg" alt="ダッシュボード"><figcaption><span class="cn">ダッシュボード</span>上段に数字が並びます。<strong>患者数</strong>、<strong>今月のモニタリング実施率</strong>、<strong>アセスメント期限超過</strong>（3か月以上未実施）、<strong>進行中ケース</strong>、<strong>同意取得済</strong>の件数です。<br>その下の「要対応」には、手を付けるべき患者さんが並びます。「モニタ」「初期アセス」「期限超過」「入居前」のボタンで絞り込めます。行を押すと、その患者さんの画面へ直接移動します。</figcaption></figure></div>
+<div class="note"><p><strong>毎朝ここを開くのがおすすめです。</strong>
+赤い数字（期限超過）が出ていたら、その分だけ手当てをすれば、
+モニタリングやアセスメントの抜けを防げます。</p></div>
+</section><section id="s07"><h2><span class="n">07</span>職員を招待する</h2><p class="goal"><span>この章でできること</span>職員を招待して、それぞれのIDでログインしてもらえるようになります。</p>
+<p>同じ事業所の職員を追加します。招待された職員は、法人登録をやり直す必要はありません。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/2d9312b8af2d.jpg" alt="スタッフ管理"><figcaption><span class="cn">スタッフ管理</span>メニューの「スタッフ管理」を開きます。「スタッフを招待」の欄で <strong>「招待リンクを発行」</strong> を押すと、リンクが表示されます。コピーして、職員へメールやチャットで送ってください。下には登録済みの職員が一覧で並びます。</figcaption></figure></div>
+<h3>招待された職員の操作</h3>
+<ol class="tight">
+  <li>受け取ったリンクを開きます。</li>
+  <li>お名前・メールアドレス・パスワードを入力して登録します。</li>
+  <li>登録したメールアドレスに、件名「<strong>【ｍやるゼ！】スタッフ登録完了 - あなたのログインID</strong>」のメールが届きます。
+    <span class="mono">STF-</span> から始まるIDが、その職員のログインIDです。</li>
+</ol>
+<div class="warn"><p><span class="warn-t">招待リンクは7日間で使えなくなります。</span><br>
+期限が切れたら、管理者がもう一度発行してください。</p></div>
+<div class="note"><p><strong>IDは職員ごとに発行してください。</strong>
+監査ログに「誰が操作したか」を正しく残すためです。1つのIDを共有すると、履歴の精度が落ちます。</p></div>
+</section><section id="s08"><h2><span class="n">08</span>患者・利用者を登録する</h2><p class="goal"><span>この章でできること</span>患者・利用者を登録して、一覧から探せるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/415637aec45a.jpg" alt="患者・利用者の一覧"><figcaption><span class="cn">患者・利用者の一覧</span>右上の <strong>「＋ 新規登録」</strong> で1件ずつ、<strong>「CSV取込」</strong> でまとめて登録できます。<br>検索欄は漢字でもかなでも探せます。「あ・か・さ・た・な…」のボタンで頭文字の絞り込み、その下の「全て／入居前／利用中／クローズ」で状態の絞り込みができます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/ea5d2ae290c1.jpg" alt="新規患者登録"><figcaption><span class="cn">新規患者登録</span>お名前、生年月日、性別、要介護度などを入力して保存します。入力が必要なのは名前だけで、ほかは後から足せます。まずは名前だけ入れて先に進んでも構いません。</figcaption></figure></div>
+<div class="note"><p>一覧の各行には <strong>「入居前」「利用中」</strong> などの状態と、
+<strong>「移行8」「アセス1」「2名関係者」</strong> のような件数バッジが出ます。
+その患者さんに何がどれだけ紐づいているかが、開かなくても分かります。</p></div>
+</section><section id="s09"><h2><span class="n">09</span>患者の画面</h2><p class="goal"><span>この章でできること</span>患者ごとの画面で、7つのタブを使い分けられるようになります。</p>
+<p>一覧から患者さんを押すと、この画面が開きます。上部に基本情報、その下に7つのタブが並びます。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/5b358c16a761.jpg" alt="患者の画面（上部）"><figcaption><span class="cn">患者の画面（上部）</span>お名前、年齢、状態、退院予定日、管理主体が出ます。「基本情報」「薬剤情報を確認」「ステータス変更」「非表示にする」のボタンがあります。<br>関係者（病院の医師、ケアマネジャーなど）と、それぞれの同意の取得状況も並びます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/2d4b2d542d2f.jpg" alt="薬剤情報の確認"><figcaption><span class="cn">薬剤情報の確認</span>「薬剤情報を確認」から、登録しておいた外部アプリを開けます。連携するアプリは「設定」の <strong>薬剤連携・外部アプリ</strong> で登録します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/e0d063fb3c1c.jpg" alt="患者ごとのログ履歴"><figcaption><span class="cn">患者ごとのログ履歴</span>その患者さんについて誰が何をしたかの履歴です。</figcaption></figure></div>
+
+<h3>7つのタブ</h3>
+<table>
+  <tr><th style="width:32%">タブ</th><th>できること</th></tr>
+  <tr><td>① 概要</td><td>その患者さんの状況と、直近の動きの一覧</td></tr>
+  <tr><td>② 受入れ・移行</td><td>退院・入所の調整。日程調整／通話／同意・署名／参加者／記録／監査ログ</td></tr>
+  <tr><td>③ サービス担当者会議</td><td>会議の日程調整と記録</td></tr>
+  <tr><td>④ モニタリング</td><td>訪問後の記録</td></tr>
+  <tr><td>⑤ 同意書・帳票</td><td>同意書や診療情報提供書などの作成・送付</td></tr>
+  <tr><td>⑥ 記録・監査</td><td>作った帳票の一覧と、操作の履歴</td></tr>
+  <tr><td>⑦ 外部連携BOX</td><td>他法人とのやりとり</td></tr>
+</table>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/4f999a42d722.jpg" alt="⑥ 記録・監査"><figcaption><span class="cn">⑥ 記録・監査</span>作成した帳票が新しい順に並びます。「内容を見る」でその場で開けます。<br>その下の <strong>情報共有管理</strong> では、他の事業所へ患者情報を共有する手続きを行います。共有には ①患者さんの同意 と ②受領する側の誓約 の2つが必要です。</figcaption></figure></div></section><section id="s10"><h2><span class="n">10</span>受入れ・移行を進める</h2><p class="goal"><span>この章でできること</span>日程を決めて、オンラインで面談を行い、記録を残せるようになります。</p>
+<p>「② 受入れ・移行」タブが、退院・入所調整の作業場です。
+「＋ 新規ケース」でケースを作ると、中に6つのタブ（日程調整／通話／同意・署名／参加者／記録／監査ログ）が出ます。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/71b59295a49c.jpg" alt="日程調整"><figcaption><span class="cn">日程調整</span>カレンダーから候補日をタップして選びます（複数選べます）。それぞれに時刻を設定します。<br><strong>回答期限・自動確定</strong>を設定しておくと、期限が来たとき、または全員が回答したときに、最も希望の多い日時で自動的に確定します。確定と同時に通話URLも作られます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/d60a212753e0.jpg" alt="通話タブ"><figcaption><span class="cn">通話タブ</span>発行された通話URLが表示されます。<br><strong>「URLをコピー」</strong>で参加者に配り、<strong>「主催者として開始」</strong>で自分が入室します。<br>このルームは施錠されています。参加者は待機状態になるので、主催者が1人ずつ許可して入室させてください。<br><strong>「通話終了 → 記録を自動生成」</strong>を押すと、参加者と実施日時をもとに記録の下書きが作られます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/a66c47b4262d.jpg" alt="通話中の画面"><figcaption><span class="cn">通話中の画面</span>カメラ、マイク、画面共有、チャット、参加者の一覧を、下のボタンで操作します。<br>通話を終えるときは、右上の <strong>「通話を終了して戻る」</strong> を押してアプリに戻ります。</figcaption></figure></div>
+<div class="warn"><p><span class="warn-t">通話を主催するには Pro が必要です。</span><br>
+Free でも、招待された通話に参加することはできます。
+また、ｍやるゼ！に登録していない方でも、URLをお渡しすれば参加していただけます。</p></div>
+<div class="note"><p><strong>参加者が入ってこられないときは、</strong>
+主催者が「主催者として開始」から入室しているかを確認してください。
+主催者が入室していないと、待っている方を許可できません。</p></div>
+</section><section id="s11"><h2><span class="n">11</span>同意書を発行する</h2><p class="goal"><span>この章でできること</span>同意書を発行し、医師とご家族から署名をもらえるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/5231c77e39a3.jpg" alt="同意書の画面（入口）"><figcaption><span class="cn">同意書の画面（入口）</span>メニューの「同意書」を開くと、4つの入口が並びます。<strong>① 同意書を発行</strong>／<strong>② 発行済み同意書を見る</strong>／<strong>③ 療養費同意書交付料を算定</strong>／<strong>④ 受信した署名依頼</strong>。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/8771ec2b85e4.jpg" alt="発行できる同意書の種類"><figcaption><span class="cn">発行できる同意書の種類</span>訪問診療同意書（依頼書）、はり・きゅう、あマ指（あん摩・マッサージ・指圧）、はり・きゅう＋あマ指 の4種類から選べます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/903974301af4.jpg" alt="受信した署名依頼"><figcaption><span class="cn">受信した署名依頼</span>自分あてに届いた署名依頼の一覧です。医師の立場で使う画面です。</figcaption></figure></div>
+
+<h3>発行のしかた</h3>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/b43e0672abd8.jpg" alt="ステップ1：患者と種類を選ぶ"><figcaption><span class="cn">ステップ1：患者と種類を選ぶ</span>対象の患者さんと、発行する同意書の種類を選びます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/147c2a7297f5.jpg" alt="ステップ2：内容を入力する"><figcaption><span class="cn">ステップ2：内容を入力する</span>症状・傷病をチェックすると、傷病名の欄に自動で入ります。通院困難事由（往療を必要とする理由）も選びます。<br><strong>保険算定</strong>の欄にチェックを入れると、療養費同意書交付料 100点の算定対象として登録されます。<br>途中でやめるときは <strong>「一時保存」</strong>。下書き一覧からいつでも再開できます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/f3bd365cfa3a.jpg" alt="発行元・宛先の登録"><figcaption><span class="cn">発行元・宛先の登録</span>同意書に載る保険医療機関の名称・住所・連絡先を登録しておきます。複数の法人をお持ちの場合は、法人ごとにここへ登録します。</figcaption></figure></div>
+
+<h3>署名をもらう</h3>
+<p>同意書は、<strong>医師</strong>と<strong>患者さんご本人またはご家族</strong>の署名で成立します。
+その場で書いていただく方法と、リンクを送って離れた場所で書いていただく方法があります。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/dcabdc223d0b.jpg" alt="医師の署名"><figcaption><span class="cn">医師の署名</span>医師が画面に直接署名します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/9eea9652c627.jpg" alt="ご本人・ご家族の署名"><figcaption><span class="cn">ご本人・ご家族の署名</span>タブレットの画面に指またはペンで署名していただきます。書き直しは「クリア」で。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/5dd1be83f8df.jpg" alt="署名依頼を送る"><figcaption><span class="cn">署名依頼を送る</span>その場で書けない場合は、リンクを送って離れた場所で署名していただけます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/124a05bb4d02.jpg" alt="受け取った側の画面"><figcaption><span class="cn">受け取った側の画面</span>署名を依頼された方には、この画面が開きます。内容を確認して署名すると、そのまま発行元へ戻ります。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/e3672dab61f2.jpg" alt="届いた署名依頼"><figcaption><span class="cn">届いた署名依頼</span>自分あてに届いた依頼の一覧です。ここから開いて署名します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/473d6a4fe459.jpg" alt="受信した同意書"><figcaption><span class="cn">受信した同意書</span>他の事業所から共有された同意書は、ここに届きます。</figcaption></figure></div>
+
+<h3>発行したあと</h3>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/ba8e8d054f0e.jpg" alt="発行済み同意書の一覧"><figcaption><span class="cn">発行済み同意書の一覧</span>発行した同意書が並びます。有効期限も表示されるので、更新のタイミングが分かります。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/d0b4a17c2d76.jpg" alt="1件を開いたところ"><figcaption><span class="cn">1件を開いたところ</span>PDFのプレビュー、ダウンロード、QRコードでの検証ができます。</figcaption></figure></div>
+
+<h3>オンライン実施の同意書</h3>
+<p>ビデオ通話で面談・会議・アセスメント・指導を行う場合の同意書です。「⑤ 同意書・帳票」から発行します。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/21dcc991aabf.jpg" alt="オンライン実施の同意書"><figcaption><span class="cn">オンライン実施の同意書</span>使用目的、実施の方法、個人情報の取扱い、記録の作成・保存、通信環境、自由意思による同意の6項目が書かれています。ご家族に読み上げながら説明してください。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/dd46f7fcd60c.jpg" alt="同意者の入力と署名"><figcaption><span class="cn">同意者の入力と署名</span>説明を行ったことにチェックし、同意者のお名前と続柄を入力して、署名欄に署名していただきます。最後に「同意を保存」を押します。</figcaption></figure></div></section><section id="s12"><h2><span class="n">12</span>各種の帳票をつくる</h2><p class="goal"><span>この章でできること</span>診療情報提供書などの帳票を作って、PDFで出せるようになります。</p>
+<p>メニューから、それぞれの帳票を直接作れます。どれも入力してPDFで出力する流れは同じです。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/34fd5b4c3c04.jpg" alt="診療情報提供書"><figcaption><span class="cn">診療情報提供書</span>宛先、患者情報、傷病名、紹介の目的などを入力して発行します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/569c4a0dab33.jpg" alt="居宅療養管理指導"><figcaption><span class="cn">居宅療養管理指導</span>訪問した日の指導内容を記録します。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/5b7c8b417d01.jpg" alt="歯科診療情報提供書"><figcaption><span class="cn">歯科診療情報提供書</span>歯科向けの様式です。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/87dd978c9824.jpg" alt="歯科訪問診療指示書"><figcaption><span class="cn">歯科訪問診療指示書</span>歯科訪問診療の指示書です。</figcaption></figure></div></section><section id="s13"><h2><span class="n">13</span>退院通知を送る</h2><p class="goal"><span>この章でできること</span>退院通知を送って、受入れ先とやりとりできるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/44bd76c75bf6.jpg" alt="退院通知の一覧"><figcaption><span class="cn">退院通知の一覧</span>送信した通知と受信した通知が並びます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/2e55f3ea518c.jpg" alt="退院通知の作成"><figcaption><span class="cn">退院通知の作成</span>患者さんの状態、退院予定日、必要な医療処置などを入力して送ります。受け取った事業所は、受入れの可否を返してくれます。</figcaption></figure></div>
+<div class="note"><p>退院通知は、NDA（秘密保持契約）を締結済みの法人にだけ送れます。
+まだ締結していない相手には、先に <a href="#s14">14 NDA</a> の手続きをしてください。</p></div>
+</section><section id="s14"><h2><span class="n">14</span>NDA（秘密保持契約）</h2><p class="goal"><span>この章でできること</span>他の法人と秘密保持契約を結べるようになります。</p>
+<p>他の法人と患者情報をやりとりするには、先に秘密保持契約を結びます。アプリの中で完結します。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/dcbce133e9d8.jpg" alt="NDA管理"><figcaption><span class="cn">NDA管理</span>締結済み・申請中のNDAが一覧で並びます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/2693881891ca.jpg" alt="NDAの発行"><figcaption><span class="cn">NDAの発行</span>相手法人のログインIDを入れて申請します。テンプレートのまま使うことも、文面を自分で書くこともできます。締結すると、同時に改ざん検知の仕組みに登録されます。</figcaption></figure></div></section><section id="s15"><h2><span class="n">15</span>ほかの事業所・施術者とつながる</h2><p class="goal"><span>この章でできること</span>連携先の法人や施術者を登録できるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/815da2b7fc3c.jpg" alt="法人・施設の連携"><figcaption><span class="cn">法人・施設の連携</span>自分が複数の法人を運営している場合は、ここで連携させると、ひとつのIDで切り替えて使えるようになります。患者データは法人ごとに分かれたまま保たれます。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/3c9a47b780ff.jpg" alt="施術者の登録・招待"><figcaption><span class="cn">施術者の登録・招待</span>訪問マッサージ・はり・きゅうの施術者を登録します。施術者は事業所の職員ではなく、独立したアカウントとして登録します。<br><strong>「招待リンクを発行」</strong>で施術者ご本人に登録していただくか、すでに他院の招待で登録済みの方は <span class="mono">THR-</span> から始まるログインIDを入力して追加できます。</figcaption></figure></div></section><section id="s16"><h2><span class="n">16</span>加算管理</h2><p class="goal"><span>この章でできること</span>算定の対象を月ごとに確認できるようになります。</p>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/f0013fff4c62.jpg" alt="加算管理（医療保険算定）"><figcaption><span class="cn">加算管理（医療保険算定）</span>療養費同意書交付料 100点、退院時共同指導料、訪問看護退院時共同指導加算などの算定対象を月ごとに集計します。<br>上に当月のサマリ、下に算定対象の文書が並びます。同意書を発行するとき「保険算定」にチェックを入れたものが、ここに集まります。</figcaption></figure></div>
+<div class="warn"><p><span class="warn-t">加算管理は Pro の機能です。</span></p></div>
+</section><section id="s17"><h2><span class="n">17</span>災害時モード</h2>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/243e8e08cac2.jpg" alt="災害時モード"><figcaption><span class="cn">災害時モード</span>災害時に、患者さんの安否や必要な医療処置をすばやく確認・共有するための画面です。</figcaption></figure></div></section><section id="s18"><h2><span class="n">18</span>設定</h2><p class="goal"><span>この章でできること</span>契約や本人確認まわりの設定ができるようになります。</p>
+<p>メニューのいちばん下にある「設定」を開きます。ここには、契約と本人確認まわりの項目がまとまっています。</p>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/ab5552bff771.jpg" alt="設定（上部）"><figcaption><span class="cn">設定（上部）</span><strong>誓約・秘密保持</strong>には、同意した方のお名前、所属、同意日時、誓約書のバージョン、同意ハッシュが記録されています。「同意ログ」「操作ログ」もここから開けます。<br><strong>薬剤連携・外部アプリ</strong>では、患者画面の「薬剤情報を確認」から開くアプリを登録します。URLに <span class="mono">{id}</span> を含めると、その患者さんのIDに置き換わります。</figcaption></figure><figure class="shot"><img loading="lazy" src="images/manual/0f0079efa1c9.jpg" alt="医師認証・署名権限"><figcaption><span class="cn">医師認証・署名権限</span>医師資格を登録すると、指示書や診療情報提供書に「医師資格確認済み」の署名レベルが付きます。<br>医師氏名、医籍登録番号（医師免許番号）、所属医療機関、登録年月日を入力して<strong>「プロフィール保存」</strong>を押し、<strong>「免許証画像アップロード」</strong>で免許証を登録します。</figcaption></figure></div>
+<div class="warn"><p><span class="warn-t">氏名や病名を外部アプリのURLに含めないでください。</span><br>
+ログに残ってしまう可能性があります。</p></div>
+
+<h3>署名レベルの違い</h3>
+<table>
+  <tr><th style="width:34%">レベル</th><th>意味</th></tr>
+  <tr><td>システム内署名</td><td>本人確認済みアカウントによる電子署名</td></tr>
+  <tr><td>医師資格確認済み</td><td>医籍登録番号と免許証が確認済みの医師による署名</td></tr>
+  <tr><td>HPKI電子署名</td><td>医療従事者公開鍵基盤（HPKI）による署名</td></tr>
+</table>
+<p style="font-size:13.5px;color:var(--ink-m);">
+画面上のバッジで、いまの状態（医師資格・組織所属・HPKI・多要素認証）が確認できます。</p>
+
+<h3>パスワードの変更</h3>
+<p>同じ設定画面の下のほうに、パスワード変更の欄があります。
+新しいパスワード（8文字以上）を2回入力して「パスワードを変更」を押してください。</p>
+</section><section id="s19"><h2><span class="n">19</span>Proプランを申し込む</h2><p class="goal"><span>この章でできること</span>Proプランを申し込み、カードの変更や解約ができるようになります。</p>
+<p class="lead">Proは、設定画面からカードを登録した時点で始まります。申込書のやりとりはありません。</p>
+
+<h3>申し込みの手順</h3>
+<ol>
+  <li>左上の三本線ボタンからメニューを開き、いちばん下の <strong>「設定」</strong> を押します。</li>
+  <li>画面を下にスクロールして <strong>「契約情報・決済」</strong> の欄まで進みます。</li>
+  <li><strong>「カード情報」</strong> の枠に、カード番号・有効期限・セキュリティコード・郵便番号を入力します。</li>
+  <li><strong>「Proプランを開始する」</strong> を押します。</li>
+  <li><strong>「決済設定完了」</strong> と表示されれば、その時点から Pro になります。</li>
+</ol>
+<div class="note"><p>カード番号は、入力欄から決済代行の仕組みへ直接送られます。
+ｍやるゼ！の画面には、登録後は <strong>ブランド名と下4桁</strong> だけが表示されます。</p></div>
+
+<h3>登録できたあとの画面</h3>
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/f2953a3d039f.jpg" alt="契約情報・決済"><figcaption><span class="cn">契約情報・決済</span><strong>現在の契約</strong>の欄に、月額、内訳、前回の請求月、登録済みカードの下4桁が並びます。<br>上の画面は「1名 × ¥200（税抜）＝ ¥220（税込・組織まとめ決済）」の例です。<br>右上の緑の <strong>「有効」</strong> が契約中の印です。</figcaption></figure></div>
+
+<h3>料金の考え方</h3>
+<table>
+  <tr><th style="width:34%">項目</th><th>内容</th></tr>
+  <tr><td>単価</td><td>1ユーザーあたり <strong>¥200／月（税抜）</strong>。お支払いは税込 <strong>¥220</strong></td></tr>
+  <tr><td>請求のしかた</td><td>法人単位でまとめて請求されます。職員が個別に契約する必要はありません</td></tr>
+  <tr><td>金額の決まり方</td><td>登録しているユーザー数 × ¥220（税込）。職員を増やすと、その分が加算されます</td></tr>
+  <tr><td>最低利用期間</td><td>ありません</td></tr>
+</table>
+
+<h3>カードを変えるとき</h3>
+<p>「現在の契約」の枠にある <strong>「変更」</strong> を押すと、カード入力欄が開きます。
+新しいカードを入力して保存すると差し替わります。
+差し替えた履歴は <strong>「▼ 契約履歴を表示」</strong> に残ります。</p>
+
+<h3>解約するとき</h3>
+<ol class="tight">
+  <li>同じ画面の <strong>「解約日を予約する」</strong> を押します。</li>
+  <li>解約は <strong>月末締め・当月末終了</strong> です。予約した月の末日まではProのまま使えます。</li>
+  <li>解約後 <strong>30日間</strong> は、データの閲覧と書き出しができます。</li>
+</ol>
+<div class="note"><p><strong>気が変わったら取り消せます。</strong>
+解約を予約すると、その欄が「解約予約を取消す」に変わります。末日が来る前に押せば、契約は続きます。</p></div>
+<div class="warn"><p><span class="warn-t">解約とアカウント削除は別のものです。</span><br>
+解約はProをやめてFreeに戻る手続きです。データは残ります。
+アカウント削除はデータごと消す手続きです。次の章をお読みください。</p></div>
+
+<h3>もう一度Proにするとき</h3>
+<p>解約済みの状態では、同じ欄に <strong>「再契約する（カード情報を入力）」</strong> が出ます。
+カードを入力し直せば再開できます。</p>
+</section><section id="s20"><h2><span class="n">20</span>アカウントを削除する</h2><p class="goal"><span>この章でできること</span>アカウントを削除するときの影響を理解し、手続きができるようになります。</p>
+<div class="warn"><p><span class="warn-t">この操作は取り消せません。</span><br>
+削除したデータは元に戻せません。作業の前に、下の「削除する前に」を必ずお読みください。</p></div>
+
+<div class="shots"><figure class="shot"><img loading="lazy" src="images/manual/aea7ac865086.jpg" alt="アカウントの削除"><figcaption><span class="cn">アカウントの削除</span>設定画面のいちばん下、赤い枠で囲まれた欄です。<br><strong>消えるものの件数が、その場で表示されます。</strong>上の画面では「スタッフ 0名／患者・利用者 20件／ケース 13件／同意書 8件／退院通知 4件／NDA 3件／帳票 4件」。ここに出ている数が、そのまま消えます。</figcaption></figure></div>
+
+<h3>あなたの立場によって、消える範囲が変わります</h3>
+<table>
+  <tr><th style="width:30%">立場</th><th>消えるもの</th></tr>
+  <tr><td><strong>法人の代表アカウント</strong><br>（<span class="mono">ADM-</span> のID）</td>
+      <td><strong>法人のデータが全部消えます。</strong>スタッフ、患者・利用者、ケース、同意書、退院通知、NDA、帳票のすべてです。
+      ほかの職員の方も使えなくなります</td></tr>
+  <tr><td><strong>職員のアカウント</strong><br>（<span class="mono">STF-</span> のID）</td>
+      <td>ご自身のアカウントだけが消えます。法人のデータは残ります</td></tr>
+</table>
+
+<h3>削除する前に</h3>
+<ol>
+  <li><strong>必要な書類を書き出してください。</strong>
+    同意書や各種帳票はPDFで出力できます。監査ログはCSVで出力できます（Pro）。
+    削除後は取り出せません。</li>
+  <li><strong>Proを契約中の場合、削除と同時に解約されます。</strong>
+    契約中のサブスクリプションは自動で止まります。別途の解約手続きは不要です。</li>
+  <li><strong>連携先への影響をご確認ください。</strong>
+    NDAを結んでいる法人や、同意書を共有している施術者との関係も切れます。
+    やりとりの途中であれば、先に相手へご連絡ください。</li>
+  <li><strong>「Proをやめたいだけ」の場合は、削除しないでください。</strong>
+    前の章の <strong>「解約日を予約する」</strong> をお使いください。Freeに戻るだけで、データは残ります。</li>
+</ol>
+
+<h3>削除のしかた</h3>
+<ol class="tight">
+  <li>メニューから <strong>「設定」</strong> を開きます。</li>
+  <li>いちばん下の赤い枠まで進みます。</li>
+  <li>消えるものの件数を確認します。</li>
+  <li><strong>「アカウントを削除する」</strong> を押します。</li>
+</ol>
+<p>アプリを開けない状態でも、ブラウザから手続きできます。<br>
+<code>https://myaruze.tamjump.com/delete-account.html</code></p>
+</section><section id="s21"><h2><span class="n">21</span>Free と Pro のちがい</h2>
+<table>
+  <tr><th style="width:44%">　</th><th class="c">Free</th><th class="c">Pro</th></tr>
+  <tr><td><strong>月額</strong></td><td class="c">無料</td>
+  <td class="c"><strong>¥200</strong>／ユーザー／月<br><span style="font-size:12px;color:var(--ink-m);">（税抜・お支払いは税込¥220）</span></td></tr>
+</table>
+<p style="font-size:13.5px;color:var(--ink-m);">お支払いは法人単位でまとめて請求されます。
+職員ごとに個別に契約する必要はありません。最低利用期間はありません。</p>
+
+<table>
+<tr><th style="width:44%">機能</th><th class="c">Free</th><th class="c">Pro</th></tr>
+<tr class="cat"><td colspan="3">基本機能</td></tr>
+<tr><td>スタッフ登録数</td><td class="c"><strong>50名まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>患者・利用者登録数</td><td class="c"><strong>100件まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>連携先法人（取引先）の登録数</td><td class="c"><strong>無制限</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>施術者の登録・招待</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>複数法人の切り替え</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>患者・利用者のCSV取込</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>スタッフごとの個別ログインID</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">受入れ・移行連携</td></tr>
+<tr><td>受入れ・移行ケース</td><td class="c"><strong>月1件まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>日程調整（候補提示・確定）</td><td class="c"><strong>ケース数に準ずる</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>退院通知の送信・受信</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>参加者の管理</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>退院時共同指導記録の自動生成</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">同意書・帳票</td></tr>
+<tr><td>訪問診療の同意書 兼 計画書</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>あん摩マッサージ指圧の同意書（療養費）</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>はり・きゅうの同意書（療養費）</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>医師・本人・ご家族の電子署名</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>施術者への共有</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>改ざん検知（ハッシュチェーン＋QR検証）</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>診療情報提供書</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>居宅療養管理指導</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>歯科診療・指示書</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>PDF出力</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">記録</td></tr>
+<tr><td>サービス担当者会議の記録</td><td class="c"><strong>月1件まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>モニタリング記録</td><td class="c"><strong>月1件まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>アセスメント</td><td class="c"><strong>月1件まで</strong></td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>施術報告書</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">オンライン通話</td></tr>
+<tr><td>通話URLの発行</td><td class="c no">—</td><td class="c"><strong>無制限</strong></td></tr>
+<tr><td>最大参加人数</td><td class="c no">—</td><td class="c"><strong>200人</strong></td></tr>
+<tr><td>1回あたりの通話時間</td><td class="c no">—</td><td class="c"><strong>制限なし</strong></td></tr>
+<tr><td>画面共有</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr><td>待機室（主催者が入室を許可）</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr><td>通話中のチャット</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr><td>通話の録画</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">管理・セキュリティ</td></tr>
+<tr><td>監査ログの閲覧</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>監査ログのCSV出力</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr><td>加算管理（算定記録）</td><td class="c no">—</td><td class="c yes">○</td></tr>
+<tr><td>NDA（取引先）管理</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>災害時モード</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr class="cat"><td colspan="3">サポート・契約</td></tr>
+<tr><td>メールサポート</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>セットアップ代行（別途有償）</td><td class="c yes">○</td><td class="c yes">○</td></tr>
+<tr><td>最低利用期間</td><td class="c"><strong>なし</strong></td><td class="c"><strong>なし</strong></td></tr>
+<tr><td>解約</td><td class="c no">—</td><td class="c"><strong>月末締め・当月末終了</strong></td></tr>
+<tr><td>解約後のデータ閲覧・書き出し</td><td class="c no">—</td><td class="c"><strong>30日間</strong></td></tr>
+</table>
+
+<p style="font-size:12.5px;color:var(--ink-m);line-height:1.8;">
+※ 表示価格はすべて税抜です。お支払いは税込 ¥220／ユーザー／月となります。<br>
+※ オンライン通話は Pro の機能です。Pro の法人が発行したURLをお渡しすれば、Free の方や ｍやるゼ！をご利用でない連携先も、その通話に参加していただけます。<br>
+※ Free の月次上限は暦月でリセットされます。<br>
+※ 解約は月末締め・当月末終了。解約後30日間はデータの閲覧・書き出しが可能です。<br>
+※ 正確な監査ログのため、スタッフごとに個別IDの発行を推奨します。</p>
+
+<h3>Proに切り替える</h3>
+<ol class="tight">
+  <li>メニューから <strong>「設定」</strong> を開きます。</li>
+  <li><strong>「契約情報・決済」</strong> を選びます。</li>
+  <li>クレジットカードの情報を登録すると、Proプランが始まります。</li>
+</ol>
+
+<h3>セットアップ代行（ご希望の方向け・別途有償）</h3>
+<p>ご自身でのセットアップも十分に可能ですが、初期導入をお手伝いするプランもご用意しています。</p>
+<table>
+  <tr><td>基本セットアップ（法人登録・種別設定・管理者アカウント作成）</td><td class="c" style="width:26%">¥19,800</td></tr>
+  <tr><td>スタッフ登録（10名まで）</td><td class="c">¥9,800</td></tr>
+  <tr><td>連携機関登録（10機関まで・NDAテンプレート含む）</td><td class="c">¥14,800</td></tr>
+  <tr><td>アセスメント項目のカスタマイズ</td><td class="c">¥14,800</td></tr>
+  <tr><td><strong>セットアップ一式パック</strong></td><td class="c"><strong>¥39,800</strong></td></tr>
+</table>
+<p style="font-size:12.5px;color:var(--ink-m);">※ 患者・利用者の個人情報は代行の範囲に含まれません（要配慮個人情報のため、貴機関でご入力ください）。</p>
+</section><section id="s22"><h2><span class="n">22</span>やりたいことから探す</h2>
+<p class="lead">「これがしたい」から、どこを開けばよいかを引ける表です。</p>
+<table>
+  <tr><th style="width:46%">やりたいこと</th><th>どこを開くか</th></tr>
+  <tr><td>患者・利用者を新しく登録したい</td><td>メニュー →「患者・利用者」→ 右上「＋ 新規登録」</td></tr>
+  <tr><td>患者を一覧からまとめて登録したい</td><td>メニュー →「患者・利用者」→ 右上「CSV取込」</td></tr>
+  <tr><td>職員を増やしたい</td><td>メニュー →「スタッフ管理」→「招待リンクを発行」</td></tr>
+  <tr><td>退院・入所の調整を始めたい</td><td>患者を開く →「② 受入れ・移行」→「＋ 新規ケース」</td></tr>
+  <tr><td>面談の日程を決めたい</td><td>ケースを開く →「日程調整」タブ</td></tr>
+  <tr><td>ビデオ通話をしたい</td><td>ケースを開く →「通話」タブ →「主催者として開始」</td></tr>
+  <tr><td>通話のURLを相手に送りたい</td><td>ケースを開く →「通話」タブ →「URLをコピー」</td></tr>
+  <tr><td>通話のURLを作り直したい</td><td>ケースを開く →「通話」タブ →「URLを再生成」</td></tr>
+  <tr><td>会議の記録をつくりたい</td><td>ケースを開く →「通話終了 → 記録を自動生成」→ 内容を確認して保存</td></tr>
+  <tr><td>同意書を発行したい</td><td>メニュー →「同意書」→「① 同意書を発行」</td></tr>
+  <tr><td>発行した同意書を見たい・PDFにしたい</td><td>メニュー →「同意書」→「② 発行済み同意書を見る」</td></tr>
+  <tr><td>同意書の入力を中断したい</td><td>入力画面の下「一時保存」→ 下書き一覧から再開</td></tr>
+  <tr><td>医師に署名してもらいたい</td><td>同意書の発行画面 →「発行する（医師署名へ進む）」</td></tr>
+  <tr><td>ご家族に離れた場所で署名してもらいたい</td><td>同意書の画面 →「本人・家族へ署名依頼」</td></tr>
+  <tr><td>自分あてに届いた署名依頼を見たい</td><td>メニュー →「同意書」→「④ 受信した署名依頼」</td></tr>
+  <tr><td>診療情報提供書を作りたい</td><td>メニュー →「診療情報提供書」</td></tr>
+  <tr><td>居宅療養管理指導を記録したい</td><td>メニュー →「居宅療養管理指導」</td></tr>
+  <tr><td>歯科の指示書・提供書を作りたい</td><td>メニュー →「歯科診療・指示書」</td></tr>
+  <tr><td>退院通知を送りたい</td><td>メニュー →「退院通知」→「退院通知を発行する」</td></tr>
+  <tr><td>他の法人と契約を結びたい</td><td>メニュー →「NDA管理」→ NDAを発行</td></tr>
+  <tr><td>施術者を登録したい</td><td>メニュー →「同意書」→ 施術者の登録・招待</td></tr>
+  <tr><td>算定の対象を確認したい</td><td>メニュー →「加算管理」</td></tr>
+  <tr><td>誰が何をしたか調べたい</td><td>患者を開く →「⑥ 記録・監査」／ケースの「監査ログ」タブ</td></tr>
+  <tr><td>Proに切り替えたい</td><td>メニュー →「設定」→「契約情報・決済」</td></tr>
+  <tr><td>カードを変えたい</td><td>メニュー →「設定」→「契約情報・決済」→「変更」</td></tr>
+  <tr><td>解約したい</td><td>メニュー →「設定」→「契約情報・決済」→「解約日を予約する」</td></tr>
+  <tr><td>パスワードを変えたい</td><td>メニュー →「設定」→ パスワード変更の欄</td></tr>
+  <tr><td>医師の資格を登録したい</td><td>メニュー →「設定」→「医師認証・署名権限」</td></tr>
+  <tr><td>別の法人に切り替えたい</td><td>メニュー下部 →「＋ 別の法人・施設を連携」</td></tr>
+  <tr><td>アカウントを消したい</td><td>メニュー →「設定」→ いちばん下の赤い枠</td></tr>
+</table>
+</section><section id="s23"><h2><span class="n">23</span>困ったときは</h2><div class="qa"><div class="q">ログインIDを忘れました</div><p class="a">登録時に届いたメールに書かれています。管理者の方は件名「【ｍやるゼ！】メールアドレスの確認」、職員の方は「【ｍやるゼ！】スタッフ登録完了 - あなたのログインID」をお探しください。</p></div><div class="qa"><div class="q">パスワードを忘れました</div><p class="a">ログイン画面の下にある「パスワードを忘れた」から再設定してください。</p></div><div class="qa"><div class="q">「メールアドレスが未確認です」と出てログインできません</div><p class="a">確認メールのリンクをまだ押していない状態です。画面に出る「確認メールを再送する」を押して、届いたメールのボタンを押してください。</p></div><div class="qa"><div class="q">確認メールが届きません</div><p class="a">迷惑メールフォルダをご確認ください。メールの受信制限をかけている場合は、tamjump.com からのメールを受け取れる設定にしてください。</p></div><div class="qa"><div class="q">画面が古いままで、新しい機能が出てきません</div><p class="a">ブラウザでお使いの場合は、画面を強制的に読み込み直してください。パソコンなら <span class="mono">Ctrl</span> ＋ <span class="mono">F5</span>、スマートフォンなら一度アプリを閉じてから開き直してください。</p></div><div class="qa"><div class="q">メニューが出てきません</div><p class="a">画面の左上にある青い三本線のボタンを押してください。パソコンでは左側に最初から表示されています。</p></div><div class="qa"><div class="q">通話に相手が入ってこられません</div><p class="a">この通話は、主催者が許可した方だけが入れる設定になっています。主催者は「主催者として開始」から入室してください。参加者が待っていると許可を求める表示が出ますので、そこで許可してください。</p></div><div class="qa"><div class="q">相手も ｍやるゼ！に登録していないと通話できませんか</div><p class="a">いいえ。URLをお渡しすれば、登録していない方でも参加できます。ただし通話を主催するには Pro が必要です。</p></div><div class="qa"><div class="q">同意書の入力を途中でやめたい</div><p class="a">「一時保存」を押してください。下書きの一覧から、いつでも同じところから再開できます。</p></div><div class="qa"><div class="q">発行した同意書が本物かどうかを相手に示したい</div><p class="a">発行済み同意書に付いているQRコードを読み取っていただくと、発行時から内容が変わっていないかを第三者でも確認できます。</p></div><div class="qa"><div class="q">退院通知が特定の事業所に送れません</div><p class="a">その事業所とのNDAがまだ締結されていない可能性があります。「NDA管理」で状況をご確認ください。</p></div><div class="qa"><div class="q">IDは1人に1つ必要ですか</div><p class="a">はい、職員ごとの発行を推奨しています。監査ログに「誰が操作したか」を正しく残すためです。</p></div><div class="qa"><div class="q">病院だけ、施設だけでも導入できますか</div><p class="a">できます。連携先が ｍやるゼ！を使っていなくても、通話への参加や書類の受け取りは可能です。</p></div><div class="qa"><div class="q">個人でも登録できますか</div><p class="a">登録は法人・事業所の単位です。個人名義では登録できません。</p></div><div class="qa"><div class="q">Freeのまま使い続けられますか</div><p class="a">はい。期限はありません。上限の範囲であれば、そのままお使いいただけます。</p></div><div class="qa"><div class="q">解約するとデータはどうなりますか</div><p class="a">解約は月末締め・当月末終了です。解約後30日間は、データの閲覧と書き出しができます。</p></div><div class="qa"><div class="q">アカウントを削除したい</div><p class="a">こちらのページからお手続きいただけます。<br><code>https://myaruze.tamjump.com/delete-account.html</code></p></div></section><section id="s24"><h2><span class="n">24</span>用語集</h2>
+<table>
+  <tr><th style="width:26%">ことば</th><th>意味</th></tr>
+  <tr><td>ログインID</td><td>ログインに使う記号です。管理者は <span class="mono">ADM-</span>、職員は <span class="mono">STF-</span>、施術者は <span class="mono">THR-</span> で始まります。登録時のメールに書かれています</td></tr>
+  <tr><td>法人</td><td>ｍやるゼ！では、病院・施設・事業所の単位を「法人」と呼びます。データはこの単位で分かれます</td></tr>
+  <tr><td>管理者</td><td>法人を登録した方です。職員の招待や、契約・決済の手続きができます</td></tr>
+  <tr><td>患者ハブ</td><td>患者さんを開いたときの画面のことです。7つのタブが並びます</td></tr>
+  <tr><td>ケース</td><td>ひとつの退院・入所の調整のまとまりです。日程調整から記録までがこの中に入ります</td></tr>
+  <tr><td>アセスメント</td><td>受入れの前に行う評価です。心身の状態、医療処置、リスク、ご家族の意向などを確認します</td></tr>
+  <tr><td>モニタリング</td><td>サービス開始後の状態確認です。月ごとに記録します</td></tr>
+  <tr><td>サービス担当者会議</td><td>ケアプランの作成・変更のために、関係する事業所が集まる会議です</td></tr>
+  <tr><td>共同指導</td><td>退院前に、病院と在宅側が一緒に患者さん・ご家族へ説明・指導を行うことです</td></tr>
+  <tr><td>主催者</td><td>通話を開く側の人です。待機している方の入室を許可できます</td></tr>
+  <tr><td>待機室</td><td>URLを知っていても、主催者が許可するまで入れない仕組みです</td></tr>
+  <tr><td>NDA</td><td>秘密保持契約のことです。他の法人と患者情報をやりとりする前に結びます</td></tr>
+  <tr><td>監査ログ</td><td>誰が・いつ・何をしたかの履歴です。実地指導や監査のときに示せます</td></tr>
+  <tr><td>電子署名</td><td>本人にしか作れない鍵で行う署名です。実印や自署にあたります</td></tr>
+  <tr><td>タイムスタンプ</td><td>その時刻にその内容で存在したことを証明する仕組みです。公証役場の確定日付にあたります</td></tr>
+  <tr><td>ハッシュチェーン</td><td>発行済みの書類を時系列でつなぎ、あとから差し替えると分かるようにする仕組みです</td></tr>
+  <tr><td>療養費同意書</td><td>はり・きゅう、あん摩マッサージ指圧を保険で受けるために、医師が交付する同意書です</td></tr>
+  <tr><td>あマ指</td><td>あん摩・マッサージ・指圧の略です</td></tr>
+  <tr><td>施術者</td><td>訪問マッサージ、はり・きゅうを行う方です。事業所の職員ではなく、独立したアカウントとして登録します</td></tr>
+  <tr><td>加算管理</td><td>算定の対象になる書類を月ごとに集計する画面です</td></tr>
+  <tr><td>Free／Pro</td><td>料金プランです。Freeは無料で上限つき、Proは月額で上限なしです</td></tr>
+</table>
+</section><section id="s25"><h2><span class="n">25</span>お問い合わせ</h2>
+<p>このガイドで解決しないことがありましたら、メールでご連絡ください。</p>
+<p class="mailbig">info@tamjump.com</p>
+<p style="font-size:13.5px;color:var(--ink-m);">
+お問い合わせの際は、<strong>ログインID</strong>（<span class="mono">ADM-</span> または <span class="mono">STF-</span> から始まるID）と、
+<strong>お使いの端末</strong>（Android／iPhone／パソコン）、
+<strong>画面に出ているメッセージ</strong>をあわせてお知らせいただけると、やりとりが早く済みます。</p>
+
+<h3>QRコード一覧</h3>
+<p style="font-size:13.5px;color:var(--ink-m);">このページを印刷して掲示していただいても構いません。</p>
+<div class="qrpair">
+  <span class="qrbox"><img loading="lazy" src="images/manual/ba39fea33220.svg" alt=""><span>Android<br>Google Play</span></span>
+  <span class="qrbox"><img loading="lazy" src="images/manual/bd5c389f51ca.svg" alt=""><span>iPhone・パソコン<br>myaruze.tamjump.com</span></span>
+</div>
+</section>
+<footer class="foot">
+  <p style="margin-bottom:6px;"><strong>ｍやるゼ！</strong>　<span class="mono">https://myaruze.tamjump.com</span></p>
+  <p style="margin-bottom:6px;">お問い合わせ：info@tamjump.com</p>
+  <p style="margin:0;">タムジ株式会社</p>
+</footer>
+
+</div></body></html>
