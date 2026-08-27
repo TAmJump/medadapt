@@ -4498,27 +4498,24 @@ function consentNewPage(){
   void dInp;
 
   // 症状・傷病（チェック）→ 傷病名へ自動反映。各傷病に正式な修飾欄（部位/椎間/左右）を付与。
-  // 修飾の種類: lat=□両/右/左、lumbar=□L1〜L4、site=□躯幹/右上肢/左上肢/右下肢/左下肢（あマ指 公式 施術部位）
+  // 修飾の種類: lat=□両側/右/左、lumbar=□L1〜L4、
+  //   site=□躯幹/右上肢/左上肢/右下肢/左下肢（あマ指 公式 施術部位）、
+  //   limb=□右上肢/右下肢/左上肢/左下肢（躯幹を含まない四肢のみ）
   const REASON_CFG=[
     {name:'肩関節周囲炎', mod:'lat'},
     {name:'変形性膝関節症', mod:'lat'},
     {name:'腰痛症', mod:'lumbar'},
-    {name:'変形性腰椎症', mod:'lumbar'},
+    {name:'腰椎圧迫骨折', mod:'lumbar'},
     {name:'脊柱管狭窄症', mod:'lumbar'},
-    {name:'関節リウマチ', mod:null},
-    {name:'頸肩腕症候群', mod:null},
+    {name:'頸肩腕症候群', mod:'lat'},
     {name:'頸椎捻挫後遺症', mod:null},
-    {name:'五十肩', mod:'lat'},
-    {name:'脳梗塞・脳梗塞後遺症', mod:null},
-    {name:'脳出血・脳出血後遺症', mod:null},
-    {name:'麻痺', mod:'site'},
-    {name:'神経痛', mod:'site'},
+    {name:'脳梗塞後遺症', mod:'limb'},
+    {name:'脳出血後遺症', mod:'limb'},
+    {name:'神経痛', mod:'limb'},
     {name:'関節拘縮', mod:'site'},
-    {name:'筋麻痺', mod:'site'},
-    {name:'パーキンソン', mod:null},
     {name:'その他', mod:null}
   ];
-  const MOD_OPTS={lat:['両','右','左'], lumbar:['L1','L2','L3','L4'], site:['躯幹','右上肢','左上肢','右下肢','左下肢']};
+  const MOD_OPTS={lat:['両側','右','左'], lumbar:['L1','L2','L3','L4'], site:['躯幹','右上肢','左上肢','右下肢','左下肢'], limb:['右上肢','右下肢','左上肢','左下肢']};
   const reasonNames=REASON_CFG.map(r=>r.name);
 
   // チェック内容から傷病名テキストを再構築（手入力の追記行は保持）
