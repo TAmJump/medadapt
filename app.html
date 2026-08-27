@@ -2294,7 +2294,7 @@ function caseScheduleTab(c){const w=h('div');w.appendChild(h('h3',{style:{fontSi
 function caseCallTab(c){const w=h('div');
 const panel=h('div',{style:{background:'#fff',border:'2px solid #0891b2',borderRadius:'16px',padding:'20px'}});
 panel.appendChild(h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}},
-  h('div',{style:{fontSize:'15px',fontWeight:'800',color:'var(--ink)'}},'オンライン共同指導'),
+  h('div',{style:{fontSize:'15px',fontWeight:'800',color:'var(--ink)'}},'オンライン通話'),
   h('div',{style:{padding:'3px 10px',borderRadius:'100px',border:'1px solid #0891b2',color:'#0891b2',fontSize:'11px',fontWeight:'700'}},'Whereby')
 ));
 if(c.callUrl){
@@ -2804,7 +2804,7 @@ function showCallModal(url, onStart){
   ov.style.cssText='position:fixed;inset:0;background:#000;z-index:9999;display:flex;flex-direction:column;';
   const bar=document.createElement('div');
   bar.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#0c4a6e;color:#fff;flex-shrink:0;';
-  bar.innerHTML='<span style="font-weight:700;font-size:14px;">オンライン共同指導 - Whereby</span>';
+  bar.innerHTML='<span style="font-weight:700;font-size:14px;">オンライン通話 - Whereby</span>';
   const closeBtn=document.createElement('button');
   closeBtn.textContent='通話を終了して戻る';
   closeBtn.style.cssText='background:#dc2626;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;';
