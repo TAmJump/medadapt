@@ -472,7 +472,7 @@
  *   consent_date_jp: { year: 8, month: 5, day: 24 },  // 令和8年5月24日 = 2026-05-24
  *   patient: {
  *     address: '埼玉県...',
- *     name: '田中 タムジ',
+ *     name: '田中 太郎',
  *     phone: '048-xxx-xxxx'
  *   },
  *   clinic: { name, address, tel, fax } | null  // null 時は医療法人コンパス既定値
@@ -718,8 +718,8 @@ if (window.location.search.includes('demo=1')) {
     chain_index: 1,
     qr_image_base64: '',
     doc_title: '訪問診療同意書　兼　計画書',
-    addressee: '医療法人タムジ',
-    addressee_detail: { address: '東京都中央区東日本橋3-3-17', tel: '03-0000-0000' },
+    addressee: '医療法人〇〇会',
+    addressee_detail: { address: '東京都練馬区豊玉北1-2-3', tel: '03-0000-0000' },
     diseases: ['変形性膝関節症（右）', '腰痛症', '脳梗塞後遺症'],
     visit_plan: '年２回（６か月に１回）',
     difficulty_reasons: {
@@ -731,7 +731,7 @@ if (window.location.search.includes('demo=1')) {
     consent_date_jp: { year: 8, month: 5, day: 24 },
     patient: {
       address: '埼玉県さいたま市大宮区桜木町4-1-1',
-      name: '田中 タムジ',
+      name: '田中 太郎',
       phone: '048-000-0000'
     },
     signature: { signed_at: '2026-05-24T10:00:00+09:00', signer_label: '後藤 基温　医師（医療法人コンパス）' },

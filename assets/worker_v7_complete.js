@@ -108,7 +108,7 @@ async function handleRequest(request, env, json, err) {
             <a href="${verifyUrl}" style="display:inline-block;padding:12px 24px;background:#0891b2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;margin:16px 0;">メールアドレスを確認する</a>
             <p style="font-size:12px;color:#666;">このリンクは24時間有効です。</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-            <p style="font-size:11px;color:#999;">タムジ.Corp | ｍやるゼ！ 医療介護連携OS</p>
+            <p style="font-size:11px;color:#999;">株式会社GMS | ｍやるゼ！ 医療介護連携OS</p>
           </div>
         `
       });
@@ -367,7 +367,7 @@ async function handleRequest(request, env, json, err) {
               <p style="font-size:13px;">医師が署名した同意書が共有されると、アプリに届きます。施術のもとでご本人・ご家族の署名を取得してください。</p>
               <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.tamjump.com/app.html</p>
               <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-              <p style="font-size:11px;color:#999;">タムジ.Corp | ｍやるゼ！ 医療介護連携OS</p>
+              <p style="font-size:11px;color:#999;">株式会社GMS | ｍやるゼ！ 医療介護連携OS</p>
             </div>
           `
         });
@@ -1083,7 +1083,7 @@ async function handleRequest(request, env, json, err) {
               <a href="${inviteUrl}" style="display:inline-block;padding:12px 24px;background:#0891b2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;margin:16px 0;">施術者アカウントを作成する</a>
               <p style="font-size:12px;color:#666;">このリンクは7日間有効です。</p>
               <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-              <p style="font-size:11px;color:#999;">タムジ.Corp | ｍやるゼ！ 医療介護連携OS</p>
+              <p style="font-size:11px;color:#999;">株式会社GMS | ｍやるゼ！ 医療介護連携OS</p>
             </div>
           `
         });
