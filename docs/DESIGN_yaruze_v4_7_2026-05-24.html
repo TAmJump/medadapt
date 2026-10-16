@@ -310,7 +310,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <tr><td>partners.renewal/terminate_*</td><td>contract継続/終了申請カラム追加</td><td>v7</td></tr>
 <tr><td>partner_invitations</td><td>セルフ登録招待（Phase 4-3b）</td><td>v8</td></tr>
 <tr><td>consent_records</td><td>反社条項・利用規約 同意記録</td><td>v8</td></tr>
-<tr><td>partner_notifications</td><td>タムジ→Master/Reseller の通知</td><td>v9</td></tr>
+<tr><td>partner_notifications</td><td>GMS→Master/Reseller の通知</td><td>v9</td></tr>
 <tr><td>audit_logs</td><td>全操作の監査ログ。cron実行ログも記録</td><td>v1</td></tr>
 </table>
 
@@ -326,9 +326,9 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <tr><td>partner-register.html</td><td>リセラーセルフ登録（招待リンク経由）</td></tr>
 <tr><td>partner-dashboard.html</td><td>リセラーのダッシュボード（顧客数・契約数・当月売上）</td></tr>
 <tr><td>partner-account.html</td><td>リセラー側アカウント設定</td></tr>
-<tr><td>partner-notifications.html</td><td>タムジからの通知一覧</td></tr>
+<tr><td>partner-notifications.html</td><td>GMSからの通知一覧</td></tr>
 <tr><td>partner-forgot-password.html / partner-reset-password.html</td><td>partners の PW リセット</td></tr>
-<tr><td>admin-dashboard.html</td><td>タムジ管理者用ダッシュボード（partners 一覧・売上・申請対応）</td></tr>
+<tr><td>admin-dashboard.html</td><td>GMS管理者用ダッシュボード（partners 一覧・売上・申請対応）</td></tr>
 <tr><td>purchase.html</td><td>Square Web Payments SDK 統合（Phase 3f モック実装）</td></tr>
 <tr><td>lp.html</td><td>未ログイン時のランディング</td></tr>
 <tr><td>guide.html</td><td>操作ガイド</td></tr>
@@ -363,11 +363,11 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 
 <h3>3-6. リセラー機構の運用フロー</h3>
 <pre>
-[Master Reseller 招待] タムジ admin が partner_invitations 発行
+[Master Reseller 招待] GMS admin が partner_invitations 発行
   ↓ メール送信（SES）
 [セルフ登録] partner-register.html で法人情報入力 + 同意記録
   ↓
-[タムジ admin 承認] approved_at セット → partners.status='active' / SUP-XXXXXX 採番
+[GMS admin 承認] approved_at セット → partners.status='active' / SUP-XXXXXX 採番
   ↓
 [Reseller を Master Reseller が招待] /api/partner/invitations
   ↓
@@ -382,7 +382,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
   ↓
 [partner-dashboard.html] 当月売上を表示
   ↓
-[タムジが手動で支払い] revenue_ledger.status='paid' に更新
+[GMSが手動で支払い] revenue_ledger.status='paid' に更新
 </pre>
 
 <div class="urgent">
@@ -518,7 +518,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <h3>6-1. 用語統一辞書（v2.10 で確定）</h3>
 <table>
 <tr><th>表示用語</th><th>意味</th><th>内部識別子（変更不可）</th></tr>
-<tr><td>Master Reseller</td><td>タムジ直契約の総代理店</td><td>type='super' / SUP-XXXXXX / sub_agents / parent_partner_id</td></tr>
+<tr><td>Master Reseller</td><td>GMS直契約の総代理店</td><td>type='super' / SUP-XXXXXX / sub_agents / parent_partner_id</td></tr>
 <tr><td>Reseller</td><td>Master Reseller の下に属する代理店</td><td>type='agent' / AGT-XXXXXX</td></tr>
 <tr><td>ご紹介先企業</td><td>Reseller / Master Reseller 経由のエンドユーザー会社</td><td>master_companies（partner_code 紐付）</td></tr>
 <tr><td>ご担当の Master Reseller</td><td>Reseller から見た親 Master Reseller</td><td>parent_partner_id</td></tr>
@@ -526,8 +526,8 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 
 <h3>6-2. 階層構造</h3>
 <pre>
-タムジ（プラットフォーマー）
-  ├─ Master Reseller A（SUP-000001・タムジ直契約）
+GMS（プラットフォーマー）
+  ├─ Master Reseller A（SUP-000001・GMS直契約）
   │   ├─ Reseller A-1（AGT-000001・parent_partner_id=SUP-000001）
   │   ├─ Reseller A-2（AGT-000002）
   │   └─ ご紹介先企業（master_companies.partner_code='SUP-000001'）
@@ -535,9 +535,9 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
   ├─ Master Reseller B（SUP-000002）
   │   └─ Reseller B-1
   │
-  └─ タムジ直販（partner_code=NULL のエンドユーザー）
+  └─ GMS直販（partner_code=NULL のエンドユーザー）
 
-支払い：タムジは Master Reseller にしか直接支払わない（Reseller への支払いは Master Reseller が行う）
+支払い：GMSは Master Reseller にしか直接支払わない（Reseller への支払いは Master Reseller が行う）
        ＝ revenue_ledger.partner_code は常に SUP-XXXXXX
 </pre>
 
@@ -547,7 +547,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <tr><td class="label">挙動</td><td>master_companies.partner_code に値をセット + partner_code_locked_at = NOW</td></tr>
 <tr><td class="label">ロック条件</td><td>partner_code_locked_at が NULL でないなら 409 Conflict（変更不可）</td></tr>
 <tr><td class="label">バリデーション</td><td>SUP-XXXXXX または AGT-XXXXXX 形式 + partners テーブルに status='active' で存在</td></tr>
-<tr><td class="label">未claim 状態</td><td>partner_code = NULL → タムジ直販扱い</td></tr>
+<tr><td class="label">未claim 状態</td><td>partner_code = NULL → GMS直販扱い</td></tr>
 </table>
 
 <h3>6-4. 後付け連携の正規フロー（ユーザー設計の核）</h3>
@@ -579,8 +579,8 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <h3>6-5. ★ 子→親 subscription 同期パイプ（タスク3 で実装・§22 で完全設計）</h3>
 <div class="urgent">
 <strong>現状：</strong>子（ｔ・ｍ）の B-2方式 課金は子 DB の subscriptions に記録されるが、親 adapt-db.subscriptions に同期されていない。<br>
-<strong>影響：</strong>partner-dashboard.html の集計（adapt-db.subscriptions と revenue_ledger ベース）に売上が出ない。タムジ直販扱いになる。<br>
-<strong>ユーザー指摘：</strong>「決済機能も中途半端に止まっちゃってる」「タムジ製品（今はｔとｍのみ）を販売した時に、ダッシュボードで管理できる」← これを実現するための連携。<br>
+<strong>影響：</strong>partner-dashboard.html の集計（adapt-db.subscriptions と revenue_ledger ベース）に売上が出ない。GMS直販扱いになる。<br>
+<strong>ユーザー指摘：</strong>「決済機能も中途半端に止まっちゃってる」「GMS製品（今はｔとｍのみ）を販売した時に、ダッシュボードで管理できる」← これを実現するための連携。<br>
 <strong>v25 でこのタスクに着手する</strong>。詳細設計は §22 参照。
 </div>
 
@@ -1135,10 +1135,10 @@ pending_member_changes (
 <tr><td>partner 招待</td><td>GET /api/partner-invitations/info</td><td>招待情報取得</td></tr>
 <tr><td>partner 招待</td><td>POST /api/partner-invitations/verify-corporate-number</td><td>法人番号検証</td></tr>
 <tr><td>partner 招待</td><td>POST /api/partner-invitations/accept</td><td>招待受諾＋登録</td></tr>
-<tr><td>admin</td><td>GET /api/admin/summary</td><td>タムジ admin ダッシュボード集計</td></tr>
+<tr><td>admin</td><td>GET /api/admin/summary</td><td>GMS admin ダッシュボード集計</td></tr>
 <tr><td>admin</td><td>GET /api/admin/partners</td><td>partners 一覧</td></tr>
 <tr><td>admin</td><td>POST /api/admin/partners</td><td>partner 新規登録（手動）</td></tr>
-<tr><td>admin</td><td>POST /api/admin/notify</td><td>タムジ→partner 通知送信</td></tr>
+<tr><td>admin</td><td>POST /api/admin/notify</td><td>GMS→partner 通知送信</td></tr>
 <tr><td>admin</td><td>GET /api/admin/notifications</td><td>通知一覧</td></tr>
 <tr><td>admin</td><td>POST /api/admin/partner-invitations</td><td>招待発行（admin 経由）</td></tr>
 <tr><td>admin</td><td>GET /api/admin/partner-invitations</td><td>招待一覧</td></tr>
@@ -1319,11 +1319,11 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 
 <h3>13-6. Play Console</h3>
 <table>
-<tr><td class="label">デベロッパー名</td><td>TAmJ.Corp（旧タムジ株式会社）</td></tr>
+<tr><td class="label">デベロッパー名</td><td>株式会社GMS</td></tr>
 <tr><td class="label">アカウント ID</td><td>8531951863872577016</td></tr>
 <tr><td class="label">メール</td><td>animalb001@gmail.com</td></tr>
 <tr><td class="label">本人確認</td><td>完了</td></tr>
-<tr><td class="label">住所</td><td>東京都中央区東日本橋3-3-17 Re-Know4B</td></tr>
+<tr><td class="label">住所</td><td>〒176-0013 東京都練馬区豊玉中三丁目7番5号</td></tr>
 <tr><td class="label">公開連絡先</td><td>info@tamjump.com</td></tr>
 </table>
 
@@ -1481,7 +1481,7 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 <tr><td>やるゼ！（親）</td><td>プラットフォーム本体</td><td>Adapt / Adavoo / adapt</td><td>adapt-api / adapt-db / TAmJump/adapt</td></tr>
 <tr><td>ｔやるゼ！</td><td>子：施設設備管理</td><td>OneTouchAdapt / Touchvoo / touchadapt</td><td>onetouch-api / onetouch-db / TAmJump/onetouch_app</td></tr>
 <tr><td>ｍやるゼ！</td><td>子：医療介護連携</td><td>MedAdapt / Medvoo / medadapt</td><td>medadapt-api-v2 / medadapt-db / TAmJump/medadapt</td></tr>
-<tr><td>Master Reseller</td><td>タムジ直契約の総代理店</td><td>総代理店</td><td>type='super' / SUP-XXXXXX</td></tr>
+<tr><td>Master Reseller</td><td>GMS直契約の総代理店</td><td>総代理店</td><td>type='super' / SUP-XXXXXX</td></tr>
 <tr><td>Reseller</td><td>Master Reseller 配下の代理店</td><td>代理店 / パートナー代理店 / 配下代理店</td><td>type='agent' / AGT-XXXXXX</td></tr>
 <tr><td>ご紹介先企業</td><td>Reseller / Master Reseller 経由のエンドユーザー会社</td><td>配下エンドユーザー</td><td>master_companies (partner_code 紐付)</td></tr>
 <tr><td>ご担当の Master Reseller</td><td>Reseller から見た親 Master Reseller</td><td>所属総代理店</td><td>parent_partner_id</td></tr>
@@ -1805,7 +1805,7 @@ git push origin main
 <li>partner-dashboard.html（Master Reseller / Reseller）に当月売上が表示される</li>
 <li>毎月1日 00:05 JST の <code>ledger_monthly_close</code> Cron が前月分を集計し、<code>revenue_ledger</code> に INSERT</li>
 <li>Master Reseller への手数料支払い計算が正しく動く</li>
-<li>タムジ admin の admin-dashboard.html で総合売上が見える</li>
+<li>GMS admin の admin-dashboard.html で総合売上が見える</li>
 </ol>
 
 <h3>22-2. 既存実装の調査結果（タスク3 着手前に確認すべき事項）</h3>
@@ -2277,7 +2277,7 @@ async function backfillSubscriptionAfterLink(env, master_company_id, app_name, c
 <table>
 <tr><th>カラム</th><th>記録された値</th><th>意味</th></tr>
 <tr><td>subscription_id</td><td><code>SUB-e92bf1b00677</code></td><td>親側で <code>'SUB-' + randomId(12)</code> で生成された ID</td></tr>
-<tr><td>master_company_id</td><td><code>ADP-000001</code></td><td>タムジ株式会社（親 master_companies の company_id）</td></tr>
+<tr><td>master_company_id</td><td><code>ADP-000001</code></td><td>株式会社GMS（親 master_companies の company_id）</td></tr>
 <tr><td>app_name</td><td><code>medadapt</code></td><td>子の種別</td></tr>
 <tr><td>partner_code</td><td><code>SUP-000001</code></td><td>v25 で claim した sup-test の Master Reseller コード（NULL ではない）</td></tr>
 <tr><td>status</td><td><code>active</code></td><td>子で課金成立状態</td></tr>
@@ -2313,7 +2313,7 @@ async function backfillSubscriptionAfterLink(env, master_company_id, app_name, c
 <tr><td>UNIQUE INDEX idx_subs_company_app</td><td><span class="badge-done">adapt-db 追加済</span></td><td>SQL：<code>CREATE UNIQUE INDEX IF NOT EXISTS idx_subs_company_app ON subscriptions(master_company_id, app_name);</code></td></tr>
 <tr><td>Service Binding ADAPT_SVC（medadapt-api-v2）</td><td><span class="badge-done">追加済</span></td><td>medadapt-api-v2 → adapt-api / Variable name=ADAPT_SVC<br>同一 Cloudflare アカウント内 Worker 間の通常 fetch は <strong>Error 1042</strong> で遮断されるため必須</td></tr>
 <tr><td>Service Binding ADAPT_SVC（onetouch-api）</td><td><span class="badge-done">既存（v24 以前から存在）</span></td><td>SSO verify 用に既設定。タスク3 でも再利用</td></tr>
-<tr><td>master_companies.partner_code claim</td><td><span class="badge-done">タムジ株式会社で claim 済</span></td><td>company_id=<code>ADP-000001</code> / partner_code=<code>SUP-000001</code> / partner_code_locked_at=<code>2026-05-06 05:43:55</code></td></tr>
+<tr><td>master_companies.partner_code claim</td><td><span class="badge-done">株式会社GMSで claim 済</span></td><td>company_id=<code>ADP-000001</code> / partner_code=<code>SUP-000001</code> / partner_code_locked_at=<code>2026-05-06 05:43:55</code></td></tr>
 <tr><td>partner_code が NULL のままだった原因</td><td>—</td><td>partner-register フローを経由していないテストデータ（直販扱い）。v25 で D1 Console の UPDATE で claim</td></tr>
 </table>
 
@@ -2444,8 +2444,8 @@ Square Web Payments SDK のカードフォームに ZIP 欄が出るが、日本
 
 <table>
 <tr><th>テーブル</th><th>状態</th></tr>
-<tr><td>adapt-db.master_companies</td><td><code>ADP-000001</code> タムジ株式会社 / partner_code=<code>SUP-000001</code> claim 済 / partner_code_locked_at=2026-05-06 05:43:55</td></tr>
-<tr><td>adapt-db.master_staff</td><td><code>ADP-STF-000001</code> / login_id=（タムジ admin）/ master_company_id=ADP-000001</td></tr>
+<tr><td>adapt-db.master_companies</td><td><code>ADP-000001</code> 株式会社GMS / partner_code=<code>SUP-000001</code> claim 済 / partner_code_locked_at=2026-05-06 05:43:55</td></tr>
+<tr><td>adapt-db.master_staff</td><td><code>ADP-STF-000001</code> / login_id=（GMS admin）/ master_company_id=ADP-000001</td></tr>
 <tr><td>adapt-db.app_links</td><td>2 件 linked：<br>(medadapt, ADM-TIGER, ADP-STF-000001)<br>(onetouch, TEST1-admin, ADP-STF-000001)</td></tr>
 <tr><td>adapt-db.subscriptions</td><td>1 件：<code>SUB-e92bf1b00677</code> / ADP-000001 / medadapt / SUP-000001 / active / seat_count=1 / square_subscription_id=efffa9b3-...</td></tr>
 <tr><td>adapt-db.partners</td><td>2 件：<code>SUP-000001</code> sup-test（super）/ <code>AGT-000001</code> agt-test（agent）</td></tr>
@@ -2966,20 +2966,20 @@ const tokenResult = await card.tokenize(opts);</pre>
 <h4>master_companies テーブル（実データ）</h4>
 <table>
 <tr><th>company_id</th><th>name</th><th>email</th><th>partner_code</th><th>備考</th></tr>
-<tr><td><code>ADP-000001</code></td><td>タムジ株式会社</td><td>info@tamjump.com</td><td><code>SUP-000001</code></td><td>partner_code=SUP-000001 = タムジが Master Reseller として「直販」扱いされる構造</td></tr>
+<tr><td><code>ADP-000001</code></td><td>株式会社GMS</td><td>info@tamjump.com</td><td><code>SUP-000001</code></td><td>partner_code=SUP-000001 = GMSが Master Reseller として「直販」扱いされる構造</td></tr>
 </table>
 
 <h4>master_staff テーブル（実データ）</h4>
 <table>
 <tr><th>login_id</th><th>name</th><th>role</th><th>属する master_company</th><th>備考</th></tr>
-<tr><td><code>tamj-admin</code></td><td>タムジ管理者</td><td><code>tamj_admin</code></td><td>ADP-000001</td><td>タムジ管理画面（partner マスタ管理 / 招待発行 / 按分率変更）アクセス権持ち</td></tr>
+<tr><td><code>tamj-admin</code></td><td>GMS管理者</td><td><code>tamj_admin</code></td><td>ADP-000001</td><td>GMS管理画面（partner マスタ管理 / 招待発行 / 按分率変更）アクセス権持ち</td></tr>
 <tr><td><code>ADM-TIGER</code></td><td>大下テスト</td><td><code>master_admin</code></td><td>ADP-000001</td><td>ｍ・ｔ両アプリの管理者として app_links で連携済</td></tr>
 </table>
 
 <h4>partners テーブル（実データ）</h4>
 <table>
 <tr><th>partner_id / code</th><th>type</th><th>parent_partner_id</th><th>company_name</th><th>login_id</th><th>email</th><th>revenue_share_pct</th><th>contract_end_at</th><th>備考</th></tr>
-<tr><td><code>SUP-000001</code></td><td>super（Master Reseller）</td><td>NULL（タムジ直属）</td><td>テスト総代理店株式会社</td><td><code>sup-test</code></td><td>sup-test@example.com</td><td>30%</td><td>2027/04/21</td><td>タムジ→自社の按分率 30%。partner_revenue_share_history で履歴管理</td></tr>
+<tr><td><code>SUP-000001</code></td><td>super（Master Reseller）</td><td>NULL（GMS直属）</td><td>テスト総代理店株式会社</td><td><code>sup-test</code></td><td>sup-test@example.com</td><td>30%</td><td>2027/04/21</td><td>GMS→自社の按分率 30%。partner_revenue_share_history で履歴管理</td></tr>
 <tr><td><code>AGT-000001</code></td><td>agent（Reseller）</td><td><code>SUP-000001</code></td><td>テスト代理店株式会社</td><td><code>agt-test</code></td><td>agt-test@example.com</td><td>NULL（Reseller は親側のみ）</td><td>2027/04/21</td><td>SUP-000001 配下。本人ダッシュボードでは売上情報非表示</td></tr>
 </table>
 
@@ -2995,13 +2995,13 @@ const tokenResult = await card.tokenize(opts);</pre>
 <h4>users テーブル（実データ）</h4>
 <table>
 <tr><th>id (login_id)</th><th>name</th><th>org_id</th><th>role</th><th>plan</th><th>備考</th></tr>
-<tr><td><code>ADM-TIGER</code></td><td>大下テスト</td><td>タムジ.Corp</td><td>admin</td><td>pro</td><td>v28 で JCB 5841 → VISA 1111 にカード変更済</td></tr>
+<tr><td><code>ADM-TIGER</code></td><td>大下テスト</td><td>株式会社GMS</td><td>admin</td><td>pro</td><td>v28 で JCB 5841 → VISA 1111 にカード変更済</td></tr>
 </table>
 
 <h4>subscriptions テーブル（実データ・v29 完了時点）</h4>
 <table>
 <tr><th>id (sub_id)</th><th>org_id</th><th>module_id</th><th>status</th><th>member_count</th><th>amount_jpy</th><th>card_brand</th><th>card_last_4</th></tr>
-<tr><td><code>f1a47fb0-997a-4ce8-bb3d-0655736edc1d</code></td><td>タムジ.Corp</td><td>pro</td><td>active</td><td>1</td><td>200</td><td>VISA</td><td>1111</td></tr>
+<tr><td><code>f1a47fb0-997a-4ce8-bb3d-0655736edc1d</code></td><td>株式会社GMS</td><td>pro</td><td>active</td><td>1</td><td>200</td><td>VISA</td><td>1111</td></tr>
 </table>
 <p>※ v28 セッション中に旧 sub_id <code>efffa9b3-e2ac-4cf1-91ea-ceacd861f183</code> から JCB 5841 で再契約 → さらに JCB → VISA 1111 にカード変更。</p>
 
@@ -3016,7 +3016,7 @@ const tokenResult = await card.tokenize(opts);</pre>
 <h4>companies テーブル（実データ）</h4>
 <table>
 <tr><th>company_code</th><th>name</th><th>備考</th></tr>
-<tr><td><code>TEST1</code></td><td>タムジ</td><td>13 名・¥2,600/月（@¥200 × 13）</td></tr>
+<tr><td><code>TEST1</code></td><td>GMS</td><td>13 名・¥2,600/月（@¥200 × 13）</td></tr>
 </table>
 
 <h4>subscriptions テーブル（実データ・v29 完了時点）</h4>
@@ -3086,7 +3086,7 @@ const tokenResult = await card.tokenize(opts);</pre>
 <table>
 <tr><td class="label">親「やるゼ！」</td><td><code>https://yaruze.tamjump.com/</code></td></tr>
 <tr><td class="label">partner-dashboard</td><td><code>https://yaruze.tamjump.com/partner-dashboard.html</code></td></tr>
-<tr><td class="label">タムジ管理画面</td><td><code>https://yaruze.tamjump.com/admin-dashboard.html</code> 等</td></tr>
+<tr><td class="label">GMS管理画面</td><td><code>https://yaruze.tamjump.com/admin-dashboard.html</code> 等</td></tr>
 <tr><td class="label">ｍやるゼ！</td><td><code>https://myaruze.tamjump.com/app.html</code></td></tr>
 <tr><td class="label">ｔやるゼ！</td><td><code>https://tyaruze-app.tamjump.com/billing.html</code> 等</td></tr>
 </table>
@@ -3714,7 +3714,7 @@ v28 引継書 §5 では「Webhook 移植 + monthly_charges 新規作成 + 月�
 
 <h4>39-4-1. 前提</h4>
 <ul>
-<li>Google Play Console アカウント：タムジ.Corp（個人用アカウント / アカウント ID <code>8531951863872577016</code>）</li>
+<li>Google Play Console アカウント：株式会社GMS（個人用アカウント / アカウント ID <code>8531951863872577016</code>）</li>
 <li>使用する Google グループ：<code>androidtestkkbouu@googlegroups.com</code></li>
 <li>同グループのメンバー管理は別途 Google グループの管理画面で行う（Play Console から見えない）</li>
 </ul>
@@ -3961,7 +3961,7 @@ WHERE master_company_id = (SELECT company_id FROM master_companies WHERE company
 <h4>40-7-5. シナリオ 4：partner-dashboard 確認</h4>
 <p><strong>目的</strong>：シナリオ 1〜3 の結果が partner-dashboard に正しく反映されることを確認。</p>
 <ul>
-<li>SUP-000001（タムジ Master Reseller）でログイン</li>
+<li>SUP-000001（GMS Master Reseller）でログイン</li>
 <li>サマリの「有料契約中 N 件」が解約後に減ること</li>
 <li>当月売上に人数変更後の金額（5名×¥200=¥1,000）が反映されること</li>
 </ul>
@@ -5332,7 +5332,7 @@ win.addEventListener('load', () =&gt; {
 <!-- ========== Final Footer ========== -->
 <div class="footer">
 やるゼ！プラットフォーム 統合設計書 v4.7<br>
-2026-05-24 改訂 / TAmJ.Corp 大下 / Vision Of Oneness<br>
+2026-05-24 改訂 / 株式会社GMS 大下 / Vision Of Oneness<br>
 v4.6 を完全承継 + §56 で後藤先生実写写真（505×481px → 480×480 / 240×240 JPG）+ サイト素材 13 枚（カード4 + ヒーロー2 + アイコン6 + OGP1）を index.html / app.html へ実装。HERO BAND セクション + FEATURE HIGHLIGHTS セクション新設。OGP メタタグを新画像へ更新。既存 11 sections / 221 divs 構造は完全維持。<br>
 本書改訂時は §16 の年表に行を追加。<br>
 <br>
