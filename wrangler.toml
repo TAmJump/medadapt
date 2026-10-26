@@ -34,7 +34,7 @@ bucket_name = "medadapt-files"
 # ───────────────────────────────────────────
 [vars]
 ENV = "production"
-APP_URL = "https://myaruze.tamjump.com"
+APP_URL = "https://myaruze.115en.com"
 
 # 以下は wrangler secret put で個別に設定（GitHub にコミットしない）:
 #   wrangler secret put JWT_SECRET

@@ -123,7 +123,7 @@
 
 ### Step 4: 現状の HEAD と本番URL
 - **GitHub**: https://github.com/TAmJump/medadapt
-- **本番 LP/アプリ**: https://myaruze.tamjump.com/
+- **本番 LP/アプリ**: https://myaruze.115en.com/
 - **Worker**: https://medadapt-api-v2.animalb001.workers.dev/
 - **最新コミット**: `dacdd83`（v5.0.6 / LP HERO 透け感 + 医師写真差し替え）
 - **状態**: コード実装完了。Cloudflare 側のデプロイ操作待ち（v16 + v17 マイグレーション両方適用必要）
@@ -1264,9 +1264,9 @@ v4.15 完了直後の大下指摘「患者がリンクされない」「完成�
 
 | サービス | ドメイン | GitHub リポジトリ | CNAME |
 |---|---|---|---|
-| **ｍやるゼ！(medadapt)** | myaruze.tamjump.com | `TAmJump/medadapt` ★このファイルの場所 | myaruze.tamjump.com |
-| **やるゼ！親LP** | **yaruze.tamjump.com** | **`TAmJump/adapt`** | yaruze.tamjump.com |
-| **ｔやるゼ！(adapt)** | **tyaruze.tamjump.com** | **`TAmJump/one-touch`** | tyaruze.tamjump.com |
+| **ｍやるゼ！(medadapt)** | myaruze.115en.com | `TAmJump/medadapt` ★このファイルの場所 | myaruze.115en.com |
+| **やるゼ！親LP** | **yaruze.115en.com** | **`TAmJump/adapt`** | yaruze.115en.com |
+| **ｔやるゼ！(adapt)** | **tyaruze.115en.com** | **`TAmJump/one-touch`** | tyaruze.115en.com |
 
 ⚠️ **超重要な注意点**:
 - リポジトリ名 `adapt` は **やるゼ! 本体LP**（親）の場所。「ｔやるゼ! の adapt」ではない
@@ -1331,8 +1331,8 @@ git config user.name "TAmJump"
 
 ### 2-5. デプロイ
 
-- **本番LP**: https://myaruze.tamjump.com/
-- **アプリ**: https://myaruze.tamjump.com/app.html
+- **本番LP**: https://myaruze.115en.com/
+- **アプリ**: https://myaruze.115en.com/app.html
 - **デプロイ方式**: GitHub Pages（main branch 自動デプロイ） + Cloudflare 経由独自ドメイン
 - **CDN キャッシュ**: 1-2分で反映。古いキャッシュが残る場合は強制リロード（Ctrl+Shift+R / Cmd+Shift+R）
 
@@ -1402,7 +1402,7 @@ medadapt/
 
 ### v4.8.1 — app.html起動不能バグ修正（緊急）
 
-- **症状**: `myaruze.tamjump.com/app.html` が真っ白、コンソールに `TypeError: parameter 2 is not of type 'Object' at h (app.html:371)`
+- **症状**: `myaruze.115en.com/app.html` が真っ白、コンソールに `TypeError: parameter 2 is not of type 'Object' at h (app.html:371)`
 - **原因**: v4.7 で追加した `onerror: 'this.style.display=\'none\''` 文字列を h() ヘルパーが addEventListener の第2引数として渡していた
 - **修正**:
   - app.html L371: h() に防御ロジック（`on***` キーが function の時のみ addEventListener、string の時は setAttribute へフォールバック）
@@ -1525,11 +1525,11 @@ v4.11 の e-cert-banner（電子署名のサマリ）に加えて、独立した
 
 #### 13-1. 経緯
 大下指示「チーム写真２箇所あるでしょ。添付した２枚と入れ替えて。team3 が TOP の最初、team4 が TOP のスクロール下。
-ついでに、やるゼ！(yaruze.tamjump.com/lp.html) / ｔやるゼ！(tyaruze.tamjump.com) の LP にも使ってほしい」
+ついでに、やるゼ！(yaruze.115en.com/lp.html) / ｔやるゼ！(tyaruze.115en.com) の LP にも使ってほしい」
 
 #### 13-2. 重要な発見: リポジトリ名と CNAME のミスマッチ
 - 過去メモで「adapt = ｔやるゼ!」「one-touch = やるゼ!本体」と記載していたが、CNAME 実地確認の結果は逆だった
-- 正しい対応: `adapt → yaruze.tamjump.com（やるゼ!親LP）` / `one-touch → tyaruze.tamjump.com（ｔやるゼ!LP）`
+- 正しい対応: `adapt → yaruze.115en.com（やるゼ!親LP）` / `one-touch → tyaruze.115en.com（ｔやるゼ!LP）`
 - 今後は CNAME ファイルを必ず実地確認すること（§2-1 参照）
 
 #### 13-3. medadapt: team3 / team4 差し替え
@@ -1717,9 +1717,9 @@ bfb326a feat: HEROにチーム写真背景を導入（やるゼ！3兄弟ブラ�
 
 | リポジトリ | 最新 HEAD | デプロイ先 | 設計書 |
 |---|---|---|---|
-| medadapt | v4.15 commit（後述） | myaruze.tamjump.com | `docs/DESIGN_yaruze_v4_15_2026-05-25.html` |
-| adapt（やるゼ!親） | v4.15 commit（HERO修正） | yaruze.tamjump.com | 同上の §67-2-2 で言及 |
-| one-touch（ｔやるゼ!） | v4.15 commit（HERO修正） | tyaruze.tamjump.com | 同上の §67-2-3 で言及 |
+| medadapt | v4.15 commit（後述） | myaruze.115en.com | `docs/DESIGN_yaruze_v4_15_2026-05-25.html` |
+| adapt（やるゼ!親） | v4.15 commit（HERO修正） | yaruze.115en.com | 同上の §67-2-2 で言及 |
+| one-touch（ｔやるゼ!） | v4.15 commit（HERO修正） | tyaruze.115en.com | 同上の §67-2-3 で言及 |
 
 3兄弟LP すべて v4.15 で HERO「顔と文字の完全分離」完了（写真は全面表示・テキストカードを下半分配置）。ｍやるゼ! app.html はマッサージ・鍼灸導線新設＋保険医療機関名「医療法人コンパス」統一済み + 退院時共同指導/担当者会議/モニタリング 帳票への電子署名+TSA 拡大済み。LP本体に「電子署名+タイムスタンプ+SHA-256ハッシュチェーン」三位一体保証の訴求文反映済み。
 

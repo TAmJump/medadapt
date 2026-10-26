@@ -96,10 +96,10 @@ curl -H "Authorization: Bearer {token}" \
 
 push 後 1〜3 分で以下が反映：
 
-- https://myaruze.tamjump.com/app.html
+- https://myaruze.115en.com/app.html
   - 左メニューに「**同意書**」「**加算管理**」が追加されている
   - サイドバーフッタに医監修クレジット表示
-- https://myaruze.tamjump.com/index.html
+- https://myaruze.115en.com/index.html
   - ヒーロー直下に医監修パートナーセクション
 
 ---

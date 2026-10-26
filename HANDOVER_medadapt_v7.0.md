@@ -37,7 +37,7 @@
 | git user.name | `TAmJump` |
 | git user.email | `animalb001@gmail.com` |
 | リポジトリ | `TAmJump/medadapt` |
-| 本番URL | https://myaruze.tamjump.com （GitHub Pages 自動デプロイ。`static.yml`） |
+| 本番URL | https://myaruze.115en.com （GitHub Pages 自動デプロイ。`static.yml`） |
 | API（Worker） | `medadapt-api-v2` ／ https://medadapt-api-v2.animalb001.workers.dev ／ **手動Deploy** |
 | 通話補助Worker | `medadapt-whereby` |
 | Cloudflareアカウント | `tamj_Account` ／ Account ID `b9de28abfd009bbf696ceec4da62c5b8` ／ subdomain `animalb001.workers.dev` |
@@ -252,7 +252,7 @@ wrangler d1 execute medadapt-db --remote --command "UPDATE users SET status='act
 
 ## 9. 関連リポジトリ・他案件（同一Cloudflareアカウント tamj_Account 内）
 
-Workers & Pages：next-api（Next Innovation）, develop-api（不動産 develop.tamjump.com）, rebridge-api（M&A rebridge.tamjump.com）, carepay-api / carepass-api（CarePAY/Care Support Pass）, tamj-residence, tamjump-contact-api, tamjump-member-api, adapt-api（親・課金集約）, **medadapt-api-v2（本OS）**, medadapt-whereby, tamsic-send-letter, onetouch-api, late-shadow-b145。
+Workers & Pages：next-api（Next Innovation）, develop-api（不動産 develop.115en.com）, rebridge-api（M&A rebridge.115en.com）, carepay-api / carepass-api（CarePAY/Care Support Pass）, tamj-residence, tamjump-contact-api, tamjump-member-api, adapt-api（親・課金集約）, **medadapt-api-v2（本OS）**, medadapt-whereby, tamsic-send-letter, onetouch-api, late-shadow-b145。
 
 > 本OS（ｍやるゼ！）以外は本ハンドオーバーの対象外。必要時に各リポジトリの引継書を参照。
 

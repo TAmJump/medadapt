@@ -397,7 +397,7 @@ ChatGPT が忘れがちなので、生成前に必ず以下を確認：
    git commit -m "feat(assets): ChatGPT 生成画像追加（hero / cards / icons）"
    git push origin main
    ```
-4. **本番反映**：GitHub Pages 経由で 1〜3 分で `https://myaruze.tamjump.com/assets/img/generated/{filename}.png` でアクセス可能
+4. **本番反映**：GitHub Pages 経由で 1〜3 分で `https://myaruze.115en.com/assets/img/generated/{filename}.png` でアクセス可能
 5. **コード組み込み**：`index.html` / `app.html` 内の該当 `<img src="">` を差し替え or 追記
 
 ---

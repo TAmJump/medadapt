@@ -193,11 +193,11 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <h3>1-3. ドメイン体系（旧→現行）</h3>
 <table>
 <tr><th>用途</th><th>旧ドメイン</th><th>現行ドメイン</th></tr>
-<tr><td>親 LP / アプリ</td><td>adapt.tamjump.com</td><td>yaruze.tamjump.com</td></tr>
-<tr><td>ｔ LP</td><td>one-touch.tamjump.com</td><td>tyaruze.tamjump.com</td></tr>
-<tr><td>ｔ アプリ（TWA）</td><td>tamjump.github.io/onetouch_app/</td><td>tyaruze-app.tamjump.com</td></tr>
+<tr><td>親 LP / アプリ</td><td>yaruze.115en.com</td><td>yaruze.115en.com</td></tr>
+<tr><td>ｔ LP</td><td>tyaruze.115en.com</td><td>tyaruze.115en.com</td></tr>
+<tr><td>ｔ アプリ（TWA）</td><td>tamjump.github.io/onetouch_app/</td><td>tyaruze-app.115en.com</td></tr>
 <tr><td>ｍ LP</td><td>medadapt.scsgo.co.jp</td><td>medvoo.tamjump.com（要確認）</td></tr>
-<tr><td>ｍ アプリ（TWA）</td><td>medadapt.scsgo.co.jp/app.html</td><td>myaruze.tamjump.com/app.html</td></tr>
+<tr><td>ｍ アプリ（TWA）</td><td>medadapt.scsgo.co.jp/app.html</td><td>myaruze.115en.com/app.html</td></tr>
 </table>
 
 <h3>1-4. ブランドタグライン</h3>
@@ -258,10 +258,10 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 <h3>2-3. リポジトリ・DB・Worker 対応表</h3>
 <table>
 <tr><th>レイヤー</th><th>GitHub リポ</th><th>D1 DB ID</th><th>Worker URL</th><th>本番 LP / アプリ</th></tr>
-<tr class="layer-parent"><td>親</td><td>TAmJump/adapt（Public）</td><td>c22145ae-73fe-4dc1-b309-56d4ba15db92</td><td>adapt-api.animalb001.workers.dev</td><td>yaruze.tamjump.com</td></tr>
-<tr class="layer-t"><td>ｔ アプリ</td><td>TAmJump/onetouch_app（Private）</td><td>dac0f1ec-b9d9-4d63-a0e7-5380ba6cd2bd</td><td>onetouch-api.animalb001.workers.dev</td><td>tyaruze-app.tamjump.com</td></tr>
-<tr class="layer-t"><td>ｔ LP</td><td>TAmJump/one-touch（Public）</td><td>—</td><td>—（GitHub Pages）</td><td>tyaruze.tamjump.com</td></tr>
-<tr class="layer-m"><td>ｍ アプリ</td><td>TAmJump/medadapt（Public）</td><td>f9e88ff6-ce55-436a-bd5f-baf9ea902121</td><td>medadapt-api-v2.animalb001.workers.dev</td><td>myaruze.tamjump.com</td></tr>
+<tr class="layer-parent"><td>親</td><td>TAmJump/adapt（Public）</td><td>c22145ae-73fe-4dc1-b309-56d4ba15db92</td><td>adapt-api.animalb001.workers.dev</td><td>yaruze.115en.com</td></tr>
+<tr class="layer-t"><td>ｔ アプリ</td><td>TAmJump/onetouch_app（Private）</td><td>dac0f1ec-b9d9-4d63-a0e7-5380ba6cd2bd</td><td>onetouch-api.animalb001.workers.dev</td><td>tyaruze-app.115en.com</td></tr>
+<tr class="layer-t"><td>ｔ LP</td><td>TAmJump/one-touch（Public）</td><td>—</td><td>—（GitHub Pages）</td><td>tyaruze.115en.com</td></tr>
+<tr class="layer-m"><td>ｍ アプリ</td><td>TAmJump/medadapt（Public）</td><td>f9e88ff6-ce55-436a-bd5f-baf9ea902121</td><td>medadapt-api-v2.animalb001.workers.dev</td><td>myaruze.115en.com</td></tr>
 </table>
 
 <h3>2-4. 各アプリの独立 ID 体系（重要原則）</h3>
@@ -284,7 +284,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 
 <h3>3-1. 役割と立ち位置</h3>
 <table>
-<tr><td class="label">URL</td><td>https://yaruze.tamjump.com/（旧 adapt.tamjump.com）</td></tr>
+<tr><td class="label">URL</td><td>https://yaruze.115en.com/（旧 yaruze.115en.com）</td></tr>
 <tr><td class="label">役割</td><td>無料ランチャー + 統一ID + SSO ハブ + リセラー管理 + 反社チェック / 利用規約管理</td></tr>
 <tr><td class="label">料金</td><td>無料（収益は子アプリ側 Pro 課金から）</td></tr>
 <tr><td class="label">実装規模</td><td>Worker 約4,200行 / D1 13テーブル / HTML 約20ページ / Cron 6本</td></tr>
@@ -394,8 +394,8 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 
 <h3>4-1. 役割</h3>
 <table>
-<tr><td class="label">URL（アプリ）</td><td>tyaruze-app.tamjump.com（旧 tamjump.github.io/onetouch_app/）</td></tr>
-<tr><td class="label">URL（LP）</td><td>tyaruze.tamjump.com（旧 one-touch.tamjump.com）</td></tr>
+<tr><td class="label">URL（アプリ）</td><td>tyaruze-app.115en.com（旧 tamjump.github.io/onetouch_app/）</td></tr>
+<tr><td class="label">URL（LP）</td><td>tyaruze.115en.com（旧 tyaruze.115en.com）</td></tr>
 <tr><td class="label">役割</td><td>施設設備管理・QR台帳・通報→対応→記録</td></tr>
 <tr><td class="label">課金</td><td>B-2方式（Square Subscriptions API + price_override_money）¥200/ユーザー/月</td></tr>
 <tr><td class="label">パッケージ ID</td><td>com.tamjump.onetouch（変更不可・Google Play 申請済）</td></tr>
@@ -461,7 +461,7 @@ Sandbox 共有や旧名混在の状態を清算するため、以下を本番切
 
 <h3>5-1. 役割</h3>
 <table>
-<tr><td class="label">URL（アプリ）</td><td>myaruze.tamjump.com/app.html（旧 medadapt.scsgo.co.jp/app.html）</td></tr>
+<tr><td class="label">URL（アプリ）</td><td>myaruze.115en.com/app.html（旧 medadapt.scsgo.co.jp/app.html）</td></tr>
 <tr><td class="label">URL（LP）</td><td>medvoo.tamjump.com（旧 medadapt.scsgo.co.jp）</td></tr>
 <tr><td class="label">役割</td><td>医療介護連携OS：退院通知・NDA締結・サ担会議・電子署名・アセスメント管理</td></tr>
 <tr><td class="label">課金</td><td>B-2方式 ¥200/ユーザー/月（実機テスト 2026-05-05 成功 / ¥600/月 = 3名×¥200 確認 / v24 タスク2 で Webhook 翌月分 price_override 自動更新動作確認済 = ¥400 / 2名）</td></tr>
@@ -904,8 +904,8 @@ async function squareRetrieveSubscription(env, subscriptionId) {
 [親 Worker] POST /api/apps/sso-ticket { app_name }
   ↓ sso_tickets に60秒有効な ticket 発行
    redirect_url:
-     - ｔ：https://tyaruze-app.tamjump.com/login.html?sso_ticket=xxx&from=adapt
-     - ｍ：https://myaruze.tamjump.com/app.html?sso_ticket=xxx&from=adapt
+     - ｔ：https://tyaruze-app.115en.com/login.html?sso_ticket=xxx&from=adapt
+     - ｍ：https://myaruze.115en.com/app.html?sso_ticket=xxx&from=adapt
   ↓
 親フロントが新タブで redirect_url を開く
   ↓
@@ -1230,9 +1230,9 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 <h3>12-3. assetlinks.json 配置</h3>
 <table>
 <tr><th>アプリ</th><th>配置 URL</th></tr>
-<tr><td>親</td><td>https://yaruze.tamjump.com/.well-known/assetlinks.json</td></tr>
-<tr><td>ｔ</td><td>https://tyaruze-app.tamjump.com/.well-known/assetlinks.json（旧 tamjump.github.io/onetouch_app）</td></tr>
-<tr><td>ｍ</td><td>https://myaruze.tamjump.com/.well-known/assetlinks.json</td></tr>
+<tr><td>親</td><td>https://yaruze.115en.com/.well-known/assetlinks.json</td></tr>
+<tr><td>ｔ</td><td>https://tyaruze-app.115en.com/.well-known/assetlinks.json（旧 tamjump.github.io/onetouch_app）</td></tr>
+<tr><td>ｍ</td><td>https://myaruze.115en.com/.well-known/assetlinks.json</td></tr>
 </table>
 
 <h3>12-4. buntyan 業者代行範囲</h3>
@@ -1263,7 +1263,7 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 <tr><td class="label">アカウントメール</td><td>animalb001@gmail.com</td></tr>
 <tr><td class="label">アカウント ID</td><td>b9de28abfd009bbf696ceec4da62c5b8</td></tr>
 <tr><td class="label">アカウント名</td><td>tamj_Account</td></tr>
-<tr><td class="label">管理ドメイン</td><td>tamjump.com</td></tr>
+<tr><td class="label">管理ドメイン</td><td>115en.com</td></tr>
 <tr><td class="label">Zone ID</td><td>4dae801e42490f78c030c1619963f15e</td></tr>
 <tr><td class="label">Workers Paid</td><td>$5/月（2026-04-23 アップグレード）</td></tr>
 </table>
@@ -1324,7 +1324,7 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 <tr><td class="label">メール</td><td>animalb001@gmail.com</td></tr>
 <tr><td class="label">本人確認</td><td>完了</td></tr>
 <tr><td class="label">住所</td><td>〒176-0013 東京都練馬区豊玉中三丁目7番5号</td></tr>
-<tr><td class="label">公開連絡先</td><td>info@tamjump.com</td></tr>
+<tr><td class="label">公開連絡先</td><td>info@115en.com</td></tr>
 </table>
 
 <h3>13-7. テストアカウント横断</h3>
@@ -1339,7 +1339,7 @@ keystore は Google Play 申請後 <strong>変更不可</strong>。紛失する�
 <tr><td>ｔ</td><td>contractor_admin</td><td>BILL1-admin</td><td>bill12345</td></tr>
 <tr><td>ｍ</td><td>admin（Pro）</td><td>ADM-PROTEST</td><td>test1234（pro@test.com）/ <strong>v24 タスク2 動作確認に使用・現状 member_count=2 / amount_jpy=400 / pending=NULL</strong></td></tr>
 <tr><td>ｍ</td><td>admin（Free）</td><td>ADM-FREETEST</td><td>test1234（free@test.com）</td></tr>
-<tr><td>ｍ</td><td>admin（Pro・SSO）</td><td>ADM-TIGER</td><td>test1234（tiger@tamjump.com）</td></tr>
+<tr><td>ｍ</td><td>admin（Pro・SSO）</td><td>ADM-TIGER</td><td>test1234（tiger@115en.com）</td></tr>
 <tr><td>ｍ</td><td>staff</td><td>STF-PQEFMD / STF-JTXLNJ</td><td>各個別</td></tr>
 </table>
 
@@ -2966,7 +2966,7 @@ const tokenResult = await card.tokenize(opts);</pre>
 <h4>master_companies テーブル（実データ）</h4>
 <table>
 <tr><th>company_id</th><th>name</th><th>email</th><th>partner_code</th><th>備考</th></tr>
-<tr><td><code>ADP-000001</code></td><td>株式会社GMS</td><td>info@tamjump.com</td><td><code>SUP-000001</code></td><td>partner_code=SUP-000001 = GMSが Master Reseller として「直販」扱いされる構造</td></tr>
+<tr><td><code>ADP-000001</code></td><td>株式会社GMS</td><td>info@115en.com</td><td><code>SUP-000001</code></td><td>partner_code=SUP-000001 = GMSが Master Reseller として「直販」扱いされる構造</td></tr>
 </table>
 
 <h4>master_staff テーブル（実データ）</h4>
@@ -3078,17 +3078,17 @@ const tokenResult = await card.tokenize(opts);</pre>
 <li><code>AWS_ACCESS_KEY_ID</code></li>
 <li><code>AWS_SECRET_ACCESS_KEY</code></li>
 <li><code>FROM_EMAIL</code> = <code>no-reply@tamjump.com</code></li>
-<li><code>BASE_URL</code> = <code>https://yaruze.tamjump.com</code></li>
-<li><code>ADMIN_NOTIFY_EMAIL</code> = <code>info@tamjump.com</code></li>
+<li><code>BASE_URL</code> = <code>https://yaruze.115en.com</code></li>
+<li><code>ADMIN_NOTIFY_EMAIL</code> = <code>info@115en.com</code></li>
 </ul>
 
 <h3>35-6. フロントエンド URL</h3>
 <table>
-<tr><td class="label">親「やるゼ！」</td><td><code>https://yaruze.tamjump.com/</code></td></tr>
-<tr><td class="label">partner-dashboard</td><td><code>https://yaruze.tamjump.com/partner-dashboard.html</code></td></tr>
-<tr><td class="label">GMS管理画面</td><td><code>https://yaruze.tamjump.com/admin-dashboard.html</code> 等</td></tr>
-<tr><td class="label">ｍやるゼ！</td><td><code>https://myaruze.tamjump.com/app.html</code></td></tr>
-<tr><td class="label">ｔやるゼ！</td><td><code>https://tyaruze-app.tamjump.com/billing.html</code> 等</td></tr>
+<tr><td class="label">親「やるゼ！」</td><td><code>https://yaruze.115en.com/</code></td></tr>
+<tr><td class="label">partner-dashboard</td><td><code>https://yaruze.115en.com/partner-dashboard.html</code></td></tr>
+<tr><td class="label">GMS管理画面</td><td><code>https://yaruze.115en.com/admin-dashboard.html</code> 等</td></tr>
+<tr><td class="label">ｍやるゼ！</td><td><code>https://myaruze.115en.com/app.html</code></td></tr>
+<tr><td class="label">ｔやるゼ！</td><td><code>https://tyaruze-app.115en.com/billing.html</code> 等</td></tr>
 </table>
 
 <h3>35-7. Worker URL（API）</h3>
@@ -3726,7 +3726,7 @@ v28 引継書 §5 では「Webhook 移植 + monthly_charges 新規作成 + 月�
 <li>ページ上部のタブ <strong>「テスター数」</strong> を選択</li>
 <li>「テスター」セクションのラジオボタンで <strong>「Google グループ」</strong> を選択（既定では「メーリングリスト」が選ばれていることが多いので注意）</li>
 <li>表示される「メールアドレス」入力欄に <code>androidtestkkbouu@googlegroups.com</code> を入力 → Enter キー</li>
-<li>下部の「フィードバック用の URL またはメールアドレス」が <code>info@tamjump.com</code> になっていることを確認</li>
+<li>下部の「フィードバック用の URL またはメールアドレス」が <code>info@115en.com</code> になっていることを確認</li>
 <li>右下の <strong>「保存」</strong> ボタンをクリック</li>
 <li>左メニュー <strong>「公開の概要」</strong> をクリック</li>
 <li>「審査にまだ送信されていない変更」セクションに「クローズド テスト - Alpha」が表示されていることを確認</li>
@@ -3901,7 +3901,7 @@ v29 まで syncToParent は <code>/billing/setup</code> および <code>/billing
 <h4>40-7-2. シナリオ 1：人数変更（ｍ ADM-TIGER）</h4>
 <p><strong>目的</strong>：Webhook 経由の親同期（人数）動作確認。debug/apply-pending を使うことで翌月を待たず即時検証可能。</p>
 <ol>
-<li>ｍ ADM-TIGER でログイン（<code>https://myaruze.tamjump.com/app.html</code>）</li>
+<li>ｍ ADM-TIGER でログイン（<code>https://myaruze.115en.com/app.html</code>）</li>
 <li>左メニュー「スタッフ管理」→ 既存スタッフを 4 名追加するか、休止中スタッフを「在籍中」に戻す → recalcMemberCount で pending_member_count = 5 に</li>
 <li>debug/apply-pending を curl で叩く（admin token 必須）：
 <pre style="background:#f9fafb; border-left:3px solid #16a34a; padding:8px 12px; font-size:12px; overflow:auto;">
@@ -5123,7 +5123,7 @@ win.addEventListener('load', () =&gt; {
 
 <h3>55-2. patient-consent.html（患者向け改ざん検証ページ）</h3>
 <ul>
-<li><strong>URL 形式</strong>：<code>https://myaruze.tamjump.com/patient-consent.html?id=SD-xxxxx&amp;token=xxxx</code></li>
+<li><strong>URL 形式</strong>：<code>https://myaruze.115en.com/patient-consent.html?id=SD-xxxxx&amp;token=xxxx</code></li>
 <li><strong>主用途</strong>：QR コード（コンパス書式 PDF 左下）から直接アクセス → 改ざん検証 + 署名履歴確認</li>
 <li><strong>認証不要</strong>：公開エンドポイント <code>/verify/document/:sd_id</code> を叩く</li>
 <li>レンダリング内容：
@@ -5141,7 +5141,7 @@ win.addEventListener('load', () =&gt; {
 
 <h3>55-3. acupuncturist-portal.html（鍼灸師ポータル）</h3>
 <ul>
-<li><strong>URL</strong>：<code>https://myaruze.tamjump.com/acupuncturist-portal.html</code></li>
+<li><strong>URL</strong>：<code>https://myaruze.115en.com/acupuncturist-portal.html</code></li>
 <li><strong>ログイン</strong>：med_acupuncturist ロールの ｍやるゼ！アカウント（パスワードトークン認証）</li>
 <li><strong>localStorage</strong>：<code>myaruze_acupuncturist_token</code> でセッション持続</li>
 <li>タブ構成：
@@ -5189,8 +5189,8 @@ win.addEventListener('load', () =&gt; {
 <li>Cloudflare Workers <code>medadapt-api-v2</code> を <code>worker_v7_complete.js</code> で更新（v13 から +2 API）</li>
 <li>GitHub Pages 自動反映確認：
   <ul>
-  <li><code>https://myaruze.tamjump.com/patient-consent.html?id=SD-xxx</code></li>
-  <li><code>https://myaruze.tamjump.com/acupuncturist-portal.html</code></li>
+  <li><code>https://myaruze.115en.com/patient-consent.html?id=SD-xxx</code></li>
+  <li><code>https://myaruze.115en.com/acupuncturist-portal.html</code></li>
   </ul>
 </li>
 <li>D1 への追加変更なし（v13 のテーブルをそのまま利用）</li>
@@ -5265,10 +5265,10 @@ win.addEventListener('load', () =&gt; {
 <p>従来の <code>og-image.png</code>（1024×500・47KB）から <code>assets/img/generated/ogp_v1.jpg</code>（1200×630・62KB）へ。OpenGraph 標準サイズ 1200×630 に準拠し、Facebook / X (Twitter) / LINE での表示が最適化される。<code>og:image:width</code> + <code>og:image:height</code> も明示追加。既存 <code>og-image.png</code> ファイル自体は残置（破壊なし）。</p>
 
 <pre style="background:#f9fafb; border-left:3px solid #2563eb; padding:8px 12px; font-size:11px;">
-&lt;meta property="og:image" content="https://myaruze.tamjump.com/assets/img/generated/ogp_v1.jpg"&gt;
+&lt;meta property="og:image" content="https://myaruze.115en.com/assets/img/generated/ogp_v1.jpg"&gt;
 &lt;meta property="og:image:width" content="1200"&gt;
 &lt;meta property="og:image:height" content="630"&gt;
-&lt;meta name="twitter:image" content="https://myaruze.tamjump.com/assets/img/generated/ogp_v1.jpg"&gt;
+&lt;meta name="twitter:image" content="https://myaruze.115en.com/assets/img/generated/ogp_v1.jpg"&gt;
 </pre>
 
 <h3>56-5. レスポンシブ対応</h3>
@@ -5314,8 +5314,8 @@ win.addEventListener('load', () =&gt; {
 <li>GitHub Pages 自動反映（1〜3 分）</li>
 <li>動作確認：
   <ul>
-  <li><code>https://myaruze.tamjump.com/</code> → HERO BAND が表示、医監修パートナー写真が実写に、FEATURE HIGHLIGHTS が表示</li>
-  <li><code>https://myaruze.tamjump.com/app.html</code> ログイン後 → サイドバー最下部に後藤先生写真 32×32 表示</li>
+  <li><code>https://myaruze.115en.com/</code> → HERO BAND が表示、医監修パートナー写真が実写に、FEATURE HIGHLIGHTS が表示</li>
+  <li><code>https://myaruze.115en.com/app.html</code> ログイン後 → サイドバー最下部に後藤先生写真 32×32 表示</li>
   <li>X / Facebook で URL シェア → OGP 画像が新しい ogp_v1.jpg で表示される</li>
   </ul>
 </li>

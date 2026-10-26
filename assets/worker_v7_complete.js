@@ -89,7 +89,7 @@ async function handleRequest(request, env, json, err) {
     } catch(e) { /* subscriptionsテーブルがない場合はスキップ */ }
 
     if (hasEmail && verifyToken) {
-      const baseUrl = 'https://myaruze.tamjump.com';
+      const baseUrl = 'https://myaruze.115en.com';
       const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&login_id=${loginId}`;
       await sendEmail(env, {
         to: email.trim(),
@@ -149,7 +149,7 @@ async function handleRequest(request, env, json, err) {
     if (user.email_verified) return err('既に認証済みです');
     const verifyToken = crypto.randomUUID();
     await env.DB.prepare('UPDATE users SET verify_token=? WHERE email=?').bind(verifyToken, email).run();
-    const baseUrl = 'https://myaruze.tamjump.com';
+    const baseUrl = 'https://myaruze.115en.com';
     const verifyUrl = `${baseUrl}/app.html?verify=${verifyToken}&email=${encodeURIComponent(email)}`;
     await sendEmail(env, {
       to: email,
@@ -237,7 +237,7 @@ async function handleRequest(request, env, json, err) {
       const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       await env.DB.prepare('UPDATE users SET reset_token=?, reset_expires=? WHERE email=?')
         .bind(resetToken, resetExpires, email).run();
-      const baseUrl = 'https://myaruze.tamjump.com';
+      const baseUrl = 'https://myaruze.115en.com';
       // login_id があればURLに含める（新しいリセット画面対応）
       const resetUrl = user.login_id
         ? `${baseUrl}/app.html?reset=${resetToken}&login_id=${user.login_id}`
@@ -365,7 +365,7 @@ async function handleRequest(request, env, json, err) {
                 <div style="font-size:11px;color:#94a3b8;margin-top:4px;">このIDとパスワードでログインしてください</div>
               </div>
               <p style="font-size:13px;">医師が署名した同意書が共有されると、アプリに届きます。施術のもとでご本人・ご家族の署名を取得してください。</p>
-              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.tamjump.com/app.html</p>
+              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.115en.com/app.html</p>
               <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
               <p style="font-size:11px;color:#999;">株式会社GMS | ｍやるゼ！ 医療介護連携OS</p>
             </div>
@@ -432,7 +432,7 @@ async function handleRequest(request, env, json, err) {
                 <div style="font-size:12px;color:#64748b;">あなたのログインIDは</div>
                 <div style="font-size:28px;font-weight:900;color:#0891b2;letter-spacing:2px;">${loginId}</div>
               </div>
-              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.tamjump.com/app.html</p>
+              <p style="font-size:12px;color:#666;">ログインURL: https://myaruze.115en.com/app.html</p>
             </div>
           `
         });
@@ -761,7 +761,7 @@ async function handleRequest(request, env, json, err) {
   // ═══════════════════════════════════════════════
   // アカウント削除：ログイン不要の Web 窓口
   // Google Play User data policy / App Store 5.1.1(v) が要求する「アプリを再インストール
-  // せずに削除できる Web リソース」。 https://myaruze.tamjump.com/delete-account.html
+  // せずに削除できる Web リソース」。 https://myaruze.115en.com/delete-account.html
   // ※ 認証ミドルウェアより前に置くこと（Bearer トークンを持たない相手が叩くため）
   // ═══════════════════════════════════════════════
 
@@ -1038,7 +1038,7 @@ async function handleRequest(request, env, json, err) {
     const now = new Date().toISOString();
     await env.DB.prepare('INSERT INTO invites (id,org_id,org_name,email,token,expires,used,created) VALUES (?,?,?,?,?,?,?,?)')
       .bind(id, currentUser.org_id || currentUser.id, currentUser.org, email || '', inviteToken, expires, 0, now).run();
-    const baseUrl = 'https://myaruze.tamjump.com';
+    const baseUrl = 'https://myaruze.115en.com';
     const inviteUrl = `${baseUrl}/app.html?invite=${inviteToken}`;
     if (email) {
       await sendEmail(env, {
@@ -1069,7 +1069,7 @@ async function handleRequest(request, env, json, err) {
     const orgId = currentUser.org_id || currentUser.id;
     await env.DB.prepare('INSERT INTO invites (id,org_id,org_name,email,token,expires,used,created,kind) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, orgId, currentUser.org, email || '', inviteToken, expires, 0, now, 'therapist').run();
-    const inviteUrl = `https://myaruze.tamjump.com/app.html?tinvite=${inviteToken}`;
+    const inviteUrl = `https://myaruze.115en.com/app.html?tinvite=${inviteToken}`;
     if (email) {
       try {
         await sendEmail(env, {
@@ -1172,7 +1172,7 @@ async function handleRequest(request, env, json, err) {
     if (!target) return err('対象スタッフが見つかりません');
     const qrToken = crypto.randomUUID().replace(/-/g,'') + crypto.randomUUID().replace(/-/g,'');
     await env.DB.prepare('UPDATE users SET qr_token=? WHERE id=?').bind(qrToken, staff_id).run();
-    const baseUrl = 'https://myaruze.tamjump.com';
+    const baseUrl = 'https://myaruze.115en.com';
     const qrUrl = `${baseUrl}/app.html?qr=${qrToken}`;
     return json({ success: true, qr_url: qrUrl, qr_token: qrToken });
   }

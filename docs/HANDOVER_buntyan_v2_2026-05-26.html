@@ -32,7 +32,7 @@
 
 <div class="v2-update">
 <strong>★v2 での主要更新点（2026-05-26）</strong><br>
-1. ｔやるゼ！ Android アプリの WebView URL 誤り原因が完全確定（e-app.tamjump.com → 正：tyaruze-app.tamjump.com）<br>
+1. ｔやるゼ！ Android アプリの WebView URL 誤り原因が完全確定（e-app.tamjump.com → 正：tyaruze-app.115en.com）<br>
 2. buntyan 様が <strong>2 アプリクローズドテスト代行（9,495円・ココナラ別取引）</strong>を新規購入・12 人分オプトイン完了<br>
 3. buntyan 様より <strong>クロテ中の運用ルール文書（PDF）</strong>受領・遵守必須事項を §6 として整理<br>
 4. ｍやるゼ！ ID/PW 共有方針確定 + ｔ修正・親 / 新規 3 アプリの段取り確定<br>
@@ -90,8 +90,8 @@
 <tr><th>項目</th><th>確定値</th></tr>
 <tr><td>★Android アプリが現在開いている URL（誤）</td><td><code>https://e-app.tamjump.com</code></td></tr>
 <tr><td>表示される画面</td><td>「オフラインです」（雲マーク・接続不可）</td></tr>
-<tr><td>★本来開くべき URL（正）</td><td><code>https://tyaruze-app.tamjump.com</code></td></tr>
-<tr><td>正常時の画面（PC で動作確認済）</td><td><code>tyaruze-app.tamjump.com/login.html</code>（ｔやるゼ！ロゴ・ログイン画面正常表示）<br><code>tyaruze-app.tamjump.com/contractor-dashboard.html</code>（対応依頼 6件・対応中 7件・完了 2件 全機能正常動作）</td></tr>
+<tr><td>★本来開くべき URL（正）</td><td><code>https://tyaruze-app.115en.com</code></td></tr>
+<tr><td>正常時の画面（PC で動作確認済）</td><td><code>tyaruze-app.115en.com/login.html</code>（ｔやるゼ！ロゴ・ログイン画面正常表示）<br><code>tyaruze-app.115en.com/contractor-dashboard.html</code>（対応依頼 6件・対応中 7件・完了 2件 全機能正常動作）</td></tr>
 <tr><td>Google Play 申請 URL</td><td>✅ 正常（<code>play.google.com/store/apps/details?id=com.tamjump.onetouch</code> + テスター用 <code>play.google.com/apps/testing/com.tamjump.onetouch</code>）</td></tr>
 <tr><td>テスター用 Google グループ</td><td>✅ 正常（<code>androidtestkkbouu@googlegroups.com</code>）</td></tr>
 <tr><td>クローズドテスト Alpha トラック ID</td><td><code>4699223375785846279</code></td></tr>
@@ -104,7 +104,7 @@
 <table>
 <tr><th>STEP</th><th>内容</th><th>担当</th></tr>
 <tr><td>1</td><td>Android アプリの開発方式を確定<br>★Android Studio / PWABuilder / Bubblewrap / その他のいずれか？</td><td>大下が確認</td></tr>
-<tr><td>2</td><td>該当ソースの URL 部分を <code>https://tyaruze-app.tamjump.com</code> に修正<br>★Native Android：<code>MainActivity.java/kt</code> の <code>webView.loadUrl()</code><br>★PWA / TWA：<code>manifest.json</code> の <code>start_url</code> + <code>twa-manifest.json</code></td><td>修正担当 chat の Claude</td></tr>
+<tr><td>2</td><td>該当ソースの URL 部分を <code>https://tyaruze-app.115en.com</code> に修正<br>★Native Android：<code>MainActivity.java/kt</code> の <code>webView.loadUrl()</code><br>★PWA / TWA：<code>manifest.json</code> の <code>start_url</code> + <code>twa-manifest.json</code></td><td>修正担当 chat の Claude</td></tr>
 <tr><td>3</td><td>AAB ビルド + 署名</td><td>大下（Android Studio）または PWABuilder で再生成</td></tr>
 <tr><td>4</td><td>Google Play Console にアップロード（クロテ Alpha トラック）<br>★buntyan 様提供の PDF 手順書通り（§6-2 参照）</td><td>大下</td></tr>
 <tr><td>5</td><td>新リリースを審査に送信</td><td>大下</td></tr>
@@ -335,7 +335,7 @@ buntyan 様が「どちらのアプリもはじめるボタンを押しても、
 <tr><th>項目</th><th>値</th></tr>
 <tr><td>パッケージ名</td><td><code>com.tamjump.onetouch</code></td></tr>
 <tr><td>誤った URL</td><td><code>https://e-app.tamjump.com</code></td></tr>
-<tr><td>正しい URL</td><td><code>https://tyaruze-app.tamjump.com</code></td></tr>
+<tr><td>正しい URL</td><td><code>https://tyaruze-app.115en.com</code></td></tr>
 <tr><td>onetouch_app リポジトリ</td><td><code>https://github.com/TAmJump/onetouch_app</code>（Private）</td></tr>
 <tr><td>onetouch_app の中身</td><td>Web 側（HTML/JS）+ Cloudflare Worker のみ。<strong>Android Studio プロジェクトは別の場所にある可能性大</strong></td></tr>
 <tr><td>assetlinks.json SHA-256</td><td><code>C1:EF:CF:C5:4F:01:88:26:6D:21:A8:47:6B:9A:F9:1A:D2:78:AB:DA:7E:BC:04:0B:D1:0B:83:ED:CC:3B:00:E2</code></td></tr>
@@ -344,7 +344,7 @@ buntyan 様が「どちらのアプリもはじめるボタンを押しても、
 <h3>7-2. 修正方式の特定（要確認）</h3>
 <p>Android アプリの実装方式を大下に確認すること：</p>
 <ol>
-<li><strong>Android Studio Native Project</strong>：<code>MainActivity.java</code> / <code>.kt</code> の <code>webView.loadUrl("https://e-app.tamjump.com")</code> を <code>"https://tyaruze-app.tamjump.com"</code> に置換</li>
+<li><strong>Android Studio Native Project</strong>：<code>MainActivity.java</code> / <code>.kt</code> の <code>webView.loadUrl("https://e-app.tamjump.com")</code> を <code>"https://tyaruze-app.115en.com"</code> に置換</li>
 <li><strong>PWABuilder / Bubblewrap（TWA）</strong>：<code>twa-manifest.json</code> の <code>host</code> および <code>startUrl</code> を修正 + onetouch_app/manifest.json の <code>start_url</code> 修正</li>
 <li><strong>その他</strong>：大下確認</li>
 </ol>
